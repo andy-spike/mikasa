@@ -1,0 +1,194 @@
+{
+  "title": "Mikasa's visual world",
+  "question": "Round 2. The roll assigned The Reading Room. Keep it, take an alternate, the pick, the canon, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Reading Room",
+      "kicker": "THE ROLL",
+      "lineage": "the members' library reading room after hours: brass lamps, deep green leather, hushed shelves",
+      "thesis": "Studying in a great library at night: your course is an open volume on the desk, the room stays quiet around it. It refuses the card-dashboard SaaS look and the gamified app look at once.",
+      "palette": [
+        "#20261f",
+        "#f1ead9",
+        "#c9a227",
+        "#6e2b2b",
+        "#23282c"
+      ],
+      "materials": [
+        "bottle-green leather and vellum",
+        "brass fittings and pencilled marginalia"
+      ],
+      "viewport": "The desk holds one open volume at reading scale: the course, its contents page showing Modules as chapter heads and Lessons as numbered entries. Completed entries carry an inked date stamp, the next carries a brass marker. The Tutor annotates in pencil in the outer margin; the Tailor proposes a re-catalogued page you approve before it is bound in.",
+      "risk": "Heritage kitsch if leather, brass, and stamps are costume instead of structure; also flirts with the cream-plus-serif default the category overuses, so the grammar has to carry the difference.",
+      "raised": [
+        {
+          "from": "Seven-segment clock",
+          "raise": "Absence is drawn as deliberately as light: lessons not yet generated sit as ruled ghost entries, visible empty slots in the contents."
+        },
+        {
+          "from": "Modular identity system",
+          "raise": "One invisible module disciplines every placement, so a Tailor rearrangement re-flows the page without breaking it."
+        },
+        {
+          "from": "Tensegrity column",
+          "raise": "Inactive furniture drops to ash gray while structure holds; nothing ever disappears, it de-tensions."
+        },
+        {
+          "from": "ASCII render",
+          "raise": "Tone comes from ink density, not color: progress shades the page like pressure on a pencil, not badges."
+        }
+      ],
+      "signature": "Finishing an Exercise stamps the entry with the date, as a library due-stamp settling into the paper; the chapter head recounts its entries in small caps."
+    },
+    {
+      "id": "model-pick",
+      "label": "The Night Plot",
+      "kicker": "IMPECCABLE'S PICK",
+      "lineage": "a navigation chart table under red night light",
+      "thesis": "Learning as plotting a passage: the Goal is the destination, Modules are legs, Lessons are waypoints, and your progress is drawn onto the chart as you travel.",
+      "palette": [
+        "#10151a",
+        "#e8e2d2",
+        "#c1272d",
+        "#7f8fa0",
+        "#2c3a45"
+      ],
+      "materials": [
+        "chart paper under instrument red",
+        "pencilled rhumb lines and soundings"
+      ],
+      "viewport": "The course chart spans the workspace: a drawn route from origin to destination port, legs labeled with module names, waypoints as lesson marks. Red instrument light keeps the room dark; the leg you are on burns brightest.",
+      "risk": "Nautical costume on a landlocked product; the route drawing has to do real navigational work or it is a themed progress bar."
+    },
+    {
+      "id": "challenger-transit",
+      "label": "Midnight Transit",
+      "verdict": "competitive",
+      "lineage": "metropolitan rail diagrams as midnight-blue enamel murals",
+      "thesis": "The course as a transit network: Modules are colored lines, Lessons are stations, the Goal is the destination terminus, and interchanges are where topics connect.",
+      "palette": [
+        "#16204a",
+        "#f5f2ea",
+        "#e8392a",
+        "#f2b705",
+        "#3f7f3f"
+      ],
+      "materials": [
+        "midnight-blue enamel",
+        "porcelain station ticks",
+        "45-and-90-degree line discipline"
+      ],
+      "viewport": "The course network fills the workspace on midnight-blue enamel: your line lit brightest, traveled stations filled, the destination named at the terminus.",
+      "case": "Nearly beats the room: the destination-first grammar matches Goal-shaped courses exactly, and midnight blue stays calm. It loses identification narrowly; libraries are the learner's own world, enamel murals are a commute they admire.",
+      "risk": "Line-color saturation hard to keep quiet; weak for long-form reading, which needs a page, not a map.",
+      "hero": "https://impeccable.style/worlds/cards/wayfinding-cartography-signage-midnight-transit-diagram-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/wayfinding-cartography-signage-midnight-transit-diagram.webp"
+    },
+    {
+      "id": "challenger-cyclorama",
+      "label": "The Cyc",
+      "verdict": "competitive",
+      "lineage": "theater cyclorama lit from black night through cobalt and rose to white day",
+      "thesis": "The workspace as a lit stage wall: depthless dark ground, a low horizon band carrying structure, and each finished module brings the scene one phase closer to day.",
+      "palette": [
+        "#0a0c10",
+        "#1f4a8c",
+        "#d98a9e",
+        "#f5f1e8",
+        "#5b6470"
+      ],
+      "materials": [
+        "seamless cyclorama light",
+        "lighting-plot stencil caps"
+      ],
+      "viewport": "Content sits in horizontal horizon bands stacked dark to light; the lesson you are reading sits in the fully lit band, the untouched course still in black below.",
+      "case": "Holds identification through the evening-to-day arc matching a learner's own progress, but state-as-light alone fails clarity: light phases are labeled, never color-only, and reading needs firmer edges than a gradient wall.",
+      "risk": "Atmosphere outrunning legibility; long prose on a lit cyc tires the eye.",
+      "hero": "https://impeccable.style/worlds/cards/stagecraft-theater-lighting-cyclorama-dawn-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/stagecraft-theater-lighting-cyclorama-dawn.webp"
+    },
+    {
+      "id": "challenger-segment",
+      "label": "Seven-Segment",
+      "verdict": "declined",
+      "lineage": "bedside clocks, price totems, scoreboard panels",
+      "palette": [
+        "#0d0d0d",
+        "#e03a2a",
+        "#3a3a3a"
+      ],
+      "case": "Fuses badly: a fixed cell mask counts well but cannot carry prose, and its registers are appliance, not study.",
+      "kept": "Absence drawn as deliberately as light: unlit ghost cells for what remains."
+    },
+    {
+      "id": "challenger-ascii",
+      "label": "ASCII Render",
+      "verdict": "declined",
+      "lineage": "live scenes rendered as typewriter characters",
+      "palette": [
+        "#0b0f0b",
+        "#5fd07a",
+        "#c8ffc8"
+      ],
+      "case": "Fuses badly: glyph-density imagery is a medium flex with no purchase on curriculum structure.",
+      "kept": "Tone through density, not color."
+    },
+    {
+      "id": "challenger-dumbar",
+      "label": "Modular Identity",
+      "verdict": "declined",
+      "lineage": "Dutch postmodern identity systems: photos and saturated bars snapped to a module",
+      "palette": [
+        "#d8d8d8",
+        "#e5137d",
+        "#009fda",
+        "#ffd200"
+      ],
+      "case": "Fuses badly: loud block grammar sits against the calm-polished brief at every step.",
+      "kept": "The invisible module: everything snaps, so rearrangement never breaks composition."
+    },
+    {
+      "id": "challenger-tensegrity",
+      "label": "Tensegrity Column",
+      "verdict": "declined",
+      "lineage": "carbon-rod tensegrity sculptures breathing under red cord",
+      "palette": [
+        "#d9d6cf",
+        "#26282a",
+        "#b03a2e"
+      ],
+      "case": "Fuses badly: force-network topology is engineer poetry with no learner picture.",
+      "kept": "Slack members go ash gray while structure holds."
+    }
+  ],
+  "reroll": {
+    "registers": [
+      "plain",
+      "safer",
+      "bolder"
+    ]
+  },
+  "buildPath": {
+    "value": "code",
+    "toggle": false
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "What every focused learning tool ships: clean neutral surface, workhorse sans, one blue accent, card dashboard. Executed impeccably.",
+    "palette": [
+      "#ffffff",
+      "#111827",
+      "#2563eb",
+      "#6b7280"
+    ],
+    "materials": [
+      "clean grid",
+      "soft elevation"
+    ],
+    "viewport": "Sidebar with course list, content cards on a neutral ground, primary button in accent blue.",
+    "risk": "Indistinguishable from the competition by design; that is the point of the canon."
+  },
+  "steer": true
+}

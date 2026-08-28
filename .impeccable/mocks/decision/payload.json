@@ -1,0 +1,196 @@
+{
+  "title": "Mikasa's visual world",
+  "question": "The roll assigned The Night Ledger. Keep it, take an alternate, the pick, the canon, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Night Ledger",
+      "kicker": "THE ROLL",
+      "lineage": "double-entry ledger books and feint-ruled account paper",
+      "thesis": "The course is a keeper's ledger on a dark desk at night: ruled entries, dated progress, a red margin line. It refuses the floating-cards dashboard every learning app ships.",
+      "palette": [
+        "#161a19",
+        "#eef0e6",
+        "#1c2126",
+        "#9fb8cc",
+        "#b03a2e"
+      ],
+      "materials": [
+        "feint-ruled paper on a dark desk",
+        "ink stamps and correction slips"
+      ],
+      "viewport": "Left rail lists Modules as the ledger's account heads. The page is one ruled sheet: numbered Lesson entries with one-line summaries, minutes in tabular figures at the right edge. A single band above the rules names the next entry. The Tutor annotates in a narrow margin column; the Tailor proposes changes as correction slips laid over the page.",
+      "risk": "Reads bookkeeper-dry if rules and stamps are decoration instead of structure; the grammar must do real work.",
+      "raised": [
+        {
+          "from": "Iridescent cloud edge",
+          "raise": "The text field stays achromatic; state color lives only in rules, stamps, and edge marks, never in the prose."
+        },
+        {
+          "from": "Terminal wayfinding",
+          "raise": "One message per band: a persistent next-up band carries the single next entry and its minutes, nothing else."
+        },
+        {
+          "from": "CRT arcade",
+          "raise": "A strict accent law: posting red is reserved for exactly one meaning, the next entry and the margin line, never decoration."
+        },
+        {
+          "from": "Racing league",
+          "raise": "Entry numerals set oversized and confident, livery-scale, as wayfinding inside the page."
+        }
+      ],
+      "signature": "Marking an Exercise done stamps the entry with an inked ENTERED mark that settles slightly rotated; the module subtotal rolls to recount in tabular figures."
+    },
+    {
+      "id": "model-pick",
+      "label": "The Study Lamp",
+      "kicker": "IMPECCABLE'S PICK",
+      "lineage": "the night desk under a single task lamp",
+      "thesis": "One warm light in a dark room. The active lesson lives in the pool of light; everything not in use recedes into shadow. Chrome almost disappears.",
+      "palette": [
+        "#191613",
+        "#f5ecd9",
+        "#c9a86a",
+        "#8a8478"
+      ],
+      "materials": [
+        "warm lamplight on dark wood",
+        "brass fittings"
+      ],
+      "viewport": "The workspace sits in near-dark; the current Lesson panel is the lit pool at reading scale, module rail and tutor dimmed at the pool's edge until hovered.",
+      "risk": "It is the dark-mode-with-warm-accent many thoughtful products land on, and dimmed-by-default chrome risks low-contrast accessibility traps.",
+      "case": "My top-ranked grounded candidate before the roll; assigned beat it into second on the same two axes."
+    },
+    {
+      "id": "challenger-darkroom",
+      "label": "The Safelight Bay",
+      "verdict": "competitive",
+      "lineage": "photographic printing darkrooms under amber safelight",
+      "thesis": "Course generation as development chemistry: the Outline is the exposure, each Lesson emerges like a print in the tray, deliberate and timed.",
+      "palette": [
+        "#171310",
+        "#ffb100",
+        "#f3e6c4",
+        "#bdbdbd"
+      ],
+      "materials": [
+        "amber safelight wash",
+        "silver-gelatin grays"
+      ],
+      "viewport": "The workspace glows amber on near-black; the lesson you are reading is the print developing, text emerging from gray ghost.",
+      "case": "Fuses well onto the two-phase generation, and amber suits the evening scene. Holds audience identification but loses clarity: its irreversible chemistry contradicts the product's per-change undo and mutable courses, the one thing ADR 0001 pins.",
+      "risk": "Total amber wash fights the calm-polished register and tires over long reading sessions.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-darkroom-safelight-bay-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/signals-instruments-darkroom-safelight-bay.webp"
+    },
+    {
+      "id": "challenger-wayfinding",
+      "label": "Terminal Signs",
+      "verdict": "competitive",
+      "lineage": "international airport sign systems, Schiphol yellow",
+      "thesis": "Learning as a signed route: every screen shows only the next decision, with the destination and the minutes it will take.",
+      "palette": [
+        "#ffcc00",
+        "#0b0b0b",
+        "#666666",
+        "#ffffff"
+      ],
+      "materials": [
+        "saturated yellow panels",
+        "black humanist sans",
+        "white pictograms"
+      ],
+      "viewport": "A yellow band hangs over the workspace: the next Lesson, left arrow, twelve minutes. Corridor scrolled past, the band stays.",
+      "case": "Unbeatable task clarity and everyone knows the grammar. Holds product clarity outright, loses audience identification: terminal urgency is the opposite of an evening desk.",
+      "risk": "High-alert energy in every surface; hard to make calm without breaking the system.",
+      "hero": "https://impeccable.style/worlds/cards/wayfinding-cartography-signage-terminal-yellow-wayfinding-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/wayfinding-cartography-signage-terminal-yellow-wayfinding.webp"
+    },
+    {
+      "id": "challenger-cloud",
+      "label": "Cloud Edge Spectra",
+      "verdict": "declined",
+      "lineage": "iridescent cloud edges diffracting sunlight",
+      "palette": [
+        "#f7f9fa",
+        "#9fd8c4",
+        "#e8b4c8",
+        "#c3b6e2"
+      ],
+      "case": "Fuses poorly: pastel iridescence reads decorative in a work surface and has no answer for progress or structure.",
+      "kept": "Color banished from the text field; state color only at hairline edges."
+    },
+    {
+      "id": "challenger-miura",
+      "label": "Miura Deployable",
+      "verdict": "declined",
+      "lineage": "Miura-fold orbital deployable sheets",
+      "palette": [
+        "#f2f2ef",
+        "#c9a227",
+        "#8fa8b8",
+        "#26282a"
+      ],
+      "case": "Fuses partially: the folding sheet mirrors outline-then-deploy, but tessellated panels fight long-form reading.",
+      "kept": "Linked propagation: one change visibly moves everything creased to it."
+    },
+    {
+      "id": "challenger-crt",
+      "label": "Arcade Phosphor",
+      "verdict": "declined",
+      "lineage": "CRT arcade cabinets and sprite palettes",
+      "palette": [
+        "#0d0d0d",
+        "#37c26a",
+        "#ffd23f",
+        "#e8e8e8"
+      ],
+      "case": "Fuses badly: phosphor glow and arcade energy sit against the brief's explicit no-gamification line.",
+      "kept": "Palette law: accents rationed by rule, states addressable in code."
+    },
+    {
+      "id": "challenger-racing",
+      "label": "Racing League",
+      "verdict": "declined",
+      "lineage": "anti-aliased racing game team liveries",
+      "palette": [
+        "#2b2f33",
+        "#ff6a00",
+        "#d6f212",
+        "#f4f4f4"
+      ],
+      "case": "Fuses badly: velocity grammar needs momentum the product does not have; learning pace is the learner's.",
+      "kept": "Numerals with conviction: numbers at livery scale, confident and unapologetic."
+    }
+  ],
+  "reroll": {
+    "registers": [
+      "plain",
+      "safer",
+      "bolder"
+    ]
+  },
+  "buildPath": {
+    "value": "code",
+    "toggle": false
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "What every focused learning tool ships: clean neutral surface, workhorse sans, one blue accent, card dashboard. Executed impeccably.",
+    "palette": [
+      "#ffffff",
+      "#111827",
+      "#2563eb",
+      "#6b7280"
+    ],
+    "materials": [
+      "clean grid",
+      "soft elevation"
+    ],
+    "viewport": "Sidebar with course list, content cards on a neutral ground, primary button in accent blue.",
+    "risk": "Indistinguishable from the competition by design; that is the point of the canon.",
+    "case": "Played straight, at full craft, if you want Mikasa to sit alongside Linear and Notion with no argument."
+  },
+  "steer": true
+}
