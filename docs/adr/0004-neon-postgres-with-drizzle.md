@@ -1,0 +1,3 @@
+# Neon Postgres with Drizzle
+
+Courses, users, waitlist entries, progress, and chat history are relational and per-user, so Postgres. Neon gives serverless Postgres with native Vercel integration and connection pooling. Drizzle over Prisma because it's lighter at runtime, SQL-shaped, and its migrations are plain SQL files in the repo, which suits a Next.js app deployed on Vercel with a serverless driver. Rejected: Supabase (bundles auth we're not using into the data layer), Turso/SQLite (weaker fit for multi-user relational data), Prisma (heavier runtime, less comfortable for schema-as-TypeScript).

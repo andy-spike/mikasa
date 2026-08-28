@@ -1,0 +1,3 @@
+# Two-phase generation with a Tailor agent
+
+Generating a whole course in one shot produces bad curricula with no checkpoint: the user pays for 40 lessons before discovering the outline is wrong. We generate the Outline first (Default model), let the user shape it with a manual editor and a chat-based Tailor, then generate each Lesson on demand (Strong model, one Exercise per Lesson stepping toward the Goal). After generation the course stays mutable: the Tailor proposes change plans the user approves, with per-change undo that restores completion state. The Tailor runs on the Default model with an opt-in switch to the Strong model for large changes.

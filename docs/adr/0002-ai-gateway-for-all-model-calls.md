@@ -1,0 +1,3 @@
+# All model calls through the Vercel AI Gateway
+
+We need multiple providers' models (outline/lesson split, tutor, search grounding) and per-token billing without vendor markup. The Vercel AI Gateway gives us one API key, one abstraction, and per-job model swaps via string model IDs in the AI SDK v7, which routes through the gateway by default. Grounding uses the gateway's model-agnostic search tools (Exa or Perplexity) rather than native provider web search, so the search mechanism stays decoupled from the model choice. Rejected: direct provider SDKs (more keys, no unified billing) and other aggregators like OpenRouter (no advantage, splits the deployment story since we're on Vercel anyway).
