@@ -1,3 +1,3 @@
 # Neon Postgres with Drizzle
 
-Courses, users, waitlist entries, progress, and chat history are relational and per-user, so Postgres. Neon gives serverless Postgres with native Vercel integration and connection pooling. Drizzle over Prisma because it's lighter at runtime, SQL-shaped, and its migrations are plain SQL files in the repo, which suits a Next.js app deployed on Vercel with a serverless driver. Rejected: Supabase (bundles auth we're not using into the data layer), Turso/SQLite (weaker fit for multi-user relational data), Prisma (heavier runtime, less comfortable for schema-as-TypeScript).
+Courses, Course revisions, Completion, Sources, and Tutor and Tailor histories are relational and private to each Learner, so Mikasa uses Neon Postgres. Drizzle keeps the schema in TypeScript and migrations as SQL files. Lesson fragments use pgvector in the same database, starting with exact search and adding an approximate index only after measurements require one.

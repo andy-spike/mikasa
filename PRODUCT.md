@@ -4,61 +4,120 @@
 
 ## Platform
 
-web
+Web.
 
-## Users
+## Learners
 
-General self-learners who want to go from fundamentals to a concrete outcome in a topic, without stitching a curriculum together out of chat conversations. Developers learning an SDK are one example, not the whole audience.
+Mikasa is for independent Learners who want to reach a concrete Goal without assembling a curriculum from unrelated chat answers. Developers learning an SDK are one example, not the whole audience.
 
-## Product Purpose
+## Product purpose
 
-Mikasa generates structured courses from a Topic and a Goal. The learner shapes the Outline before content is generated; approving it generates the whole Course in one pass, and the learner then works through Modules and Lessons toward the Goal, with one self-marked Exercise per Lesson. Success is a learner reaching their stated Goal through the course rather than ad-hoc chat sessions.
+Mikasa creates a cohesive Course from a Topic, Goal, Depth, Background, Course Language, and Grounding choice. The Learner shapes and approves the Outline before Mikasa generates the complete Course. The Learner then works through its Lessons, completes one Exercise per Lesson, asks the Tutor for help, and uses the Tailor to propose changes.
 
 ## Positioning
 
-Two-phase generation with a learner-shaped checkpoint: the Outline is generated cheaply and edited (manually or via the Tailor) before any Lesson content is paid for, and approving it writes the whole Course in one pass, every Lesson carrying an Exercise that steps toward the learner's specific Goal. A chat-first tool cannot truthfully claim a structured, editable curriculum scoped to an outcome.
+The Outline is a checkpoint before the expensive work starts. After approval, Mikasa generates and reviews the Course as one unit instead of treating Lessons as unrelated prompts. The result should read as one designed Course with a shared Goal, sequence, vocabulary, examples, and final Exercise.
 
-## Operating Context
+## Operating context
 
-- Solo self-paced learning on the web; no cohort or instructor in the loop.
-- Courses are privately owned by the user who created them.
-- Signup is open: anyone with a Google account can sign in and start a Course. The Waitlist that previously gated account creation was removed on 31 AUG 2026.
-- Usage model: generate the Outline, shape it, approve it to generate the whole Course in one pass, keep the course mutable afterwards (Tailor change plans with per-change undo).
+- Learning is private, self-paced, and web-based. There is no cohort or instructor.
+- Registration is open through Google OAuth. The first sign-in creates the account. There is no waitlist or email and password flow.
+- A Course may take several minutes to generate. The Learner sees durable progress and can return later.
+- The current Course stays readable while Mikasa prepares an approved Course revision.
 
-## Capabilities and Constraints
+## Course creation
 
-- Two-phase generation: Outline first (Default model), then every Lesson in one cohesive pass on approval (Strong model, one Exercise per Lesson). Lessons are never generated on demand; a generated Course has no missing Lesson.
-- Tailor agent applies structure/content changes on instruction; Tutor answers questions grounded in generated Lesson content plus web search and never changes the course.
-- Grounding (live web search via the AI Gateway) is on by default and toggleable per course at creation.
-- Depth is the learner's choice at creation: just enough to reach the Goal, solid working knowledge, or deep mastery; Background is an optional statement of prior knowledge that lets the Outline skip familiar fundamentals.
-- Model access runs entirely through the Vercel AI Gateway; all model calls route through it (ADR 0002).
-- Auth is BetterAuth with Google OAuth as the only provider (ADR 0003); email+password was dropped on 31 AUG 2026. Data in Neon Postgres via Drizzle (ADR 0004); deployed on Vercel.
-- Terminology is pinned in CONTEXT.md (Topic, Goal, Course, Module, Lesson, Exercise, Outline, Depth, Background, Grounding, Tutor, Tailor, Default model, Strong model); avoid the listed synonyms.
+- Topic and titles accept at most 200 characters.
+- Goal and summaries accept at most 500 characters.
+- Background accepts at most 2,000 characters.
+- Course Language is required and cannot change. Initial values are English, Spanish, French, German, and Portuguese.
+- Grounding is on by default and can be turned off when the Course is created.
+- Depth controls the generated Outline bounds. Reach uses 3 to 4 Modules with 2 to 3 Lessons each. Working knowledge uses 5 to 7 Modules with 3 to 4 Lessons each. Mastery uses 8 to 10 Modules with 4 to 5 Lessons each.
+- Manual Outline changes are not restricted to those generated bounds.
 
-## Brand Commitments
+## Course design and generation
+
+- Mikasa creates a private Course specification and a visible Outline from the Course inputs.
+- The Course specification links the Goal, final Exercise, learning dependencies, shared examples, Lesson responsibilities, and Sources.
+- The Learner can change the Outline manually, through the Tailor, or with both before approval. Each change makes the Course specification stale until approval reconciles it.
+- Outline approval starts full Course generation.
+- Mikasa generates Lessons in dependency order, one Module at a time.
+- Every Lesson has an explanation, worked example, recall prompt, self-explanation prompt, one Exercise, and a bridge to the next Lesson.
+- Mikasa reviews the complete Course for structure, factual and code accuracy, and learning design.
+- Review findings trigger targeted corrections. Mikasa runs at most two correction rounds.
+- Coding Courses run executable examples in an isolated sandbox before publication.
+- The Course becomes readable only when every Lesson and review has passed.
+- A failed build retries only failed work and preserves valid drafts.
+- Lessons and Tutor answers include inline links to relevant Sources.
+
+## Completion
+
+- The Learner marks the Exercise done to complete a Lesson.
+- The Course is complete when every Lesson is complete.
+- Added Lessons start incomplete.
+- Renaming, moving, or rewriting Lesson prose preserves Completion.
+- Rewriting an Exercise resets that Lesson's Completion.
+- Splitting or merging Lessons resets Completion for the affected Lessons.
+- Removing a Lesson saves its Completion with the removed content.
+- Undo restores the Completion saved with the previous Course revision.
+
+## Tutor
+
+- The Tutor is attached to a Course and persists its full conversation.
+- It receives the current Lesson, Outline, a compact Course specification, recent messages, and relevant Lesson fragments.
+- It can search the Course and the web when needed.
+- It streams responses through the AI SDK agent and message interfaces.
+- It cannot change the Course.
+- A failed or disconnected turn can be retried. Mikasa stores only complete Tutor responses.
+
+## Tailor
+
+- The Tailor persists its full conversation and proposes a Change plan.
+- The manual editor supports the same structure changes before and after publication. Post-publication manual changes use the same Change plan process as Tailor changes.
+- A Change plan can add, remove, rename, move, split, or merge Modules and Lessons. It can also rewrite Lesson prose or an Exercise.
+- The Learner accepts or discards each proposed change.
+- Mikasa applies accepted changes together.
+- Before full Course generation, accepted structural changes update the Outline directly.
+- After publication, accepted changes create and review a staged Course revision before an atomic publication.
+- Each accepted change can be undone independently when later changes have not touched the same Course parts.
+- An optimistic Course version rejects conflicting edits.
+
+## Model access
+
+- All model calls use the AI SDK through OpenRouter.
+- Mikasa chooses every model and reasoning setting. The Learner never selects a model.
+- OpenRouter provider fallbacks are allowed, requested parameters are required, and provider data collection is denied.
+- The application relies on the OpenRouter budget instead of adding daily per-Learner quotas.
+
+## Brand commitments
 
 The name "Mikasa" is fixed.
 
-The user has a standing preference for the conventional product-application register, named against Linear and Notion: calm, productive, simple yet powerful. Their craft level is the bar. Recorded 29 AUG 2026 when the user took the familiar register in a direction round and rejected the preceding literary, skeuomorphic direction outright. Future surfaces inherit this unless the user changes it.
+The Graphite Workspace in `DESIGN.md` is the authoritative interface direction. It uses a calm, conventional application register inspired by products such as Linear and Notion. The earlier literary Reading Room direction was rejected.
 
-The product ships two grounds, dark and light, and neither is the afterthought. Recorded 30 AUG 2026 when the user asked for a light theme alongside the graphite one. A learner reads a Lesson for an hour at a time; which ground they read it on is their call, and the operating system's until they make one.
+Mikasa ships graphite and paper grounds. Neither is secondary. One accent marks the Lesson the Learner is up to, and the interface uses the design tokens, layout rules, typography, and component behavior recorded in `DESIGN.md`.
+
+The frontend mockup is the product interface, not a disposable prototype. Backend work must replace authored demo state with real behavior without redesigning the screens or weakening their interaction and accessibility rules.
 
 No other voice or asset commitments are binding yet.
 
-## Evidence on Hand
+## Product principles
 
-- Domain vocabulary: CONTEXT.md at the repo root.
-- Architecture decisions: docs/adr/0001 through 0004.
-- No real content, testimonials, case studies, or press exists. Future work must not fabricate learner stories, benchmarks, or usage claims.
+- The Goal shapes the Outline, Lesson sequence, Exercises, and final result.
+- The Learner approves the Outline before full Course generation starts.
+- The Course publishes as a cohesive unit, not as a growing set of unrelated Lessons.
+- The current Course remains readable while approved changes are prepared.
+- The Tutor informs. The Tailor proposes changes. Only Learner approval changes the Course.
+- Backend implementation preserves the Graphite Workspace and connects its existing states to real data.
 
-## Product Principles
+## Evidence on hand
 
-- The learner's Goal shapes the whole course, from Outline scope to the final Exercise.
-- Never spend generation budget before the learner has approved the shape of what they'll get.
-- The course stays mutable after generation; progress survives changes (per-change undo).
-- Lessons read like a knowledgeable friend explaining, in the easygoing voice CONTEXT.md implies, backed by runnable code where the Topic calls for it.
-- The Tutor informs, the Tailor changes; the two never blur.
+- Domain vocabulary: `CONTEXT.md`.
+- Architecture decisions: `docs/adr/0001` through `docs/adr/0008`.
+- Course-generation research: `docs/research/cohesive-course-generation.md`.
+- Interface direction: `DESIGN.md` and the current frontend mockup.
+- There are no real Learner stories, benchmarks, testimonials, or usage claims. Future work must not invent them.
 
-## Accessibility & Inclusion
+## Accessibility and inclusion
 
-No product-specific requirement established yet. Standard web accessibility applies as a baseline; record a target standard (e.g. WCAG 2.2 AA) if the user commits to one.
+Standard web accessibility is the current baseline. `DESIGN.md` records the current interface-specific accessibility rules.

@@ -1,61 +1,81 @@
 # Mikasa
 
-Mikasa generates structured courses from a topic and a goal, so a learner goes from fundamentals to a concrete outcome without piecing it together from chat conversations.
+Mikasa creates a cohesive Course for one Topic and Goal. It gives a Learner a guided route from their Background to a concrete result.
 
 ## Language
 
+**Learner**:
+The person who owns and studies a Course.
+_Avoid_: user, student, customer
+
 **Topic**:
-The subject a learner wants to learn about, e.g. "the Vercel AI SDK".
+The subject a Learner wants to learn, such as "the Vercel AI SDK".
 _Avoid_: subject, theme
 
 **Goal**:
-The outcome the learner wants by the end, e.g. "build my own AI chat app". Shapes where the curriculum ends and what the final exercise asks for.
+The result the Learner wants to produce by the end of a Course, such as "build my own AI chat app".
 _Avoid_: objective, aim, purpose
 
 **Course**:
-A generated curriculum for one Topic and one Goal, organized into Modules. Owned privately by the user who created it.
+A private curriculum for one Topic and Goal. It contains ordered Modules and Lessons.
 _Avoid_: track, path, learning path
 
-**Module**:
-A group of Lessons covering one area of the Topic, e.g. "streaming responses".
-_Avoid_: chapter, section
-
-**Lesson**:
-One unit of study: prose explanation in easygoing language, runnable code examples, and one Exercise. The unit of progress tracking.
-_Avoid_: page, article, unit
-
-**Exercise**:
-The single task at the end of a Lesson that steps toward the Goal. Self-marked as done by the learner.
-_Avoid_: assignment, quiz, task
-
-**Outline**:
-The skeleton of a Course: its Modules and Lesson titles with one-line summaries. The learner shapes it before Lesson content is generated, by editing it manually, by talking to the Tailor, or both.
-_Avoid_: syllabus, curriculum, table of contents
+**Course Language**:
+The language used for a Course and its conversations. It does not change after Course creation.
+_Avoid_: locale, output language
 
 **Depth**:
-The learner's choice of how far past the Goal to go: just enough to reach it, solid working knowledge, or deep mastery. Maps internally to module and lesson bounds the learner never sees.
+How far a Course goes beyond its Goal: reach the Goal, gain working knowledge, or reach mastery.
 _Avoid_: size, level, length
 
 **Background**:
-The optional statement of what the learner already knows, given at creation so the Outline can skip familiar fundamentals.
+What the Learner already knows before starting a Course.
 _Avoid_: skill level, experience, prerequisites
 
 **Grounding**:
-Whether generation consults live web search or draws on the model's knowledge alone. On by default, toggleable per course at creation.
+Whether Course creation uses current Sources beyond the model's built-in knowledge. The Learner chooses it when creating a Course.
 _Avoid_: research, browsing, RAG
 
+**Course specification**:
+The private plan that links the Goal, Outline, Lessons, Exercises, and Sources before Lesson content is written. A Learner does not edit it directly.
+_Avoid_: curriculum plan, generation plan, hidden outline
+
+**Outline**:
+The visible structure of a Course. It contains Module and Lesson titles with short summaries.
+_Avoid_: syllabus, curriculum, table of contents
+
+**Module**:
+An ordered group of Lessons that covers one area of a Topic.
+_Avoid_: chapter, section
+
+**Lesson**:
+One unit of study with an explanation, worked example, recall prompt, self-explanation prompt, Exercise, and bridge to the next Lesson.
+_Avoid_: page, article, unit
+
+**Exercise**:
+The single practice activity at the end of a Lesson. Completing it moves the Learner toward the Goal.
+_Avoid_: assignment, quiz, task
+
+**Source**:
+An external reference used to support a Course or a Tutor answer.
+_Avoid_: citation, search result, evidence item
+
 **Tutor**:
-The conversation attached to a Course, grounded in its generated Lesson content plus web search. Answers questions, does not change the Course.
+The conversation attached to a Course. It answers questions using Course content and web search but cannot change the Course.
 _Avoid_: course chat, assistant, sidebar
 
 **Tailor**:
-The agent that applies requested changes to a Course's structure or Lesson content on the learner's instruction. Distinct from the Tutor.
+The conversation that proposes changes to a Course. It cannot apply a change without the Learner's approval.
 _Avoid_: editor, editor agent, course chat
 
-**Default model**:
-The capable mid-tier model used for most generation jobs: the Outline, the Tutor, and the Tailor. Selected by default wherever a model runs.
-_Avoid_: mid-tier model, cheap model
+**Change plan**:
+An ordered set of Course changes prepared by the Tailor or the manual editor. The Learner reviews the changes before Mikasa applies the accepted set together.
+_Avoid_: patch, edit list, mutation plan
 
-**Strong model**:
-The most capable model, used for Lesson generation and available as an opt-in upgrade in Tailor mode for large course changes.
-_Avoid_: premium model
+**Course revision**:
+A complete version of a Course that can be prepared while the current version remains readable, then published as one change.
+_Avoid_: snapshot, draft version, content version
+
+**Completion**:
+The Learner's record that an Exercise is done. A Lesson is complete when its Exercise is done, and a Course is complete when every Lesson is complete.
+_Avoid_: progress flag, done state
