@@ -1,130 +1,379 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
+/* The theme is a class on <html>, resolved before first paint in layout.tsx,
+   so `dark:` follows the class rather than the OS alone. */
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-heading);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
+/* ── Graphite Workspace ────────────────────────────────────────────────────
+   A working shell. Surfaces separate by luminance, never by border. One
+   accent, one meaning: the Lesson you are up to. Which Lesson is open is a
+   raised ground, never a colour. Every corner is square, and a row carries
+   the fewest facts that let the reader act on it.
+   Direction roll 21608bd1, re-roll 1, safer register, user-picked.
+
+   Two grounds, one system. Graphite runs four steps up from #0f1012; paper
+   runs four steps down from #ffffff. Every ink lands on the same contrast
+   floor in both: 5.08 / 4.63 for the two quiet text steps against the
+   topmost surface, 3.18 for the one mark that is a graphic and never text.
+   ------------------------------------------------------------------------ */
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.147 0.004 49.3);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.147 0.004 49.3);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.147 0.004 49.3);
-  --primary: oklch(0.214 0.009 43.1);
-  --primary-foreground: oklch(0.986 0.002 67.8);
-  --secondary: oklch(0.96 0.002 17.2);
-  --secondary-foreground: oklch(0.214 0.009 43.1);
-  --muted: oklch(0.96 0.002 17.2);
-  --muted-foreground: oklch(0.547 0.021 43.1);
-  --accent: oklch(0.96 0.002 17.2);
-  --accent-foreground: oklch(0.214 0.009 43.1);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0.005 34.3);
-  --input: oklch(0.922 0.005 34.3);
-  --ring: oklch(0.714 0.014 41.2);
-  --chart-1: oklch(0.868 0.007 39.5);
-  --chart-2: oklch(0.547 0.021 43.1);
-  --chart-3: oklch(0.438 0.017 39.3);
-  --chart-4: oklch(0.367 0.016 35.7);
-  --chart-5: oklch(0.268 0.011 36.5);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.986 0.002 67.8);
-  --sidebar-foreground: oklch(0.147 0.004 49.3);
-  --sidebar-primary: oklch(0.214 0.009 43.1);
-  --sidebar-primary-foreground: oklch(0.986 0.002 67.8);
-  --sidebar-accent: oklch(0.96 0.002 17.2);
-  --sidebar-accent-foreground: oklch(0.214 0.009 43.1);
-  --sidebar-border: oklch(0.922 0.005 34.3);
-  --sidebar-ring: oklch(0.714 0.014 41.2);
+  color-scheme: light;
+
+  /* surfaces, four steps down from paper */
+  --canvas: #ffffff;
+  --panel: #f7f8fa;
+  --raised: #edeff2;
+  --over: #e3e5e9;
+
+  /* hairlines. these divide, they do not decorate */
+  --hair: #e7e9ed;
+  --rule: #d3d7dd;
+
+  /* text. every step clears 4.5:1 on all four surfaces: worst cases are
+     14.1 / 7.62 / 5.08 / 4.63 against the palette's own ground */
+  --fg: #16181b;
+  --fg-2: #3e464c;
+  --fg-3: #586066;
+  --fg-dim: #5e666c;
+  /* graphics only, never text: meaning-bearing marks need 3:1, not 4.5:1 */
+  --mark: #788086;
+
+  /* the accent. it marks the Lesson you are up to, and nothing else */
+  --live: #0a7f5f;
+  --live-dim: #0f6b52;
+  --live-wash: rgba(10, 127, 95, 0.1);
+
+  /* the browser surfaces we still own */
+  --select: rgba(10, 127, 95, 0.18);
+  --thumb: #ccd0d6;
+  --thumb-hover: #aeb4bd;
+  --scroll-shade: rgba(22, 24, 27, 0.14);
+
+  /* the two grounds the shell does not own: what floats, and what it sits on */
+  --float: #ffffff;
+  --scrim: rgba(22, 24, 27, 0.44);
+  --lift:
+    0 18px 44px -12px rgba(22, 24, 27, 0.26),
+    0 3px 10px -3px rgba(22, 24, 27, 0.16);
+
+  /* spent only where a word already says the same thing */
+  --warn: #a75f06;
+  --bad: #b62a2a;
+
+  /* ~68 characters of Geist at 16px */
+  --measure: 36rem;
+
+  /* exponential ease-out; the shell never bounces */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 120ms;
+  --dur: 160ms;
+  --dur-slow: 240ms;
+
+  /* shadcn aliases, remapped onto the workspace. They read the semantic
+     tokens above, so the theme switch below moves them too. */
+  --background: var(--canvas);
+  --foreground: var(--fg);
+  --card: var(--panel);
+  --card-foreground: var(--fg);
+  --popover: var(--float);
+  --popover-foreground: var(--fg);
+  --primary: var(--live);
+  --primary-foreground: var(--canvas);
+  --secondary: var(--raised);
+  --secondary-foreground: var(--fg);
+  --muted: var(--raised);
+  --muted-foreground: var(--fg-3);
+  --accent: var(--raised);
+  --accent-foreground: var(--fg);
+  --destructive: var(--bad);
+  --border: var(--hair);
+  --input: var(--rule);
+  --ring: var(--live);
+
+  /* the shadcn Sidebar draws both rails; it reads its own set */
+  --sidebar: var(--panel);
+  --sidebar-foreground: var(--fg);
+  --sidebar-border: var(--hair);
+  --sidebar-accent: var(--raised);
+  --sidebar-accent-foreground: var(--fg);
+  --sidebar-ring: var(--live);
 }
 
+/* Graphite. The same system, four steps up from the dark instead of down
+   from the light: the sidebars still sit one step off the reading ground. */
 .dark {
-  --background: oklch(0.147 0.004 49.3);
-  --foreground: oklch(0.986 0.002 67.8);
-  --card: oklch(0.214 0.009 43.1);
-  --card-foreground: oklch(0.986 0.002 67.8);
-  --popover: oklch(0.214 0.009 43.1);
-  --popover-foreground: oklch(0.986 0.002 67.8);
-  --primary: oklch(0.922 0.005 34.3);
-  --primary-foreground: oklch(0.214 0.009 43.1);
-  --secondary: oklch(0.268 0.011 36.5);
-  --secondary-foreground: oklch(0.986 0.002 67.8);
-  --muted: oklch(0.268 0.011 36.5);
-  --muted-foreground: oklch(0.714 0.014 41.2);
-  --accent: oklch(0.268 0.011 36.5);
-  --accent-foreground: oklch(0.986 0.002 67.8);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.547 0.021 43.1);
-  --chart-1: oklch(0.868 0.007 39.5);
-  --chart-2: oklch(0.547 0.021 43.1);
-  --chart-3: oklch(0.438 0.017 39.3);
-  --chart-4: oklch(0.367 0.016 35.7);
-  --chart-5: oklch(0.268 0.011 36.5);
-  --sidebar: oklch(0.214 0.009 43.1);
-  --sidebar-foreground: oklch(0.986 0.002 67.8);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.986 0.002 67.8);
-  --sidebar-accent: oklch(0.268 0.011 36.5);
-  --sidebar-accent-foreground: oklch(0.986 0.002 67.8);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.547 0.021 43.1);
+  color-scheme: dark;
+
+  --canvas: #0f1012;
+  --panel: #16181b;
+  --raised: #1d2024;
+  --over: #24282e;
+
+  --hair: #24272c;
+  --rule: #32363d;
+
+  /* worst cases here are 15.7 / 7.58 / 5.09 / 4.61 */
+  --fg: #e7e9ec;
+  --fg-2: #b4bac3;
+  --fg-3: #9198a2;
+  --fg-dim: #8a9099;
+  --mark: #6e747e;
+
+  --live: #4fd1a5;
+  --live-dim: #2e8f72;
+  --live-wash: rgba(79, 209, 165, 0.1);
+
+  --select: rgba(79, 209, 165, 0.26);
+  --thumb: #2a2e34;
+  --thumb-hover: #3a4048;
+  --scroll-shade: rgba(0, 0, 0, 0.5);
+
+  --float: var(--over);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --lift:
+    0 18px 44px -12px rgba(0, 0, 0, 0.72),
+    0 3px 10px -3px rgba(0, 0, 0, 0.55);
+
+  --warn: #e5a050;
+  --bad: #e06c6c;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-over: var(--over);
+  --color-hair: var(--hair);
+  --color-rule: var(--rule);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-fg-dim: var(--fg-dim);
+  --color-mark: var(--mark);
+  --color-live: var(--live);
+  --color-live-dim: var(--live-dim);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-float: var(--float);
+  --color-scrim: var(--scrim);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Every corner in the product is square. The three steps stay named so a
+     call site still says which kind of thing it is, and so one edit here
+     would bring the ramp back if the world ever wanted it. */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--hair);
+    /* Named here and not only on :focus-visible, because `transition-colors`
+       covers outline-color: a ring that animates in from currentColor
+       arrives in the wrong colour before it arrives in the right one. */
+    outline-color: var(--live);
   }
+
   body {
-    @apply bg-background text-foreground;
+    background: var(--canvas);
+    color: var(--fg);
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
   }
-  html {
-    @apply font-sans;
+
+  /* The parts we did not draw still belong to the workspace. */
+  ::selection {
+    background: var(--select);
+    color: var(--fg);
   }
+
+  :focus-visible {
+    outline-width: 2px;
+    outline-style: solid;
+    outline-offset: 2px;
+    border-radius: 0;
+  }
+
+  textarea,
+  input {
+    caret-color: var(--live);
+  }
+
+  ::placeholder {
+    color: var(--fg-3);
+  }
+
+  /* Numbers that are data line up. */
+  .tnum {
+    font-variant-numeric: tabular-nums lining;
+  }
+
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--thumb) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: var(--thumb);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  /* Lea Verou's scroll shadows: the cover layers scroll with the content
+     (local), the shadows do not, so each edge fades in only while there is
+     something past it. Set --scroll-bg to the container's own ground. */
+  .scroll-x {
+    overflow-x: auto;
+    background-image:
+      linear-gradient(to right, var(--scroll-bg) 40%, transparent),
+      linear-gradient(to left, var(--scroll-bg) 40%, transparent),
+      linear-gradient(to right, var(--scroll-shade), transparent),
+      linear-gradient(to left, var(--scroll-shade), transparent);
+    background-position:
+      left center,
+      right center,
+      left center,
+      right center;
+    background-repeat: no-repeat;
+    background-size:
+      28px 100%,
+      28px 100%,
+      14px 100%,
+      14px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+
+  .scroll-thin::-webkit-scrollbar-thumb:hover {
+    background: var(--thumb-hover);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* The one label style. Small, tracked, never Literata-sized. */
+  .label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  /* A row that can be walked with the keyboard. */
+  .row {
+    transition:
+      background-color var(--dur-fast) var(--ease),
+      color var(--dur-fast) var(--ease);
+  }
+
+  /* The floating layer. Offset and blur, never a halo. */
+  .lift {
+    box-shadow: var(--lift);
+  }
+}
+
+/* ── The authored moment ───────────────────────────────────────────────────
+   Marking an Exercise done is one handoff in two halves: the check strokes
+   itself onto the row you finished, and the accent lifts to the next one.
+   ------------------------------------------------------------------------ */
+
+@keyframes mk-check {
+  from {
+    stroke-dashoffset: 22;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes mk-handoff {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mk-open {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mk-check {
+  stroke-dasharray: 22;
+  animation: mk-check 340ms var(--ease) both;
+}
+
+.mk-handoff {
+  animation: mk-handoff 300ms var(--ease) both;
+}
+
+.mk-open {
+  animation: mk-open var(--dur-slow) var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-check,
+  .mk-handoff,
+  .mk-open {
+    animation: none;
+  }
+  * {
+    transition-duration: 1ms !important;
+  }
+}
+
+/* A rail being dragged must follow the pointer frame by frame; the 200ms
+   settle animation on the gap, the container, and the reading column's
+   reserve would otherwise read as lag. */
+[data-resizing] [data-slot="sidebar-gap"],
+[data-resizing] [data-slot="sidebar-container"],
+[data-resizing] [data-slot="sidebar-inset"] {
+  transition: none !important;
 }

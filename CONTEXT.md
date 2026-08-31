@@ -52,10 +52,6 @@ _Avoid_: course chat, assistant, sidebar
 The agent that applies requested changes to a Course's structure or Lesson content on the learner's instruction. Distinct from the Tutor.
 _Avoid_: editor, editor agent, course chat
 
-**Waitlist**:
-Prospective users who requested access and are pending manual approval. Only approved users can create an account.
-_Avoid_: signup queue, interest list
-
 **Default model**:
 The capable mid-tier model used for most generation jobs: the Outline, the Tutor, and the Tailor. Selected by default wherever a model runs.
 _Avoid_: mid-tier model, cheap model

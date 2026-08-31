@@ -1,0 +1,349 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { PanelLeftOpen, PanelRight, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { course } from "@/lib/demo-course";
+import { applyPlan, findCourse } from "@/lib/demo-library";
+import { Outline, type ModuleView } from "./outline";
+import { LessonPane } from "./lesson";
+import { Panel, type PanelMode } from "./panel";
+import { Resizer } from "./resizer";
+import { CommandPalette, type Command } from "./palette";
+import { ThemeToggle } from "./theme-toggle";
+
+/* The demo Course's Tailor plan, with the operations each change performs.
+   The Outline is always base + approved changes, here and on the Outline
+   screen, so one function serves both. */
+const plan = findCourse(course.id)!.plan;
+
+/** Demonstration clock. Real completions carry the day the learner marked one. */
+const TODAY = "28 AUG";
+
+/* The two rails. The Outline opens at 20rem and leaves a 2.75rem stub behind;
+   the panel opens at 21rem. Both are learner-resizable within the bounds
+   below, and the widths ride CSS variables, so the classes stay literal. */
+
+const RAIL_MIN = 16;
+const RAIL_MAX = 28;
+const PANEL_MIN = 18;
+const PANEL_MAX = 30;
+
+export function Workspace() {
+  const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
+  const [doneAt, setDoneAt] = useState<Record<string, string>>(() => {
+    const seed: Record<string, string> = {};
+    for (const m of course.modules)
+      for (const l of m.lessons) if (l.stampedOn) seed[l.id] = l.stampedOn;
+    return seed;
+  });
+  const [openId, setOpenId] = useState("l5");
+  /* null until the learner collapses or expands; the width decides until then. */
+  const [railChoice, setRailChoice] = useState<boolean | null>(null);
+  const [panel, setPanel] = useState<PanelMode | null>(null);
+  const [lastMode, setLastMode] = useState<PanelMode>("tutor");
+  /* The rails' widths, in rem. Held here so the resizer and the reading
+     column's reserves read the same numbers. */
+  const [railWidth, setRailWidth] = useState(20);
+  const [panelWidth, setPanelWidth] = useState(21);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  /* transient: the handoff plays on the mark, never on a revisit */
+  const [justDone, setJustDone] = useState<string | null>(null);
+
+  const router = useRouter();
+  const narrow = useIsMobile();
+  const railOpen = railChoice ?? !narrow;
+
+  const modules: ModuleView[] = useMemo(() => {
+    let n = 0;
+    return applyPlan(course.modules, applied, plan).map((m) => ({
+      numeral: m.numeral,
+      title: m.title,
+      lessons: m.lessons.map((l) => ({ ...l, n: ++n })),
+    }));
+  }, [applied]);
+
+  const flat = useMemo(
+    () =>
+      modules.flatMap((m) =>
+        m.lessons.map((l) => ({
+          ...l,
+          moduleNumeral: m.numeral,
+          moduleTitle: m.title,
+        })),
+      ),
+    [modules],
+  );
+
+  const open = flat.find((l) => l.id === openId) ?? flat[0];
+  const set = flat.filter((l) => l.status !== "unset");
+  const doneCount = flat.filter((l) => doneAt[l.id]).length;
+  /* The accent means one thing: the Lesson you are up to. Which Lesson is
+     open is carried by a raised ground in the rail, never by colour. */
+  const live = set.find((l) => !doneAt[l.id]) ?? null;
+  const openIndex = flat.findIndex((l) => l.id === open.id);
+  const next =
+    flat.slice(openIndex + 1).find((l) => l.status !== "unset") ?? null;
+
+  function showPanel(mode: PanelMode) {
+    setLastMode(mode);
+    setPanel(mode);
+  }
+
+  function openLesson(id: string) {
+    setOpenId(id);
+    setJustDone(null);
+    if (narrow) setRailChoice(false);
+  }
+
+  function markDone() {
+    setDoneAt((d) => ({ ...d, [open.id]: TODAY }));
+    setJustDone(open.id);
+  }
+
+  function unmark() {
+    setDoneAt((d) => {
+      const copy = { ...d };
+      delete copy[open.id];
+      return copy;
+    });
+    setJustDone(null);
+  }
+
+  /* Two keys, and both are navigation: the palette, and the Outline. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      } else if (key === "b") {
+        e.preventDefault();
+        setRailChoice((r) => !(r ?? !window.matchMedia("(max-width: 767px)").matches));
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  const commands: Command[] = useMemo(() => {
+    const list: Command[] = [];
+    if (open.exercise) {
+      list.push(
+        doneAt[open.id]
+          ? {
+              id: "cmd-unmark",
+              label: "Undo this Exercise",
+              group: "Actions",
+              run: unmark,
+            }
+          : {
+              id: "cmd-mark",
+              label: "Mark the Exercise done",
+              group: "Actions",
+              run: markDone,
+            },
+      );
+    }
+    list.push(
+      {
+        id: "cmd-tutor",
+        label: "Open the Tutor",
+        group: "Actions",
+        run: () => showPanel("tutor"),
+      },
+      {
+        id: "cmd-tailor",
+        label: "Open the Tailor",
+        group: "Actions",
+        run: () => showPanel("tailor"),
+      },
+      {
+        id: "cmd-rail",
+        label: railOpen ? "Collapse the Outline" : "Expand the Outline",
+        group: "Actions",
+        run: () => setRailChoice(!railOpen),
+      },
+      {
+        id: "cmd-outline",
+        label: "Shape the Outline",
+        group: "Actions",
+        run: () => router.push(`/courses/${course.id}/outline`),
+      },
+    );
+    for (const l of flat) {
+      if (l.status === "unset") continue;
+      list.push({
+        id: `go-${l.id}`,
+        label: `${l.n}. ${l.title}`,
+        hint: `${l.moduleNumeral}. ${l.moduleTitle}`,
+        group: "Lessons",
+        run: () => openLesson(l.id),
+      });
+    }
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flat, open.id, open.exercise, doneAt, railOpen, router]);
+
+  return (
+    <SidebarProvider
+      open={railOpen}
+      onOpenChange={setRailChoice}
+      className="h-full min-h-0 overflow-hidden bg-canvas"
+      style={
+        {
+          "--sidebar-width": `${railWidth}rem`,
+          "--sidebar-width-icon": "2.75rem",
+        } as CSSProperties
+      }
+    >
+      <Outline
+        modules={modules}
+        openId={open.id}
+        liveId={live?.id ?? null}
+        handing={justDone !== null}
+        justDoneId={justDone}
+        stampFor={(id) => doneAt[id]}
+        onOpen={openLesson}
+        onCollapse={() => setRailChoice(false)}
+        onExpand={() => setRailChoice(true)}
+        total={flat.length}
+        doneCount={doneCount}
+        resizer={
+          <Resizer
+            side="left"
+            width={railWidth}
+            min={RAIL_MIN}
+            max={RAIL_MAX}
+            onResize={setRailWidth}
+          />
+        }
+      />
+
+      {/* The panel is a rail of its own, so it gets its own provider: one
+          open state each, and neither can close the other by accident. */}
+      <SidebarProvider
+        open={panel !== null}
+        onOpenChange={(o) => (o ? showPanel(lastMode) : setPanel(null))}
+        /* min-w-0: without it this wrapper's own min-content floor (the
+           capped blocks plus the panel gap) overflows the row, and the
+           fixed-position panel lands on top of the content. */
+        className="min-h-0 min-w-0 flex-1"
+        style={{ "--sidebar-width": `${panelWidth}rem` } as CSSProperties}
+      >
+        {/* Standard behaviour: the reading column sits centred in whatever
+            room the open rails leave, at its default width, and only
+            narrows when a rail actually crowds it. min-w-0 lets it give
+            up ground all the way, instead of overflowing under the
+            fixed-positioned rails. */}
+        <SidebarInset className="min-h-0 min-w-0 bg-canvas">
+          {/* the only chrome: what opens the palette, the panel, and the ground */}
+          {/* the only chrome: what opens the palette, the panel, and the ground.
+              It spans the region, not the reading column: the search sits
+              centred over the sentence, the actions pin to the right edge. */}
+          <div className="relative flex w-full shrink-0 items-center gap-2 px-5 py-3 sm:px-8 lg:px-10">
+            <Button
+              variant="icon"
+              onClick={() => setRailChoice(true)}
+              className={cn("md:hidden", railOpen ? "hidden" : "flex")}
+              aria-label="Expand the Outline"
+            >
+              <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
+            </Button>
+
+            {/* A real input, but a doorway: focusing it hands off to the
+                palette, which owns the typing. Centred over the column on
+                desktop, in the flow beside the buttons on a phone. */}
+            <div className="relative min-w-0 flex-1 md:absolute md:left-1/2 md:top-1/2 md:w-80 md:max-w-[calc(100%-9rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:flex-none">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-fg-3"
+                strokeWidth={1.75}
+              />
+              <Input
+                readOnly
+                placeholder="Go to a Lesson"
+                aria-label="Go to a Lesson"
+                onFocus={() => setPaletteOpen(true)}
+                className="h-auto rounded-md border-transparent border-b-transparent bg-panel py-1.5 pr-10 pl-8 text-[0.8125rem] text-fg-3 hover:bg-raised"
+              />
+              <kbd className="tnum pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 rounded-sm bg-raised px-1.5 py-0.5 font-mono text-[0.6875rem] text-fg-dim sm:block">
+                ⌘K
+              </kbd>
+            </div>
+
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <ThemeToggle />
+              {panel ? null : (
+                <Button
+                  variant="icon"
+                  onClick={() => showPanel(lastMode)}
+                  aria-expanded={false}
+                  aria-label={
+                    lastMode === "tutor" ? "Open the Tutor" : "Open the Tailor"
+                  }
+                  title={lastMode === "tutor" ? "Open the Tutor" : "Open the Tailor"}
+                  className="p-2"
+                >
+                  <PanelRight className="h-4 w-4" strokeWidth={1.75} />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1">
+            <LessonPane
+              key={open.id}
+              lesson={open}
+              total={flat.length}
+              stamp={doneAt[open.id]}
+              striking={justDone === open.id}
+              next={next ? { id: next.id, n: next.n, title: next.title } : null}
+              onMark={markDone}
+              onUnmark={unmark}
+              onOpen={openLesson}
+            />
+          </div>
+        </SidebarInset>
+
+        <Panel
+          mode={panel ?? lastMode}
+          applied={applied}
+          onMode={(m) => {
+            setLastMode(m);
+            setPanel(m);
+          }}
+          onClose={() => setPanel(null)}
+          onApprove={(id) => setApplied((a) => new Set(a).add(id))}
+          onUndo={(id) =>
+            setApplied((a) => {
+              const copy = new Set(a);
+              copy.delete(id);
+              return copy;
+            })
+          }
+          resizer={
+            <Resizer
+              side="right"
+              width={panelWidth}
+              min={PANEL_MIN}
+              max={PANEL_MAX}
+              onResize={setPanelWidth}
+            />
+          }
+        />
+      </SidebarProvider>
+
+      <CommandPalette
+        open={paletteOpen}
+        commands={commands}
+        onClose={() => setPaletteOpen(false)}
+      />
+    </SidebarProvider>
+  );
+}

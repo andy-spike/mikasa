@@ -1,0 +1,687 @@
+{
+ "schemaVersion": 2,
+ "generatedAt": "2026-08-29T00:00:00Z",
+ "title": "Design System: Mikasa",
+ "extensions": {
+  "colorMeta": {
+   "canvas": {
+    "role": "neutral",
+    "displayName": "Graphite Canvas",
+    "canonical": "oklch(17.3% 0.004 264.5)",
+    "purpose": "The ground everything sits on: shell, reading column, panel inset fields.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#ffffff"
+   },
+   "panel": {
+    "role": "neutral",
+    "displayName": "Panel",
+    "canonical": "oklch(20.8% 0.007 258.4)",
+    "purpose": "One step up: Outline rail, Tutor/Tailor panel, code blocks, palette trigger, Done chip.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#f7f8fa"
+   },
+   "raised": {
+    "role": "neutral",
+    "displayName": "Raised",
+    "canonical": "oklch(24.2% 0.009 255.6)",
+    "purpose": "Two steps up: the open Lesson row, the active palette option, inline code, the primary button at rest.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#edeff2"
+   },
+   "over": {
+    "role": "neutral",
+    "displayName": "Over",
+    "canonical": "oklch(27.5% 0.013 258.4)",
+    "purpose": "Three steps up: the command palette body, the compact Approve button, primary button hover.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#e3e5e9"
+   },
+   "hair": {
+    "role": "neutral",
+    "displayName": "Hairline",
+    "canonical": "oklch(27.2% 0.010 260.7)",
+    "purpose": "The default divider and the global border colour. Divides regions; never wraps an object.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#e7e9ed"
+   },
+   "rule": {
+    "role": "neutral",
+    "displayName": "Rule",
+    "canonical": "oklch(33.2% 0.014 261.7)",
+    "purpose": "The stronger divider: the note block's left rule, the table header rule, Approve hover.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#d3d7dd"
+   },
+   "fg": {
+    "role": "neutral",
+    "displayName": "Full Ink",
+    "canonical": "oklch(93.3% 0.005 258.3)",
+    "purpose": "Lesson titles, open rows, strong emphasis, code keywords. 12.18-15.65:1 across all four surfaces.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#16181b"
+   },
+   "fg-2": {
+    "role": "neutral",
+    "displayName": "Second Ink",
+    "canonical": "oklch(78.7% 0.014 258.4)",
+    "purpose": "Body prose, unopened Lesson titles, Tutor answers. 7.58-9.75:1.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#3e464c"
+   },
+   "fg-3": {
+    "role": "neutral",
+    "displayName": "Third Ink",
+    "canonical": "oklch(67.7% 0.017 257.2)",
+    "purpose": "Goal, counts, captions, quiet buttons, placeholders, code comments. 5.09-6.54:1.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#586066"
+   },
+   "fg-dim": {
+    "role": "neutral",
+    "displayName": "Dim Ink",
+    "canonical": "oklch(65.1% 0.015 258.4)",
+    "purpose": "Completion dates, minute estimates, keycaps, separators, palette group headers. 4.61-5.92:1.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#5e666c"
+   },
+   "mark": {
+    "role": "neutral",
+    "displayName": "Mark",
+    "canonical": "oklch(55.7% 0.017 260.7)",
+    "purpose": "GRAPHICS ONLY, never text. 3.15-4.05:1. One consumer: the dashed rule for a Lesson not yet generated.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ],
+    "lightValue": "#788086"
+   },
+   "live": {
+    "role": "primary",
+    "displayName": "Live Mint",
+    "canonical": "oklch(77.7% 0.131 167.1)",
+    "purpose": "The one accent. The Lesson you are up to, plus the focus ring, caret and selection. 9.97:1 on graphite canvas; the paper twin #0a7f5f clears 4.98:1 on white and 3.95:1 on the topmost surface.",
+    "tonalRamp": [
+     "oklch(15% 0.131 167.1)",
+     "oklch(26.4% 0.131 167.1)",
+     "oklch(37.9% 0.131 167.1)",
+     "oklch(49.3% 0.131 167.1)",
+     "oklch(60.7% 0.131 167.1)",
+     "oklch(72.1% 0.131 167.1)",
+     "oklch(83.6% 0.131 167.1)",
+     "oklch(95% 0.131 167.1)"
+    ],
+    "lightValue": "#0a7f5f"
+   },
+   "bad": {
+    "role": "tertiary",
+    "displayName": "Bad Red",
+    "canonical": "oklch(66.9% 0.145 21.7)",
+    "purpose": "One consumer: the hover state of the Tailor's Discard control. No red fill, badge or error surface ships.",
+    "tonalRamp": [
+     "oklch(15% 0.145 21.7)",
+     "oklch(26.4% 0.145 21.7)",
+     "oklch(37.9% 0.145 21.7)",
+     "oklch(49.3% 0.145 21.7)",
+     "oklch(60.7% 0.145 21.7)",
+     "oklch(72.1% 0.145 21.7)",
+     "oklch(83.6% 0.145 21.7)",
+     "oklch(95% 0.145 21.7)"
+    ],
+    "lightValue": "#b62a2a"
+   },
+   "select": {
+    "role": "neutral",
+    "displayName": "Selection Wash",
+    "canonical": "rgba(79, 209, 165, 0.26)",
+    "purpose": "Text selection. One of the browser surfaces the workspace still owns.",
+    "lightValue": "rgba(10, 127, 95, 0.18)"
+   },
+   "thumb": {
+    "role": "neutral",
+    "displayName": "Scrollbar Thumb",
+    "canonical": "oklch(30.0% 0.012 258.4)",
+    "purpose": "Thin scrollbar thumb, content-box clipped inside a 3px transparent border; #3a4048 on hover.",
+    "lightValue": "#ccd0d6"
+   },
+   "scroll-shade": {
+    "role": "neutral",
+    "displayName": "Scroll Shade",
+    "canonical": "rgba(0, 0, 0, 0.5)",
+    "purpose": "Fades a horizontal scroller's edge while content sits past it; paired with a local cover layer so it disappears at the ends.",
+    "lightValue": "rgba(22, 24, 27, 0.14)"
+   },
+   "float": {
+    "role": "neutral",
+    "displayName": "Float",
+    "canonical": "#24282e",
+    "lightValue": "#ffffff",
+    "purpose": "What leaves the document. --over on graphite, white on paper: a modal that steps down from its own page reads as a hole, not a layer. One consumer, the command palette.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ]
+   },
+   "scrim": {
+    "role": "neutral",
+    "displayName": "Scrim",
+    "canonical": "rgba(0, 0, 0, 0.55)",
+    "lightValue": "rgba(22, 24, 27, 0.44)",
+    "purpose": "The ground the command palette sits on. Heavier on paper than a naive inversion would give, because a white dialog on a white page needs the page pushed further back.",
+    "tonalRamp": [
+     "#0f1012",
+     "#16181b",
+     "#1d2024",
+     "#24282e",
+     "#32363d",
+     "#6e747e",
+     "#b4bac3",
+     "#e7e9ec"
+    ]
+   }
+  },
+  "declaredUnspent": [
+   {
+    "name": "--live-dim",
+    "value": "#2e8f72",
+    "note": "Declared in app/globals.css, in both grounds. Zero consumers in the components."
+   },
+   {
+    "name": "--live-wash",
+    "value": "rgba(79, 209, 165, 0.1)",
+    "note": "Declared in app/globals.css, in both grounds. Zero consumers in the components."
+   },
+   {
+    "name": "--warn",
+    "value": "#e5a050",
+    "note": "Declared in app/globals.css, in both grounds. Zero consumers in the components."
+   },
+   {
+    "name": "--radius",
+    "value": "6px",
+    "note": "Declared but never read. The vendored Sidebar writes it to 0 on its header and content; nothing in this world reads it. The radius ramp is served by --radius-sm/md/lg."
+   }
+  ],
+  "typographyMeta": {
+   "display-lg": {
+    "displayName": "Display Large",
+    "purpose": "Persuade surfaces only: the landing's opening and closing statements. 3rem at 640px and up, 2.5rem below."
+   },
+   "display-lg-sm": {
+    "displayName": "Display Large Small",
+    "purpose": "The same Persuade statement below 640px, at 2.5rem."
+   },
+   "display": {
+    "displayName": "Display",
+    "purpose": "The Lesson title at 640px and up, capped at 22ch and text-balanced."
+   },
+   "display-sm": {
+    "displayName": "Display Small",
+    "purpose": "The same Lesson title below 640px. The only responsive type step in the system."
+   },
+   "title": {
+    "displayName": "Title",
+    "purpose": "The Course Topic at the head of the Outline rail; also the palette input."
+   },
+   "body": {
+    "displayName": "Body",
+    "purpose": "Lesson prose and the Exercise task, at a 36rem measure that reads 64-75 characters per line."
+   },
+   "body-sm": {
+    "displayName": "Body Small",
+    "purpose": "Note blocks, the Exercise check line, the Next-Lesson title."
+   },
+   "ui-lg": {
+    "displayName": "UI Large",
+    "purpose": "Palette options and Tailor change summaries."
+   },
+   "ui": {
+    "displayName": "UI",
+    "purpose": "The workhorse step: Outline rows, chrome, panel prose, code, tables, captions."
+   },
+   "meta": {
+    "displayName": "Meta",
+    "purpose": "The facts around the content: Lesson position, rail numbers, module counts."
+   },
+   "label": {
+    "displayName": "Label",
+    "purpose": "The one uppercase tracked style. Module headings, Exercise, Goal, Next, table headers."
+   },
+   "mono": {
+    "displayName": "Mono",
+    "purpose": "Geist Mono. Code, result tables, inline code at 0.86em, keycaps at 0.6875rem."
+   }
+  },
+  "shadows": [
+   {
+    "name": "lift",
+    "value": "0 18px 44px -12px rgba(0, 0, 0, 0.72), 0 3px 10px -3px rgba(0, 0, 0, 0.55)",
+    "lightValue": "0 18px 44px -12px rgba(22, 24, 27, 0.26), 0 3px 10px -3px rgba(22, 24, 27, 0.16)",
+    "purpose": "The only shadow in the system. The command palette, and nothing else. Offset and blur, never a halo. Two values: a shadow tuned for a dark ground reads as soot on a white one."
+   }
+  ],
+  "motion": [
+   {
+    "name": "ease",
+    "value": "cubic-bezier(0.2, 0, 0, 1)",
+    "purpose": "Exponential ease-out. The shell never bounces. Every transition and animation uses it."
+   },
+   {
+    "name": "dur-fast",
+    "value": "120ms",
+    "purpose": "Row and colour transitions in the Outline rail."
+   },
+   {
+    "name": "dur",
+    "value": "160ms",
+    "purpose": "Default state transition."
+   },
+   {
+    "name": "dur-slow",
+    "value": "240ms",
+    "purpose": "Entrances: the palette opening (mk-open), the panel sliding in (mk-slide)."
+   },
+   {
+    "name": "mk-check",
+    "value": "340ms stroke-dashoffset 22 -> 0",
+    "purpose": "The check strokes itself onto the Exercise just marked. Fires on a real mark only."
+   },
+   {
+    "name": "mk-handoff",
+    "value": "300ms opacity 0 -> 1, translateY(-10px) -> none",
+    "purpose": "The accent lifting into place on the next Lesson. The second half of the handoff."
+   },
+   {
+    "name": "reduced-motion",
+    "value": "animation: none; transition-duration: 1ms",
+    "purpose": "Both end states remain, all movement drops."
+   }
+  ],
+  "breakpoints": [
+   {
+    "name": "sheet",
+    "value": "767px",
+    "note": "At or below, both rails become sheets over a blurred scrim at min(22rem, 88vw); rail rows grow to 44px."
+   },
+   {
+    "name": "md",
+    "value": "768px",
+    "note": "Rail 20rem, stub 2.75rem, panel 21rem."
+   },
+   {
+    "name": "lg",
+    "value": "1024px",
+    "note": "Reading gutters step to 2.5rem."
+   },
+   {
+    "name": "panel-costs-rail",
+    "value": "1279px",
+    "note": "At or below, opening the panel collapses the rail."
+   },
+   {
+    "name": "xl",
+    "value": "1280px",
+    "note": "Rail widens to 23rem."
+   },
+   {
+    "name": "2xl",
+    "value": "1536px",
+    "note": "A closed panel keeps its 21rem in reserve and the reading column centres in the region that leaves."
+   }
+  ],
+  "measurements": [
+   {
+    "name": "measure",
+    "value": "36rem",
+    "note": "64-75 characters per line, measured across four real paragraphs."
+   },
+   {
+    "name": "reading-drift",
+    "value": "0px",
+    "note": "Reading column drift when the rail or the panel toggles, at 1280, 1440, 1600 and 1920."
+   },
+   {
+    "name": "outline-density",
+    "value": "20 of 20 rows",
+    "note": "All Lesson rows visible with no scrolling at 1440x900, at 0.22rem row padding."
+   },
+   {
+    "name": "rail-stub",
+    "value": "2.75rem",
+    "note": "Collapsed rail width; the region takes calc(rail - 2.75rem) of left pad to stay put."
+   },
+   {
+    "name": "panel-reserve",
+    "value": "21rem",
+    "note": "From 2xl up, a closed panel keeps its width as right pad, so the region around the sentence is the same size open or closed."
+   },
+   {
+    "name": "contrast-floor",
+    "value": "0 below floor",
+    "note": "Text audited in-browser against its computed ground, in both themes."
+   }
+  ],
+  "themes": {
+   "grounds": [
+    "graphite (dark)",
+    "paper (light)"
+   ],
+   "mechanism": "A `dark` class on <html>, set before first paint by an inline script in the root layout. localStorage `mk-theme` wins; with nothing stored, prefers-color-scheme decides. Tailwind's dark: variant is remapped to the class with @custom-variant.",
+   "structure": ":root carries the complete paper palette and the shadcn/sidebar aliases, which read the semantic tokens and so follow the switch for free. .dark redeclares only the tokens that move.",
+   "colorScheme": "color-scheme moves with the theme, so browser-drawn scrollbars and form controls follow.",
+   "floors": "Both grounds hit the same contrast floors: 5.08/4.63 (paper) and 5.09/4.61 (graphite) for the quiet text steps against the topmost surface, 3.18/3.15 for the graphics-only mark. Audited in-browser against the computed ground: zero text below its floor in either theme.",
+   "switch": "One chrome control with no React state. The class is the state, the icon swap is CSS, and the choice is stored under mk-theme."
+  }
+ },
+ "components": [
+  {
+   "name": "Outline Row",
+   "kind": "nav",
+   "refersTo": "outline-row",
+   "description": "The Lesson row in the Outline rail: four facts on one line, in its three states. Live is the accent, open is a raised ground, unset is ruled and inert.",
+   "html": "<ul class=\"ds-outline\"><li><button class=\"ds-row\" type=\"button\"><span class=\"ds-mark\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" fill=\"none\" aria-hidden=\"true\"><path d=\"M1.5 6.4 4.4 9.3 10.5 2.9\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"square\"/></svg></span><span class=\"ds-n\">4</span><span class=\"ds-title\">Windows or subqueries</span><span class=\"ds-tail\">24 AUG</span></button></li><li><button class=\"ds-row ds-row-open\" type=\"button\" aria-current=\"true\"><span class=\"ds-mark ds-mark-live\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" fill=\"none\" aria-hidden=\"true\"><path d=\"M3 1.5 9.5 6 3 10.5 Z\" fill=\"currentColor\"/></svg></span><span class=\"ds-n\">5</span><span class=\"ds-title\">PARTITION BY, one window per group</span><span class=\"ds-tail\">14m</span></button></li><li><div class=\"ds-row ds-row-unset\" aria-disabled=\"true\"><span class=\"ds-mark ds-mark-unset\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" fill=\"none\" aria-hidden=\"true\"><path d=\"M2 6h8\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-dasharray=\"2 2\"/></svg></span><span class=\"ds-n\">6</span><span class=\"ds-title\">What ORDER BY does inside a window</span><span class=\"ds-tail\">11m</span></div></li></ul>",
+   "css": ".ds-outline { list-style: none; margin: 0; padding: 0.5rem; background: var(--panel); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; } .ds-row { display: grid; grid-template-columns: 0.75rem 1.25rem 1fr auto; align-items: center; column-gap: 0.5rem; width: 100%; padding: 0.22rem 0.5rem; border: 0; border-radius: 0; background: transparent; text-align: left; cursor: pointer; transition: background-color 120ms cubic-bezier(0.2,0,0,1), color 120ms cubic-bezier(0.2,0,0,1); } .ds-row:hover { background: color-mix(in srgb, var(--raised) 60%, transparent); } .ds-row:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; } .ds-row-open, .ds-row-open:hover { background: var(--raised); } .ds-mark { display: flex; align-items: center; justify-content: center; height: 1rem; width: 0.75rem; color: var(--fg-3); } .ds-mark-live { color: var(--live); } .ds-mark-unset { color: var(--mark); } .ds-n { font-size: 0.75rem; color: var(--fg-3); font-variant-numeric: tabular-nums lining; } .ds-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; line-height: 1.25rem; color: var(--fg-2); } .ds-row-open .ds-title { color: var(--fg); font-weight: 500; } .ds-row-open .ds-n { color: var(--fg-2); } .ds-tail { font-size: 0.6875rem; color: var(--fg-dim); font-variant-numeric: tabular-nums lining; } .ds-row-unset { cursor: default; } .ds-row-unset:hover { background: transparent; } .ds-row-unset .ds-title { color: var(--fg-3); } .ds-row-unset .ds-n { color: var(--fg-dim); }"
+  },
+  {
+   "name": "Primary Button",
+   "kind": "button",
+   "refersTo": "button-primary",
+   "description": "The most important action on the Lesson, and still greyscale: raised ground, stepping up to over on hover.",
+   "html": "<button class=\"ds-btn-primary\" type=\"button\">Mark the Exercise done</button>",
+   "css": ".ds-btn-primary { background: var(--raised); color: var(--fg); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; padding: 0.625rem 1rem; border: 0; border-radius: 0; cursor: pointer; transition: background-color 150ms cubic-bezier(0.2,0,0,1); } .ds-btn-primary:hover { background: var(--over); } .ds-btn-primary:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }"
+  },
+  {
+   "name": "Hero Button",
+   "kind": "button",
+   "refersTo": "button-hero",
+   "description": "The landing's one action. Over ground, a luminance step above the in-app primary, stepping to rule on hover.",
+   "html": "<button class=\"ds-btn-hero\" type=\"button\">Start a Course</button>",
+   "css": ".ds-btn-hero { background: var(--over); color: var(--fg); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; padding: 0.75rem 1.25rem; border: 0; border-radius: 0; cursor: pointer; transition: background-color 150ms cubic-bezier(0.2,0,0,1); } .ds-btn-hero:hover { background: var(--rule); } .ds-btn-hero:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }"
+  },
+  {
+   "name": "Compact and Quiet Buttons",
+   "kind": "button",
+   "refersTo": "button-compact",
+   "description": "The Tailor's pair: a compact Approve on the over step, and a quiet Discard with no ground that reaches for bad red only on hover.",
+   "html": "<div class=\"ds-btn-row\"><button class=\"ds-btn-compact\" type=\"button\">Approve</button><button class=\"ds-btn-quiet ds-btn-discard\" type=\"button\">Discard</button></div>",
+   "css": ".ds-btn-row { display: flex; align-items: center; gap: 0.75rem; font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; } .ds-btn-compact { background: var(--over); color: var(--fg); font-size: 0.75rem; font-weight: 500; padding: 0.375rem 0.625rem; border: 0; border-radius: 0; cursor: pointer; transition: background-color 150ms cubic-bezier(0.2,0,0,1); } .ds-btn-compact:hover { background: var(--rule); } .ds-btn-quiet { margin-left: auto; background: transparent; color: var(--fg-3); font-size: 0.8125rem; padding: 0 0.25rem; border: 0; border-radius: 0; cursor: pointer; transition: color 150ms cubic-bezier(0.2,0,0,1); } .ds-btn-quiet:hover { color: var(--fg); } .ds-btn-discard:hover { color: var(--bad); } .ds-btn-compact:focus-visible, .ds-btn-quiet:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }"
+  },
+  {
+   "name": "Command Palette",
+   "kind": "custom",
+   "refersTo": "palette-dialog",
+   "description": "Navigation, not a shortcut. The one floating layer in the system, and the one place the lift shadow is spent.",
+   "html": "<div class=\"ds-palette\"><input class=\"ds-palette-input\" placeholder=\"Go to a Lesson, or run an action\" aria-label=\"Search Lessons and actions\"/><ul class=\"ds-palette-list\"><li><p class=\"ds-palette-group\">Actions</p><button class=\"ds-palette-opt ds-palette-opt-active\" type=\"button\"><span>Open the Tutor</span><span class=\"ds-palette-hint\">answers, changes nothing</span></button></li><li><button class=\"ds-palette-opt\" type=\"button\"><span>Open the Tailor</span><span class=\"ds-palette-hint\">proposes changes</span></button></li><li><p class=\"ds-palette-group\">Lessons</p><button class=\"ds-palette-opt\" type=\"button\"><span>5. PARTITION BY, one window per group</span><span class=\"ds-palette-hint\">II. Partitioning and ordering</span></button></li></ul><div class=\"ds-palette-foot\"><span><kbd class=\"ds-key\">&#8593;</kbd> <kbd class=\"ds-key\">&#8595;</kbd> move</span><span><kbd class=\"ds-key\">&#8629;</kbd> open</span><span><kbd class=\"ds-key\">esc</kbd> close</span></div></div>",
+   "css": ".ds-palette { width: 100%; max-width: 34rem; overflow: hidden; border-radius: 0; background: var(--float); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; box-shadow: var(--lift); } .ds-palette-input { width: 100%; padding: 0.875rem 1rem; border: 0; border-bottom: 1px solid var(--hair); background: transparent; color: var(--fg); font: inherit; font-size: 0.9375rem; outline: none; } .ds-palette-input::placeholder { color: var(--fg-3); } .ds-palette-list { list-style: none; margin: 0; padding: 0.375rem 0; max-height: 46vh; overflow-y: auto; } .ds-palette-group { margin: 0; padding: 0.75rem 1rem 0.375rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; line-height: 1; text-transform: uppercase; color: var(--fg-dim); } .ds-palette-opt { display: flex; align-items: baseline; gap: 0.75rem; width: 100%; padding: 0.5rem 1rem; border: 0; background: transparent; color: var(--fg-2); font-size: 0.875rem; text-align: left; cursor: pointer; } .ds-palette-opt:hover, .ds-palette-opt-active { background: var(--raised); color: var(--fg); } .ds-palette-hint { margin-left: auto; flex-shrink: 0; font-size: 0.75rem; color: var(--fg-3); font-variant-numeric: tabular-nums lining; } .ds-palette-foot { display: flex; align-items: center; gap: 1rem; padding: 0.5rem 1rem; border-top: 1px solid var(--hair); font-size: 0.6875rem; color: var(--fg-dim); } .ds-key { background: var(--raised); color: var(--fg-3); padding: 0.125rem 0.375rem; border-radius: 0; font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 0.6875rem; }"
+  },
+  {
+   "name": "Panel Mode Switch",
+   "kind": "nav",
+   "refersTo": "mode-switch",
+   "description": "The Tutor/Tailor switch at the head of the panel: an inset canvas track with the active segment one luminance step up. The panel owns its own switch and its own close.",
+   "html": "<div class=\"ds-switch\"><button class=\"ds-switch-seg ds-switch-seg-on\" type=\"button\" aria-pressed=\"true\">Tutor</button><button class=\"ds-switch-seg\" type=\"button\" aria-pressed=\"false\">Tailor</button></div>",
+   "css": ".ds-switch { display: inline-flex; gap: 0.125rem; padding: 0.125rem; border-radius: 0; background: var(--canvas); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; } .ds-switch-seg { padding: 0.375rem 0.75rem; border: 0; border-radius: 0; background: transparent; color: var(--fg-3); font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: background-color 150ms cubic-bezier(0.2,0,0,1), color 150ms cubic-bezier(0.2,0,0,1); } .ds-switch-seg:hover { color: var(--fg-2); } .ds-switch-seg-on, .ds-switch-seg-on:hover { background: var(--raised); color: var(--fg); } .ds-switch-seg:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }"
+  },
+  {
+   "name": "Tutor Composer",
+   "kind": "input",
+   "refersTo": "composer",
+   "description": "A field inset into the panel on the canvas step, rising to raised on focus-within. No border, no ring: focus is a change in light.",
+   "html": "<form class=\"ds-composer\"><textarea class=\"ds-composer-field\" rows=\"2\" placeholder=\"Ask about this Lesson\" aria-label=\"Ask the Tutor about this Lesson\"></textarea><button class=\"ds-composer-send\" type=\"submit\" aria-label=\"Ask the Tutor\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 7-7 7 7\"/><path d=\"M12 19V5\"/></svg></button></form>",
+   "css": ".ds-composer { display: flex; align-items: flex-end; gap: 0.5rem; padding: 0.5rem 0.625rem; border-radius: 0; background: var(--canvas); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; transition: background-color 160ms cubic-bezier(0.2,0,0,1); } .ds-composer:focus-within { background: var(--raised); } .ds-composer-field { flex: 1; min-height: 2.5rem; resize: none; border: 0; background: transparent; color: var(--fg); font: inherit; font-size: 0.8125rem; line-height: 1.55; outline: none; caret-color: var(--live); } .ds-composer-field::placeholder { color: var(--fg-3); } .ds-composer-send { margin-bottom: 0.125rem; padding: 0.375rem; border: 0; border-radius: 0; background: transparent; color: var(--fg-3); cursor: pointer; transition: background-color 150ms cubic-bezier(0.2,0,0,1), color 150ms cubic-bezier(0.2,0,0,1); } .ds-composer-send:hover { background: var(--over); color: var(--fg); } .ds-composer-send:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }"
+  },
+  {
+   "name": "Code Block",
+   "kind": "custom",
+   "refersTo": "code-block",
+   "description": "Code sits one luminance step up with a label-style language strip. Weight carries the keywords, a dim step carries comments. No accent in code, no border, no chrome.",
+   "html": "<div class=\"ds-code\"><div class=\"ds-code-head\"><span class=\"ds-code-lang\">sql</span></div><pre class=\"ds-code-body\"><code><span class=\"ds-kw\">select</span> user_id,\n  <span class=\"ds-kw\">sum</span>(events) <span class=\"ds-kw\">over</span> (<span class=\"ds-kw\">partition by</span> user_id) <span class=\"ds-kw\">as</span> events_to_date\n<span class=\"ds-kw\">from</span> daily_events <span class=\"ds-cm\">-- one row in, one row out</span></code></pre></div>",
+   "css": ".ds-code { max-width: 36rem; overflow: hidden; border-radius: 0; background: var(--panel); } .ds-code-head { display: flex; align-items: center; padding: 0.5rem 0.875rem; border-bottom: 1px solid var(--hair); } .ds-code-lang { font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; line-height: 1; text-transform: uppercase; color: var(--fg-3); } .ds-code-body { margin: 0; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--thumb) transparent; } .ds-code-body code { display: block; padding: 0.875rem; font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 0.8125rem; line-height: 1.72; color: var(--fg-2); white-space: pre; } .ds-kw { font-weight: 600; color: var(--fg); } .ds-cm { color: var(--fg-3); }"
+  },
+  {
+   "name": "Tailor Change Row",
+   "kind": "custom",
+   "refersTo": "outline-row",
+   "description": "A pending change from the Tailor. Hairline-divided rows on the panel's own ground, deliberately not a card list: the Outline already set the grammar.",
+   "html": "<ul class=\"ds-changes\"><li class=\"ds-change\"><div class=\"ds-change-head\"><span class=\"ds-change-verb\">Split</span><span class=\"ds-change-entry\">Lesson 7</span></div><p class=\"ds-change-detail\">Frames: ROWS, RANGE, and the default that bites</p><p class=\"ds-change-reason\">Two ideas are fighting for one Lesson; the default deserves its own.</p><div class=\"ds-change-actions\"><button class=\"ds-btn-compact\" type=\"button\">Approve</button><button class=\"ds-btn-quiet ds-btn-discard\" type=\"button\">Discard</button></div></li></ul>",
+   "css": ".ds-changes { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hair); background: var(--panel); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; } .ds-change { padding: 0.875rem; border-bottom: 1px solid var(--hair); } .ds-change-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; } .ds-change-verb { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; line-height: 1; text-transform: uppercase; color: var(--fg-3); } .ds-change-entry { font-size: 0.6875rem; color: var(--fg-dim); font-variant-numeric: tabular-nums lining; } .ds-change-detail { margin: 0.5rem 0 0; font-size: 0.875rem; line-height: 1.45; font-weight: 500; color: var(--fg); } .ds-change-reason { margin: 0.375rem 0 0; font-size: 0.8125rem; line-height: 1.5; color: var(--fg-3); } .ds-change-actions { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }"
+  },
+  {
+   "name": "Sidebar Rail",
+   "kind": "nav",
+   "refersTo": "sidebar",
+   "description": "The vendored shadcn Sidebar, carrying both rails: the Outline on the left as collapsible=\"icon\", the Tutor/Tailor panel on the right as collapsible=\"offcanvas\". Restyled through the token aliases rather than rebuilt, and adapted in four places: one open state per rail across both widths, no cookie, no provider-level keyboard shortcut, and inert while parked off the canvas.",
+   "html": "<div class=\"ds-shell\"><div class=\"ds-rail\"><div class=\"ds-rail-head\">SQL window functions</div><div class=\"ds-rail-body\">Outline rows</div></div><div class=\"ds-inset\"><div class=\"ds-chrome\">Go to a Lesson</div><div class=\"ds-read\">The Lesson</div></div><div class=\"ds-panel\"><div class=\"ds-rail-head\">Tutor</div></div></div>",
+   "css": ".ds-shell { display: flex; height: 22rem; background: var(--canvas); font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif; } .ds-rail { width: 20rem; flex-shrink: 0; border-right: 1px solid var(--hair); background: var(--sidebar, var(--panel)); } .ds-panel { width: 21rem; flex-shrink: 0; border-left: 1px solid var(--hair); background: var(--sidebar, var(--panel)); } .ds-rail-head { padding: 1rem; font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.011em; color: var(--fg); border-bottom: 1px solid var(--hair); } .ds-rail-body { padding: 0.5rem; font-size: 0.8125rem; color: var(--fg-3); } .ds-inset { display: flex; min-width: 0; flex: 1; flex-direction: column; background: var(--canvas); } .ds-chrome { margin: 0.75rem 2.5rem 0; padding: 0.375rem 0.75rem; max-width: 20rem; border-radius: 0; background: var(--panel); font-size: 0.8125rem; color: var(--fg-3); } .ds-read { padding: 2rem 2.5rem; max-width: 36rem; font-size: 1rem; line-height: 1.72; color: var(--fg-2); }"
+  },
+  {
+   "name": "Theme Switch",
+   "kind": "control",
+   "refersTo": "theme-switch",
+   "description": "One chrome control, no React state. The dark class on <html> is the state, which icon shows is a CSS question, and the choice is written to localStorage under mk-theme. Identical on the server and the client, so it needs no mounted flag and leaves no hydration seam.",
+   "html": "<button class=\"ds-theme\" type=\"button\" aria-label=\"Switch theme\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19\"/></svg></button>",
+   "css": ".ds-theme { display: inline-flex; padding: 0.375rem; border: 0; border-radius: 0; background: transparent; color: var(--fg-3); cursor: pointer; transition: background-color 120ms cubic-bezier(0.2,0,0,1), color 120ms cubic-bezier(0.2,0,0,1); } .ds-theme:hover { background: var(--panel); color: var(--fg); }"
+  }
+ ],
+ "narrative": {
+  "northStar": "The Graphite Workspace",
+  "overview": "The Course is a working shell, not a reading room. It refuses the course player's checklist-and-progress-bar and the paper metaphor at once: everything on screen is information, and the only colour is where you are. The learner opens one Course at a laptop, often with an editor beside it, and the surface is built for that posture — dense, quiet, and legible in a long session.\n\nDepth comes from light, and light has two settings. Graphite runs four steps up from #0f1012; paper runs four steps down from #ffffff. The ground flips, the system does not: in both, the sidebars sit one step off the reading ground, the open row sits two, and what floats sits at the top of the stack. A stored choice decides which ground a learner gets, and with no stored choice the operating system does; the class is set on <html> before first paint, so the shell is never briefly the wrong colour. A graphite canvas with three luminance steps up carries every layer in the product; hairlines divide but never enclose, and nothing on screen is a card. Type does the structural work that borders would do elsewhere: one sans for every word, one mono for every number that is data, and a single small tracked label style for the few things that need naming rather than reading.\n\nColour is rationed to one job. #4fd1a5 on graphite, #0a7f5f on paper, marks the Lesson you are up to and nothing else. Which Lesson is open is carried by a raised ground, so position and progress never compete for the same signal. Everything the learner has already finished is neutral, and everything not yet generated stays in place at a lower ink instead of disappearing or greying into a dead button. This world explicitly replaced a serif, paper-and-brass direction that was rejected outright; that vocabulary is anti-reference, not heritage.",
+  "keyCharacteristics": [
+   "Two grounds, one system: graphite and paper, four surface steps each, zero cards, one shadow.",
+   "One accent with exactly one meaning, spent on roughly one row per screen.",
+   "Density as the point: all twenty Lessons visible at once on a laptop.",
+   "Geist and Geist Mono only; no serif anywhere in the product.",
+   "Reading column pinned to a 36rem measure that never moves when chrome opens.",
+   "Command palette as primary navigation, not a power-user shortcut.",
+   "Both rails are the shadcn Sidebar, adapted rather than reinvented."
+  ],
+  "rules": [
+   {
+    "name": "The One Accent Rule",
+    "body": "#4fd1a5 means exactly one thing: the Lesson you are up to. Roughly one row per screen carries it. If a second element wants the accent, the answer is a luminance step, not a hue.",
+    "section": "colors"
+   },
+   {
+    "name": "The Light, Not Line Rule",
+    "body": "Surfaces separate by luminance. A hairline divides two regions; it never wraps one to make an object. If a thing needs a border on all four sides to read, it is drawn wrong.",
+    "section": "colors"
+   },
+   {
+    "name": "The Graphics-Only Floor Rule",
+    "body": "--mark clears 3:1 and not 4.5:1. It is legal for meaning-bearing marks and illegal for text. Every other ink step is legal everywhere.",
+    "section": "colors"
+   },
+   {
+    "name": "The Two Family Rule",
+    "body": "Geist sets every word and Geist Mono every number that is data. No third face, and no serif anywhere in this product — the serif world was tried and rejected.",
+    "section": "typography"
+   },
+   {
+    "name": "The Tabular Data Rule",
+    "body": "Any number a learner might compare down a column — completion counts, Lesson numbers, dates, minute estimates, table cells, keycaps — carries .tnum (font-variant-numeric: tabular-nums lining). Prose numbers do not.",
+    "section": "typography"
+   },
+   {
+    "name": "The One Label Rule",
+    "body": "There is exactly one uppercase tracked style in the system, at 0.6875rem/600/0.06em. Uppercase is never used at any other size, and a label never grows into a heading.",
+    "section": "typography"
+   },
+   {
+    "name": "The One Right Edge Rule",
+    "body": "Every painted edge in the Lesson column — paragraph, code block, table, note, Exercise rule, footer rule — lands on the same right edge at 36rem. Code and tables scroll inside that edge; nothing reaches past it.",
+    "section": "layout"
+   },
+   {
+    "name": "The Fixed Sentence Rule",
+    "body": "Opening or closing chrome must not move the reading column. Zero drift is the acceptance test, not \"close enough\".",
+    "section": "layout"
+   },
+   {
+    "name": "The Whole Outline Rule",
+    "body": "Every Lesson in the Course is visible in the rail at once at 1440x900. Density is the feature; if a row wants more, it belongs on the Lesson, not in the rail.",
+    "section": "layout"
+   },
+   {
+    "name": "The Flat Shell Rule",
+    "body": "One shadow exists in this system and it belongs to the layer that leaves the document — a modal dialog. Everything else earns its depth from light.",
+    "section": "elevation"
+   },
+   {
+    "name": "The No Card Rule",
+    "body": "Nothing in this product is a card. Not a Lesson, not a Tailor change, not a note, not a code block. Repeated content is a hairline-divided row list on its own ground; a note is a left rule; a code block is a luminance step. A stack of identically shaped boxes with a border and a radius is the failure mode this world was built against.",
+    "section": "shapes"
+   },
+   {
+    "name": "The Stays In Place Rule",
+    "body": "A Lesson that has not been generated is drawn, ruled and inert. It is never hidden, never faded out, and never a disabled button — it holds its position in the Outline so the shape of the Course stays true.",
+    "section": "components"
+   },
+   {
+    "name": "The Two Signals Rule",
+    "body": "Where you are up to is colour; what you have open is light. The two never swap and never combine on one row.",
+    "section": "components"
+   },
+   {
+    "name": "The Both Grounds Rule",
+    "body": "A colour is a role with two values, not a value. Anything added to :root is answered in .dark unless it genuinely does not move, and a token is never hardcoded at a call site — a literal hex in a component is a colour that cannot follow the theme.",
+    "section": "colors"
+   },
+   {
+    "name": "The Constant Region Rule",
+    "body": "The reading column does not hold still by being nailed to the left; it holds still because the region around it never changes size. Anything that opens at an edge either reserves its width in advance or is not allowed to move the sentence.",
+    "section": "layout"
+   }
+  ],
+  "dos": [
+   "Do separate surfaces with luminance — canvas -> panel -> raised -> over — and use hairlines only to divide.",
+   "Do spend the accent on exactly one thing: the Lesson the learner is up to.",
+   "Do carry the open state with a raised ground and aria-current, never with colour.",
+   "Do hold body copy to the 36rem measure and land every painted edge in the reading column on it.",
+   "Do set every number that is data in Geist Mono or with .tnum, so columns of counts, dates and estimates line up.",
+   "Do keep unavailable entries in place, ruled at --mark and inert, with no hover and no click target.",
+   "Do give a scrolling code block or table its own edge fade rather than letting it bleed past the measure.",
+   "Do keep the full Outline visible at 1440x900; new row information goes on the Lesson instead.",
+   "Do move focus into a full-screen overlay, close it on Escape, mark the layers behind inert, and return focus to the control that opened it.",
+   "Do keep both end states and drop the movement under prefers-reduced-motion.",
+   "Do answer every new :root colour in .dark, and check both grounds against the contrast floors before shipping either.",
+   "Do reach for the vendored Sidebar for anything rail-shaped, and record an adaptation in the file at the line it changes.",
+   "Do mark a layer parked off the canvas inert, so it leaves the tab order with the pixels."
+  ],
+  "donts": [
+   "Don't build cards. No bordered, radiused, shadowed boxes as page structure — the Tailor's change list included.",
+   "Don't introduce a second accent, a coloured status pill, a progress ring, a percentage, a streak, or an XP counter.",
+   "Don't spend the accent on done, on hover, on a button, on code syntax, or on anything but the live Lesson.",
+   "Don't set any part of this product in a serif, or reintroduce paper, vellum, ink stamps, folds, brass or a book metaphor. That world was tried and rejected outright.",
+   "Don't use --mark for text; it clears 3:1, not 4.5:1.",
+   "Don't render an unavailable Lesson as a disabled button, and don't list it in the command palette.",
+   "Don't add a shadow to anything that is not a floating modal layer; step the luminance instead.",
+   "Don't let opening or closing the rail or the panel shift the reading column by a single pixel.",
+   "Don't duplicate a control the panel already owns; while the panel is open, the shell shows no second control naming the same thing.",
+   "Don't add a radius outside 4/6/10px, or an uppercase style outside the one 0.6875rem label.",
+   "Don't hardcode a colour at a call site, or define one in only one ground.",
+   "Don't let the accent change meaning between the two grounds — it is darkened for paper, not repurposed.",
+   "Don't carry the theme in React state; the class on <html> is the state, and a mounted flag is a hydration seam waiting to show."
+  ]
+ }
+}
