@@ -306,6 +306,19 @@ async function stepPublish(
     : { ok: false, reason: result.reason };
 }
 
+/**
+ * Embeds the published Lessons' fragments (ticket #11), so the Tutor's
+ * Course search answers from exactly what was just published. Runs after
+ * the revision exists; re-running replaces the fragments wholesale.
+ */
+async function stepEmbedFragments(courseId: string, outlineVersion: number): Promise<void> {
+  "use step";
+  const { db } = await import("@/lib/db");
+  const { embedCourseFragments } = await import("@/lib/course/fragments");
+  const { embedTexts } = await import("@/lib/model");
+  await embedCourseFragments(db, embedTexts, courseId, outlineVersion);
+}
+
 async function stepFailReview(
   courseId: string,
   runId: string,
@@ -474,6 +487,7 @@ export async function generateCourseWorkflow(
       await stepFailReview(courseId, reviewRunId, published.reason ?? "Publication failed.");
       return { ok: false as const, reason: "publish-failed" };
     }
+    await stepEmbedFragments(courseId, outlineVersion);
     return { ok: true as const, revisionNumber: published.revisionNumber };
   } catch (error) {
     await stepFail(courseId, runId, errorMessage(error));

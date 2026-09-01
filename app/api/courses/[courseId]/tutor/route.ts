@@ -10,7 +10,7 @@ import "server-only";
  */
 import { headers } from "next/headers";
 import { z } from "zod";
-import { streamText } from "ai";
+import { isStepCount, streamText } from "ai";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/session";
 import { findOwnedPublishedCourse } from "@/lib/db/review";
@@ -22,7 +22,9 @@ import {
 } from "@/lib/db/tutor";
 import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
 import { tutorPrompt, tutorSystemPrompt } from "@/lib/course/tutor";
-import { tutorModel, tutorProviderOptions } from "@/lib/model";
+import { tutorTools } from "@/lib/course/tutor-tools";
+import { embedQuery, tutorModel, tutorProviderOptions } from "@/lib/model";
+import { webSearch } from "@/lib/web/firecrawl";
 
 const turnSchema = z.object({
   lessonId: z.string().min(1),
@@ -94,6 +96,10 @@ export async function POST(
       sources: [...toSourceLinks(published.sourceRows).values()],
     }),
     messages: tutorPrompt(history, message),
+    tools: tutorTools({ db, courseId, embedQuery, webSearch }),
+    /* The Tutor reads, it never writes, and it does not wander: at most
+       four agent steps (search, read, answer) before it must speak. */
+    stopWhen: [isStepCount(4)],
     onEnd: async (event) => {
       /* Only a cleanly finished stream becomes history. An error or an
          abort never lands here, so the turn leaves no trace to duplicate. */

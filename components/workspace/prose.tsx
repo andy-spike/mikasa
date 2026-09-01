@@ -21,9 +21,9 @@ export function SourceLinks({ sources }: { sources: SourceLink[] }) {
   );
 }
 
-/** `code` and **emphasis** inside a Lesson paragraph. */
+/** `code`, **emphasis**, and [Source](url) links inside a Lesson paragraph. */
 export function Inline({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g);
   return (
     <>
       {parts.map((part, i) => {
@@ -42,6 +42,21 @@ export function Inline({ text }: { text: string }) {
             >
               {part.slice(1, -1)}
             </code>
+          );
+        }
+        /* A cited Source, in the Lesson's own link dress. */
+        const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        if (link) {
+          return (
+            <a
+              key={i}
+              href={link[2]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline text-fg-3 underline decoration-hair underline-offset-2 transition-colors hover:text-fg-2 focus-visible:text-fg-2"
+            >
+              {link[1]}
+            </a>
           );
         }
         return part;
