@@ -60,6 +60,7 @@ export function toReadingCourse(
   course: Course,
   outline: OutlineData,
   lessonRows: LessonRow[],
+  completions: Map<string, Date> = new Map(),
 ): ReadingCourse {
   const byRef = new Map(lessonRows.map((r) => [r.lessonRef, r]));
   return {
@@ -71,6 +72,7 @@ export function toReadingCourse(
       title: m.title,
       lessons: m.lessons.map((l): ReadingLesson => {
         const row = byRef.get(l.id);
+        const done = completions.get(l.id);
         if (!row) {
           /* Publication only happens over a whole candidate, so a missing
              row is unreachable; the Lesson still renders its Outline data
@@ -89,13 +91,21 @@ export function toReadingCourse(
           title: row.title,
           summary: l.summary,
           minutes: l.minutes,
-          status: "set",
+          status: done ? "done" : "set",
+          stampedOn: done ? stampOf(done) : undefined,
           body: composeBody(row),
           exercise: row.exercise,
         };
       }),
     })),
   };
+}
+
+/** The day a completion is stamped with, as the interface reads it. */
+function stampOf(date: Date): string {
+  return date
+    .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    .toUpperCase();
 }
 
 /** Source refs resolve to links; unknown refs render as nothing. */

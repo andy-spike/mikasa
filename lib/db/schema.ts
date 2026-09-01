@@ -108,6 +108,11 @@ export const courses = pgTable(
     grounding: boolean("grounding").notNull().default(true),
     /** One of the documented states; see the table's doc comment. */
     status: text("status").notNull().default("designing"),
+    /**
+     * When every Lesson of the current published revision was marked done
+     * (ticket #8). Cleared again the moment any Lesson is unmarked.
+     */
+    completedAt: timestamp("completed_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -380,7 +385,32 @@ export const revisions = pgTable(
   ],
 );
 
+/**
+ * One Lesson's Exercise, done. Keyed by the stable Outline lesson id, so
+ * Completion follows a Lesson through renames and moves (tickets #14/#15
+ * decide what survives a split or a merge). Belongs to the owning
+ * Learner by construction: every write goes through an owned Course
+ * lookup, and the reading path is the same one.
+ */
+export const completions = pgTable(
+  "completions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    /** The stable Outline Lesson id of the current published revision. */
+    lessonRef: text("lesson_ref").notNull(),
+    doneAt: timestamp("done_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("completions_course_lesson_key").on(table.courseId, table.lessonRef),
+    index("completions_course_id_idx").on(table.courseId),
+  ],
+);
+
 export type ReviewRun = typeof reviewRuns.$inferSelect;
 export type ReviewFindingRow = typeof reviewFindings.$inferSelect;
 export type Revision = typeof revisions.$inferSelect;
 export type LessonRow = typeof lessons.$inferSelect;
+export type Completion = typeof completions.$inferSelect;

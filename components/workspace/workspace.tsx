@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, useTransition, type CSSProperties } from "react";
 import { PanelLeftOpen, PanelRight, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -9,6 +9,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ReadingCourse, SourceLink } from "@/lib/course/reading";
+import type { CompletionActionResult } from "@/lib/actions/completion";
 import { Outline, type ModuleView } from "./outline";
 import { LessonPane } from "./lesson";
 import { Panel, type PanelMode } from "./panel";
@@ -16,8 +17,7 @@ import { Resizer } from "./resizer";
 import { CommandPalette, type Command } from "./palette";
 import { ThemeToggle } from "./theme-toggle";
 
-/** Demonstration clock. Real completions carry the day the learner marked one. */
-const TODAY = "28 AUG";
+/** Real completions carry the day the learner marked one; the server returns it. */
 
 /* The two rails. The Outline opens at 20rem and leaves a 2.75rem stub behind;
    the panel opens at 21rem. Both are learner-resizable within the bounds
@@ -33,9 +33,13 @@ type Props = {
   course: ReadingCourse;
   /** The Course's Sources, for the Lesson's inline links. */
   sources?: Map<string, SourceLink>;
+  /** Marks a Lesson's Exercise done on the server; returns the stamp. */
+  onMark: (lessonId: string) => Promise<CompletionActionResult>;
+  /** Undoes one Exercise's completion on the server. */
+  onUnmark: (lessonId: string) => Promise<CompletionActionResult>;
 };
 
-export function Workspace({ course, sources }: Props) {
+export function Workspace({ course, sources, onMark, onUnmark }: Props) {
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
   const [doneAt, setDoneAt] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
@@ -55,6 +59,7 @@ export function Workspace({ course, sources }: Props) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   /* transient: the handoff plays on the mark, never on a revisit */
   const [justDone, setJustDone] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
 
   const router = useRouter();
   const narrow = useIsMobile();
@@ -103,17 +108,34 @@ export function Workspace({ course, sources }: Props) {
   }
 
   function markDone() {
-    setDoneAt((d) => ({ ...d, [open.id]: TODAY }));
     setJustDone(open.id);
+    startTransition(async () => {
+      const result = await onMark(open.id);
+      if (result.ok) {
+        setDoneAt((d) => ({ ...d, [open.id]: result.stamp }));
+      } else {
+        /* The mark did not land (stale revision, lost session): drop the
+           handoff so the Lesson reads exactly as the server has it. */
+        setJustDone(null);
+        router.refresh();
+      }
+    });
   }
 
   function unmark() {
-    setDoneAt((d) => {
-      const copy = { ...d };
-      delete copy[open.id];
-      return copy;
-    });
     setJustDone(null);
+    startTransition(async () => {
+      const result = await onUnmark(open.id);
+      if (result.ok) {
+        setDoneAt((d) => {
+          const copy = { ...d };
+          delete copy[open.id];
+          return copy;
+        });
+      } else {
+        router.refresh();
+      }
+    });
   }
 
   /* Two keys, and both are navigation: the palette, and the Outline. */
