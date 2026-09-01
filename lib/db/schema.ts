@@ -595,6 +595,9 @@ export const changePlans = pgTable(
     baseRevisionNumber: integer("base_revision_number"),
     /** "proposed" | "applied" | "staged" | "published" | "failed" | "superseded" */
     status: text("status").notNull().default("proposed"),
+    /** Set when the plan becomes a staged revision (#14): the Outline
+        version the staged candidate is written against. */
+    stagedOutlineVersion: integer("staged_outline_version"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

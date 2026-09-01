@@ -1,14 +1,18 @@
 /**
- * Durable Course generation (ADR 0005), started by Outline approval
- * (ticket #4). One Workflow step per Lesson: a failure costs one Lesson's
- * work, and the engine's step memoization means a retry (ticket #7)
- * resumes from the first unwritten Lesson, not from zero.
+ * Durable staged revisions (ticket #14). A published Course's accepted
+ * Change plan stages a candidate: the Outline version exists, the
+ * unaffected Lessons are copied into it, and this workflow regenerates
+ * only the affected Lessons, reviews only their content, and publishes
+ * the whole candidate atomically — the current Course stays readable
+ * until that swap.
  *
- * This file owns only the Workflow shape; everything substantive lives in
- * `lib/course/generate` (plain functions, injected providers) and
- * `lib/db/lessons` (state).
+ * The shape is the main generation workflow's, deliberately: same steps,
+ * same correction budget, same failure and resume rules (ticket #7).
+ * Three differences: finishing the run never moves the Course's status
+ * (it is "ready" and stays so), the review's model-driven scope is the
+ * regenerated Lessons only, and publication refuses if a newer revision
+ * exists — a stale candidate can never replace a newer Course.
  */
-import type { LessonContent } from "@/lib/course/content";
 import type { PromptSource } from "@/lib/course/generate";
 import type { GenerationContext } from "@/lib/db/lessons";
 import type { OutlineLesson } from "@/lib/course/types";
@@ -16,8 +20,14 @@ import { MAX_CORRECTION_ROUNDS } from "@/lib/course/review";
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
-  return typeof error === "string" ? error : "Course generation failed.";
+  return typeof error === "string" ? error : "The revision failed.";
 }
+
+type ReviewPayload = {
+  runId: string;
+  round: number;
+  findings: { kind: string; lessonRef: string | null; detail: string; correction: string }[];
+};
 
 async function stepLoadContext(
   courseId: string,
@@ -41,19 +51,15 @@ async function stepMarkStep(runId: string, step: string): Promise<void> {
     .where(eq(generationRuns.id, runId));
 }
 
-/** The declared order for this Outline version; a broken graph fails here. */
 async function stepOrder(context: GenerationContext): Promise<OutlineLesson[]> {
   "use step";
   const { generationOrder } = await import("@/lib/course/generate");
   return generationOrder(context.spec, context.outline.data);
 }
 
-/**
- * One Lesson: decide whether it needs a Lesson-specific Source (only when
- * Grounding is on), fetch and store it if so, then write and persist the
- * Lesson. The new Source's ref rides back so the next lessons' prompts
- * can cite it too.
- */
+/* One affected Lesson: the main workflow's own step. The copied Lessons
+   are already written for this version, so the resume check in the
+   workflow body skips them — "only affected Lessons rerun". */
 async function stepGenerateLesson(
   context: GenerationContext,
   runId: string,
@@ -61,7 +67,7 @@ async function stepGenerateLesson(
   nextLesson: OutlineLesson | null,
   priorLessons: { title: string; summary: string }[],
   extraSources: PromptSource[],
-): Promise<{ content: LessonContent; newSource?: PromptSource }> {
+): Promise<{ newSource?: PromptSource }> {
   "use step";
   const { db } = await import("@/lib/db");
   const {
@@ -113,10 +119,11 @@ async function stepGenerateLesson(
   });
 
   await saveLessonContent(db, context.course.id, context.outline.version, runId, content);
-  return { content, newSource };
+  return { newSource };
 }
 
-async function stepFinish(
+/** Completeness only: the Course is published and stays that way. */
+async function stepFinishStaged(
   courseId: string,
   outlineVersion: number,
   runId: string,
@@ -124,39 +131,17 @@ async function stepFinish(
   "use step";
   const { finishGeneration } = await import("@/lib/db/lessons");
   const { db } = await import("@/lib/db");
-  return finishGeneration(db, courseId, outlineVersion, runId);
+  return finishGeneration(db, courseId, outlineVersion, runId, {
+    promoteCourse: false,
+  });
 }
 
-async function stepFail(courseId: string, runId: string, message: string): Promise<void> {
-  "use step";
-  const { failGeneration } = await import("@/lib/db/lessons");
-  const { db } = await import("@/lib/db");
-  await failGeneration(db, courseId, runId, message);
-}
-
-/* ------------------------------------------------------------------ */
-/* Review and publication (ticket #6).                                 */
-
-type ReviewPayload = {
-  runId: string;
-  round: number;
-  findings: { kind: string; lessonRef: string | null; detail: string; correction: string }[];
-};
-
-/** One full review pass: structural (pure), factual and code, learning design, and — for a coding Course — the Sandbox.
- *
- * `onlyLessonRefs` scopes the model-driven work to the named Lessons
- * (ticket #14): a staged revision reruns factual, design, and Sandbox
- * work only for the regenerated Lessons, whose content is the only
- * content that changed. The structural pass stays whole-Course — it is
- * pure, and the Outline itself is what changed.
- */
 async function stepReviewRound(
   courseId: string,
   outlineVersion: number,
   runId: string,
   round: number,
-  onlyLessonRefs?: string[],
+  onlyLessonRefs: string[],
 ): Promise<ReviewPayload> {
   "use step";
   const { db } = await import("@/lib/db");
@@ -183,6 +168,7 @@ async function stepReviewRound(
 
   const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
   const lessonContents = await getLessonContentsForVersion(db, courseId, outlineVersion);
+  const scope = lessonContents.filter((l) => onlyLessonRefs.includes(l.lessonId));
 
   const model = generationModel();
   const courseMeta = {
@@ -190,13 +176,6 @@ async function stepReviewRound(
     goal: context.course.goal,
     language: context.course.language,
   };
-
-  /* The review's model-driven scope: everything, or — for a staged
-     revision — only the regenerated Lessons. */
-  const scope =
-    onlyLessonRefs && onlyLessonRefs.length > 0
-      ? lessonContents.filter((l) => onlyLessonRefs.includes(l.lessonId))
-      : lessonContents;
 
   const found = [
     ...structuralFindings({
@@ -208,11 +187,6 @@ async function stepReviewRound(
     ...(await designFindings(model, courseMeta, context.spec, context.outline.data, scope)),
   ];
 
-  /* Executable claims (ticket #9): only a coding Course creates Sandbox
-     work; a coding Course re-verifies after every correction round, since
-     corrections may have rewritten the code. A pass already recorded for
-     this round is reused, so a Workflow retry does not re-run the
-     Sandbox. */
   if (needsCodeVerification(context.course, scope)) {
     const existing = await findCodeVerification(db, courseId, outlineVersion, round);
     if (!existing) {
@@ -299,12 +273,54 @@ function summaryOfBlock(block: unknown): string {
   return b.text ?? "";
 }
 
-/** The findings just corrected become "corrected"; the next round starts clean. */
 async function stepMarkCorrected(runId: string, round: number): Promise<void> {
   "use step";
   const { markFindingsCorrected } = await import("@/lib/db/review");
   const { db } = await import("@/lib/db");
   await markFindingsCorrected(db, runId, round);
+}
+
+async function stepOpenReviewRun(
+  courseId: string,
+  outlineVersion: number,
+): Promise<string> {
+  "use step";
+  const { openReviewRun } = await import("@/lib/db/review");
+  const { db } = await import("@/lib/db");
+  /* The Course is published: a staged review never moves its status. */
+  const run = await openReviewRun(db, courseId, outlineVersion, {
+    touchCourse: false,
+  });
+  return run.id;
+}
+
+async function stepFailReview(
+  courseId: string,
+  runId: string,
+  message: string,
+): Promise<void> {
+  "use step";
+  const { failReview } = await import("@/lib/db/review");
+  const { db } = await import("@/lib/db");
+  await failReview(db, courseId, runId, message);
+}
+
+/**
+ * The stale guard, the last step before publication: if a newer revision
+ * exists, this candidate is obsolete and must never replace it.
+ */
+async function stepCheckStillCurrent(
+  courseId: string,
+  baseRevisionNumber: number,
+): Promise<{ ok: boolean; current?: number }> {
+  "use step";
+  const { currentRevision } = await import("@/lib/db/review");
+  const { db } = await import("@/lib/db");
+  const revision = await currentRevision(db, courseId);
+  if (!revision || revision.revisionNumber !== baseRevisionNumber) {
+    return { ok: false, current: revision?.revisionNumber };
+  }
+  return { ok: true };
 }
 
 async function stepPublish(
@@ -322,27 +338,44 @@ async function stepPublish(
 }
 
 /**
- * Embeds the published Lessons' fragments (ticket #11), so the Tutor's
- * Course search answers from exactly what was just published. Runs after
- * the revision exists; re-running replaces the fragments wholesale.
+ * Re-embeds exactly the affected Lessons (ticket #14): regenerated and
+ * retitled Lessons get fresh fragments, removed Lessons' fragments are
+ * deleted, and every other Lesson's fragments stay as they are.
  */
-async function stepEmbedFragments(courseId: string, outlineVersion: number): Promise<void> {
-  "use step";
-  const { db } = await import("@/lib/db");
-  const { embedCourseFragments } = await import("@/lib/course/fragments");
-  const { embedTexts } = await import("@/lib/model");
-  await embedCourseFragments(db, embedTexts, courseId, outlineVersion);
-}
-
-async function stepFailReview(
+async function stepEmbedAffected(
   courseId: string,
-  runId: string,
-  message: string,
+  outlineVersion: number,
+  embedLessonRefs: string[],
 ): Promise<void> {
   "use step";
-  const { failReview } = await import("@/lib/db/review");
+  if (embedLessonRefs.length === 0) return;
   const { db } = await import("@/lib/db");
-  await failReview(db, courseId, runId, message);
+  const { embedLessonFragments } = await import("@/lib/course/fragments");
+  const { embedTexts } = await import("@/lib/model");
+  await embedLessonFragments(db, embedTexts, courseId, outlineVersion, embedLessonRefs);
+}
+
+/** The plan's terminal states, written from the workflow. */
+async function stepMarkPlan(
+  planId: string,
+  status: "published" | "failed",
+): Promise<void> {
+  "use step";
+  const { db } = await import("@/lib/db");
+  const { changePlans } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
+  await db
+    .update(changePlans)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(changePlans.id, planId));
+}
+
+async function stepFailRun(courseId: string, runId: string, message: string): Promise<void> {
+  "use step";
+  const { failGeneration } = await import("@/lib/db/lessons");
+  const { db } = await import("@/lib/db");
+  /* The Course is published and stays on duty; only the run fails. */
+  await failGeneration(db, courseId, runId, message, { touchCourse: false });
 }
 
 /** Marks a passed review as passed, so publication may look at it. */
@@ -353,75 +386,30 @@ async function stepFinishReviewRun(runId: string): Promise<void> {
   await finishReviewRun(db, runId, "succeeded");
 }
 
-async function stepOpenReviewRun(
-  courseId: string,
-  outlineVersion: number,
-): Promise<string> {
-  "use step";
-  const { openReviewRun } = await import("@/lib/db/review");
-  const { db } = await import("@/lib/db");
-  const run = await openReviewRun(db, courseId, outlineVersion);
-  return run.id;
-}
-
 /**
- * Where a retry re-enters (ticket #7). A review that already passed with
- * no open findings is not run again: the run resumes at publication. A
- * Course whose revision is already published has nothing left to do.
+ * One durable pass over a staged revision: regenerate the affected
+ * Lessons (the copied ones are already written for this version), review
+ * the whole candidate's structure and the affected content, correct at
+ * most twice, refuse if the Course moved on, and publish atomically.
+ * A failure leaves the current revision on duty and the plan staged —
+ * a retry resumes from the first unwritten step, exactly like a new
+ * Course's retry (ticket #7).
  */
-async function stepReviewResumePoint(
+export async function stageRevisionWorkflow(
   courseId: string,
-  outlineVersion: number,
-): Promise<
-  | { action: "review" }
-  | { action: "publish"; reviewRunId: string }
-  | { action: "done"; revisionNumber: number }
-> {
-  "use step";
-  const { db } = await import("@/lib/db");
-  const { latestReviewRun, currentRevision } = await import("@/lib/db/review");
-  const { reviewFindings } = await import("@/lib/db/schema");
-  const { and, eq } = await import("drizzle-orm");
-
-  const revision = await currentRevision(db, courseId);
-  if (revision && revision.outlineVersion === outlineVersion) {
-    return { action: "done", revisionNumber: revision.revisionNumber };
-  }
-
-  const review = await latestReviewRun(db, courseId);
-  if (review && review.outlineVersion === outlineVersion && review.status === "succeeded") {
-    const open = await db
-      .select({ id: reviewFindings.id })
-      .from(reviewFindings)
-      .where(
-        and(eq(reviewFindings.reviewRunId, review.id), eq(reviewFindings.status, "open")),
-      )
-      .limit(1);
-    if (open.length === 0) {
-      return { action: "publish", reviewRunId: review.id };
-    }
-  }
-  return { action: "review" };
-}
-
-/**
- * One durable pass over an approved Outline version: load, order, write
- * every Lesson in dependency order (Module by Module — the Outline's
- * order within a Module is the Learner's approved order), then review the
- * complete candidate, correct at most twice, and publish atomically. A
- * candidate that still has findings after the second correction round
- * fails the Course, unpublished and retryable.
- */
-export async function generateCourseWorkflow(
-  courseId: string,
+  planId: string,
   runId: string,
   outlineVersion: number,
+  baseRevisionNumber: number,
+  regenerateLessonRefs: string[],
+  embedLessonRefs: string[],
 ) {
   "use workflow";
 
   const context = await stepLoadContext(courseId, outlineVersion);
   if (!context) {
-    await stepFail(courseId, runId, "The Course to generate no longer exists.");
+    await stepFailRun(courseId, runId, "The staged revision's Course no longer exists.");
+    await stepMarkPlan(planId, "failed");
     return { ok: false as const, reason: "course-not-found" };
   }
 
@@ -434,17 +422,18 @@ export async function generateCourseWorkflow(
     const already = new Set(context.written);
 
     for (let i = 0; i < order.length; i++) {
-      /* Resume (ticket #7): a Lesson the failed run already wrote is
-         kept, not regenerated. */
+      /* Copied Lessons are written for this version: they are kept, not
+         regenerated. Only the affected ones rerun. */
       if (already.has(order[i].id)) {
         priorLessons.push({ title: order[i].title, summary: order[i].summary });
         continue;
       }
+      const nextLesson = order[i + 1] ?? null;
       const { newSource } = await stepGenerateLesson(
         context,
         runId,
         order[i],
-        order[i + 1] ?? null,
+        nextLesson,
         priorLessons,
         extraSources,
       );
@@ -452,7 +441,7 @@ export async function generateCourseWorkflow(
       priorLessons.push({ title: order[i].title, summary: order[i].summary });
     }
 
-    const finished = await stepFinish(courseId, outlineVersion, runId);
+    const finished = await stepFinishStaged(courseId, outlineVersion, runId);
     if (!finished.ok) {
       return {
         ok: false as const,
@@ -461,25 +450,16 @@ export async function generateCourseWorkflow(
       };
     }
 
-    /* Review: structural + factual and code + learning design, then at
-       most two rounds of targeted corrections. A retry whose review
-       already passed resumes at publication instead. */
-    const resume = await stepReviewResumePoint(courseId, outlineVersion);
-    if (resume.action === "done") {
-      return { ok: true as const, revisionNumber: resume.revisionNumber };
-    }
+    const reviewRunId = await stepOpenReviewRun(courseId, outlineVersion);
+    let round = 0;
+    let review = await stepReviewRound(
+      courseId,
+      outlineVersion,
+      reviewRunId,
+      round,
+      regenerateLessonRefs,
+    );
 
-    let reviewRunId: string;
-    let review: ReviewPayload;
-    if (resume.action === "publish") {
-      reviewRunId = resume.reviewRunId;
-      review = { runId: reviewRunId, round: 0, findings: [] };
-    } else {
-      reviewRunId = await stepOpenReviewRun(courseId, outlineVersion);
-      review = await stepReviewRound(courseId, outlineVersion, reviewRunId, 0);
-    }
-
-    let round = review.round;
     while (review.findings.length > 0 && round < MAX_CORRECTION_ROUNDS) {
       round += 1;
       await stepMarkStep(runId, `corrections:${round}`);
@@ -496,28 +476,49 @@ export async function generateCourseWorkflow(
       }
       await stepMarkCorrected(reviewRunId, round - 1);
 
-      review = await stepReviewRound(courseId, outlineVersion, reviewRunId, round);
+      review = await stepReviewRound(
+        courseId,
+        outlineVersion,
+        reviewRunId,
+        round,
+        regenerateLessonRefs,
+      );
     }
 
     if (review.findings.length > 0) {
-      const message = `The review still finds ${review.findings.length} problem(s) after ${MAX_CORRECTION_ROUNDS} correction rounds. The Course was not published.`;
+      const message = `The review still finds ${review.findings.length} problem(s) after ${MAX_CORRECTION_ROUNDS} correction rounds. The revision was not published; the current Course is unchanged.`;
       await stepFailReview(courseId, reviewRunId, message);
       return { ok: false as const, reason: "review-failed" };
     }
 
-    /* The review passed: record that, so publication's own guard sees a
-       passed run and a retry resumes at publication, not through it. */
     await stepFinishReviewRun(reviewRunId);
+
+    /* The stale guard: a candidate drawn against revision N must never
+       replace revision N+1. */
+    const stillCurrent = await stepCheckStillCurrent(courseId, baseRevisionNumber);
+    if (!stillCurrent.ok) {
+      await stepFailReview(
+        courseId,
+        reviewRunId,
+        `The Course moved to revision ${stillCurrent.current} while this revision was being prepared. The staged changes were discarded.`,
+      );
+      await stepMarkPlan(planId, "failed");
+      return { ok: false as const, reason: "stale-revision" };
+    }
 
     const published = await stepPublish(courseId, outlineVersion, reviewRunId);
     if (!published.ok) {
       await stepFailReview(courseId, reviewRunId, published.reason ?? "Publication failed.");
       return { ok: false as const, reason: "publish-failed" };
     }
-    await stepEmbedFragments(courseId, outlineVersion);
+
+    await stepEmbedAffected(courseId, outlineVersion, embedLessonRefs);
+    await stepMarkPlan(planId, "published");
     return { ok: true as const, revisionNumber: published.revisionNumber };
   } catch (error) {
-    await stepFail(courseId, runId, errorMessage(error));
-    return { ok: false as const, reason: "generation-failed" };
+    /* The current Course is untouched; the plan stays staged, and a
+       retry resumes from the first unwritten step. */
+    await stepFailRun(courseId, runId, errorMessage(error));
+    return { ok: false as const, reason: "revision-failed" };
   }
 }

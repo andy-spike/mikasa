@@ -38,6 +38,10 @@ type Props = {
   onAccept: (operationId: string) => void;
   onDiscard: (operationId: string) => void;
   onRestore: (operationId: string) => void;
+  /** Staging a revision (#14): the reading page's apply action. */
+  tailorApply?: ReactNode;
+  /** One line of pane-level status, e.g. that a revision is staging. */
+  tailorStatus?: string;
   onMode: (mode: PanelMode) => void;
   onClose: () => void;
   /** the drag strip on the panel's inner edge; the workspace owns the width */
@@ -54,6 +58,8 @@ export function Panel({
   onAccept,
   onDiscard,
   onRestore,
+  tailorApply,
+  tailorStatus,
   onMode,
   onClose,
   resizer,
@@ -84,9 +90,10 @@ export function Panel({
           </Button>
         </div>
         <p className="mt-2.5 text-[0.75rem] leading-[1.5] text-fg-3">
-          {mode === "tutor"
-            ? "Changes nothing in the Course."
-            : "Nothing is written until you apply it."}
+          {tailorStatus ??
+            (mode === "tutor"
+              ? "Changes nothing in the Course."
+              : "Nothing is written until you apply it.")}
         </p>
       </SidebarHeader>
 
@@ -109,6 +116,7 @@ export function Panel({
             onAccept={onAccept}
             onDiscard={onDiscard}
             onRestore={onRestore}
+            applySlot={tailorApply}
           />
         )}
       </SidebarContent>

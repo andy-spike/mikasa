@@ -89,3 +89,31 @@ export async function embedCourseFragments(
   await replaceCourseFragments(db, courseId, fragments, embeddings);
   return fragments.length;
 }
+
+/**
+ * Embeds and stores exactly the named Lessons' fragments (ticket #14),
+ * leaving every other Lesson's fragments untouched. A staged revision
+ * calls this after publishing, with the Lessons whose content or title
+ * changed; Lessons that left the Course are named too, so their
+ * fragments are deleted without replacement.
+ */
+export async function embedLessonFragments(
+  db: Db,
+  embedTexts: (texts: string[]) => Promise<number[][]>,
+  courseId: string,
+  outlineVersion: number,
+  lessonRefs: string[],
+): Promise<number> {
+  const { getLessonsForVersion } = await import("@/lib/db/lessons");
+  const { replaceLessonFragments } = await import("@/lib/db/fragments");
+  const wanted = new Set(lessonRefs);
+  const rows = (await getLessonsForVersion(db, courseId, outlineVersion)).filter((r) =>
+    wanted.has(r.lessonRef),
+  );
+  const fragments = buildCourseFragments(rows);
+  const embeddings = fragments.length
+    ? await embedTexts(fragments.map((f) => f.content))
+    : [];
+  await replaceLessonFragments(db, courseId, lessonRefs, fragments, embeddings);
+  return fragments.length;
+}

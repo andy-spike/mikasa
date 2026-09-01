@@ -29,11 +29,15 @@ export async function openReviewRun(
   db: Db,
   courseId: string,
   outlineVersion: number,
+  options?: { touchCourse?: boolean },
 ): Promise<ReviewRun> {
   const [run] = await db
     .insert(reviewRuns)
     .values({ courseId, outlineVersion })
     .returning();
+  /* A staged revision (ticket #14) reviews without moving the Course:
+     the published Course reads as itself the whole time. */
+  if (options?.touchCourse === false) return run;
   await db
     .update(courses)
     .set({ status: "reviewing", updatedAt: new Date() })

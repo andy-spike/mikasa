@@ -78,6 +78,13 @@
       "when": 1788236927867,
       "tag": "0010_tailor",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788240257941,
+      "tag": "0011_plan-staged-revision",
+      "breakpoints": true
     }
   ]
 }

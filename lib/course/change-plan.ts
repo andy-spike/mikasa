@@ -228,6 +228,56 @@ export function opModuleIds(op: ChangePlanOp): string[] {
   }
 }
 
+export type AffectedLessonSets = {
+  /** Lessons whose content must be regenerated: new or rewritten. */
+  regenerate: string[];
+  /** Lessons to re-embed after publish: regenerated, retitled, or gone. */
+  embed: string[];
+  /** Lessons that left the Outline; their fragments are deleted. */
+  removed: string[];
+};
+
+/**
+ * The affected sets between the Outline a plan was drawn against and the
+ * staged one (ticket #14). New ids (added Lessons, split halves) and
+ * Lessons with content demands regenerate; renamed Lessons copy with
+ * their new title and only re-embed (the title prefixes their search
+ * fragments); removed Lessons leave no row behind.
+ */
+export function affectedLessonSets(
+  base: OutlineData,
+  next: OutlineData,
+  accepted: ChangePlanOp[],
+): AffectedLessonSets {
+  const oldTitles = new Map<string, string>();
+  for (const m of base.modules) for (const l of m.lessons) oldTitles.set(l.id, l.title);
+  const newTitles = new Map<string, string>();
+  for (const m of next.modules) for (const l of m.lessons) newTitles.set(l.id, l.title);
+
+  const regenerate = new Set<string>();
+  for (const op of accepted) {
+    if (
+      op.kind === "lessonProse" ||
+      op.kind === "exercise" ||
+      op.kind === "splitLesson" ||
+      op.kind === "mergeLesson"
+    ) {
+      for (const id of opLessonIds(op)) if (newTitles.has(id)) regenerate.add(id);
+    }
+  }
+  for (const id of newTitles.keys()) if (!oldTitles.has(id)) regenerate.add(id);
+
+  const removed = [...oldTitles.keys()].filter((id) => !newTitles.has(id));
+  const retitle = [...newTitles.keys()].filter(
+    (id) => oldTitles.has(id) && oldTitles.get(id) !== newTitles.get(id),
+  );
+  return {
+    regenerate: [...regenerate],
+    embed: [...regenerate, ...retitle, ...removed],
+    removed,
+  };
+}
+
 /** Whether an operation changes only names or placement, not substance. */
 export function preservesCompletion(op: ChangePlanOp): boolean {
   return (

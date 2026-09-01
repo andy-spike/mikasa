@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ReadingCourse, SourceLink } from "@/lib/course/reading";
 import type { CompletionActionResult } from "@/lib/actions/completion";
-import { reviewTailorOperationAction } from "@/lib/actions/tailor";
+import { reviewTailorOperationAction, stagePlanRevisionAction } from "@/lib/actions/tailor";
 import type { PlanView, Turn } from "./panel";
 import { Outline, type ModuleView } from "./outline";
 import { LessonPane } from "./lesson";
@@ -234,6 +234,11 @@ export function Workspace({
     setPlan(tailorPlan);
   }
 
+  /* Staging a revision (#14): the accepted operations become a candidate
+     the durable engine regenerates; the current Course stays readable. */
+  const [staged, setStaged] = useState(false);
+  const [, startStaging] = useTransition();
+
   async function reviewOperation(
     operationId: string,
     status: "accepted" | "discarded" | "proposed",
@@ -257,6 +262,10 @@ export function Workspace({
       setPlan(await onRefreshPlan());
     }
   }
+
+  const tailorStatus = staged
+    ? "A revision is being prepared from your accepted changes. The Course reads as it is until it publishes."
+    : null;
 
   const tailorTurnsStable = useMemo<Turn[]>(() => tailorTurns ?? [], [tailorTurns]);
 
@@ -473,6 +482,27 @@ export function Workspace({
           onAccept={(id) => reviewOperation(id, "accepted")}
           onDiscard={(id) => reviewOperation(id, "discarded")}
           onRestore={(id) => reviewOperation(id, "proposed")}
+          tailorStatus={tailorStatus ?? undefined}
+          tailorApply={
+            plan ? (
+              <Button
+                onClick={() =>
+                  startStaging(async () => {
+                    const result = await stagePlanRevisionAction(course.id, plan.id);
+                    if (result.ok) {
+                      setPlan(null);
+                      setStaged(true);
+                    } else {
+                      setPlan(await onRefreshPlan());
+                    }
+                  })
+                }
+                className="w-full"
+              >
+                Stage as a new revision
+              </Button>
+            ) : null
+          }
           resizer={
             <Resizer
               side="right"

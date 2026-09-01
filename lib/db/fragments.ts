@@ -8,7 +8,7 @@ import "server-only";
  * Course id, so a Learner's Tutor can never see another Course's
  * fragments.
  */
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "./index";
 import { lessonFragments } from "./schema";
 
@@ -35,6 +35,42 @@ export async function replaceCourseFragments(
   }
   await db.transaction(async (tx) => {
     await tx.delete(lessonFragments).where(eq(lessonFragments.courseId, courseId));
+    if (fragments.length === 0) return;
+    await tx.insert(lessonFragments).values(
+      fragments.map((f, i) => ({
+        courseId,
+        lessonRef: f.lessonRef,
+        ordinal: f.ordinal,
+        content: f.content,
+        embedding: embeddings[i],
+      })),
+    );
+  });
+}
+
+/**
+ * Replaces the fragments of the named Lessons only, leaving every other
+ * Lesson's fragments untouched (ticket #14). A staged revision re-embeds
+ * exactly the affected Lessons; `lessonRefs` also names the Lessons that
+ * left the Course, whose fragments are deleted without replacement.
+ */
+export async function replaceLessonFragments(
+  db: Db,
+  courseId: string,
+  lessonRefs: string[],
+  fragments: FragmentInput[],
+  embeddings: number[][],
+): Promise<void> {
+  if (fragments.length !== embeddings.length) {
+    throw new Error("Every fragment needs exactly one embedding.");
+  }
+  if (lessonRefs.length === 0) return;
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(lessonFragments)
+      .where(
+        and(eq(lessonFragments.courseId, courseId), inArray(lessonFragments.lessonRef, lessonRefs)),
+      );
     if (fragments.length === 0) return;
     await tx.insert(lessonFragments).values(
       fragments.map((f, i) => ({

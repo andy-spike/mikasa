@@ -1,0 +1,1 @@
+ALTER TABLE "change_plans" ADD COLUMN "staged_outline_version" integer;

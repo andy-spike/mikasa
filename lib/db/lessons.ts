@@ -193,6 +193,7 @@ export async function finishGeneration(
   courseId: string,
   outlineVersion: number,
   runId: string,
+  options?: { promoteCourse?: boolean },
 ): Promise<{ ok: boolean; missing: number }> {
   const [outline] = await db
     .select()
@@ -228,6 +229,9 @@ export async function finishGeneration(
       .update(generationRuns)
       .set({ status: "succeeded", currentStep: "complete", updatedAt: new Date() })
       .where(eq(generationRuns.id, runId));
+    /* A staged revision (ticket #14) finishes its run without touching
+       the Course: it is published and stays readable throughout. */
+    if (options?.promoteCourse === false) return;
     await tx
       .update(courses)
       .set({ status: "reviewing", updatedAt: new Date() })
@@ -242,12 +246,16 @@ export async function failGeneration(
   courseId: string,
   runId: string,
   message: string,
+  options?: { touchCourse?: boolean },
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await tx
       .update(generationRuns)
       .set({ status: "failed", error: message, updatedAt: new Date() })
       .where(eq(generationRuns.id, runId));
+    /* A staged revision (ticket #14) fails without touching the Course:
+       the published Course stays on duty and the plan stays retryable. */
+    if (options?.touchCourse === false) return;
     await tx
       .update(courses)
       .set({ status: "failed", updatedAt: new Date() })
