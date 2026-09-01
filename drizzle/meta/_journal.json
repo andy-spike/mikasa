@@ -71,6 +71,13 @@
       "when": 1788234607903,
       "tag": "0009_lesson-fragments",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788236927867,
+      "tag": "0010_tailor",
+      "breakpoints": true
     }
   ]
 }

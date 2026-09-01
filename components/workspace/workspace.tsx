@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ReadingCourse, SourceLink } from "@/lib/course/reading";
 import type { CompletionActionResult } from "@/lib/actions/completion";
-import type { TutorTurn } from "./panel";
+import { reviewTailorOperationAction } from "@/lib/actions/tailor";
+import type { PlanView, Turn } from "./panel";
 import { Outline, type ModuleView } from "./outline";
 import { LessonPane } from "./lesson";
 import { Panel, type PanelMode } from "./panel";
@@ -39,11 +40,25 @@ type Props = {
   /** Undoes one Exercise's completion on the server. */
   onUnmark: (lessonId: string) => Promise<CompletionActionResult>;
   /** The Tutor's restored conversations, keyed by the Lesson id (#10). */
-  tutorHistory?: Record<string, TutorTurn[]>;
+  tutorHistory?: Record<string, Turn[]>;
+  /** The Tailor's restored conversation (#12). */
+  tailorTurns?: Turn[];
+  /** The Change plan under review, as the server has it. */
+  tailorPlan?: PlanView | null;
+  /** The plan as the server has it now, after a turn may have proposed one. */
+  onRefreshPlan: () => Promise<PlanView | null>;
 };
 
-export function Workspace({ course, sources, onMark, onUnmark, tutorHistory }: Props) {
-  const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
+export function Workspace({
+  course,
+  sources,
+  onMark,
+  onUnmark,
+  tutorHistory,
+  tailorTurns,
+  tailorPlan,
+  onRefreshPlan,
+}: Props) {
   const [doneAt, setDoneAt] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
     for (const m of course.modules)
@@ -173,10 +188,77 @@ export function Workspace({ course, sources, onMark, onUnmark, tutorHistory }: P
 
   /* The open Lesson's restored conversation, identity-stable between
      renders so the pane's live thread survives a re-render mid-stream. */
-  const tutorTurnsFor = useMemo<TutorTurn[]>(
+  const tutorTurnsFor = useMemo<Turn[]>(
     () => tutorHistory?.[open.id] ?? [],
     [tutorHistory, open.id],
   );
+
+  /* The Tailor's turn (#12): one conversation for the whole Course, the
+     server owns its history. When a turn completes, the server may have
+     proposed a plan, so the review refreshes from it. */
+  async function askTailor(
+    text: string,
+    onDelta: (chunk: string) => void,
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(`/api/courses/${course.id}/tailor`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+      if (!response.ok || !response.body) return false;
+
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+          const fresh = await onRefreshPlan();
+          setPlan(fresh);
+          return true;
+        }
+        if (value) onDelta(value);
+      }
+    } catch {
+      /* Network dropped mid-stream: the turn is not stored server-side,
+         and the pane says so. */
+      return false;
+    }
+  }
+
+  /* The plan under review: server-restored, then locally amended by the
+     review actions. A router refresh delivers the server's truth again. */
+  const [plan, setPlan] = useState<PlanView | null | undefined>(tailorPlan);
+  const [restoredPlan, setRestoredPlan] = useState(tailorPlan);
+  if (tailorPlan !== restoredPlan) {
+    setRestoredPlan(tailorPlan);
+    setPlan(tailorPlan);
+  }
+
+  async function reviewOperation(
+    operationId: string,
+    status: "accepted" | "discarded" | "proposed",
+  ) {
+    if (!plan) return;
+    const result = await reviewTailorOperationAction(plan.id, operationId, status);
+    if (result.ok) {
+      setPlan((p) =>
+        p
+          ? {
+              ...p,
+              operations: p.operations.map((o) =>
+                o.id === operationId ? { ...o, status } : o,
+              ),
+            }
+          : p,
+      );
+    } else {
+      /* The review did not land (plan applied elsewhere, lost session):
+         the server's state wins. */
+      setPlan(await onRefreshPlan());
+    }
+  }
+
+  const tailorTurnsStable = useMemo<Turn[]>(() => tailorTurns ?? [], [tailorTurns]);
 
   /* Two keys, and both are navigation: the palette, and the Outline. */
   useEffect(() => {
@@ -380,21 +462,17 @@ export function Workspace({ course, sources, onMark, onUnmark, tutorHistory }: P
           mode={panel ?? lastMode}
           tutorTurns={tutorTurnsFor}
           onAsk={(text, onDelta) => askTutor(open.id, text, onDelta)}
-          tailorPlan={[]}
-          applied={applied}
+          tailorTurns={tailorTurnsStable}
+          onTailorAsk={askTailor}
+          tailorPlan={plan ?? undefined}
           onMode={(m) => {
             setLastMode(m);
             setPanel(m);
           }}
           onClose={() => setPanel(null)}
-          onApprove={(id) => setApplied((a) => new Set(a).add(id))}
-          onUndo={(id) =>
-            setApplied((a) => {
-              const copy = new Set(a);
-              copy.delete(id);
-              return copy;
-            })
-          }
+          onAccept={(id) => reviewOperation(id, "accepted")}
+          onDiscard={(id) => reviewOperation(id, "discarded")}
+          onRestore={(id) => reviewOperation(id, "proposed")}
           resizer={
             <Resizer
               side="right"

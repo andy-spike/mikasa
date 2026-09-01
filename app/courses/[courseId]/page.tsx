@@ -5,7 +5,9 @@ import { findOwnedCourse } from "@/lib/db/courses";
 import { findOwnedPublishedCourse } from "@/lib/db/review";
 import { listCompletions } from "@/lib/db/completion";
 import { loadTutorHistory } from "@/lib/db/tutor";
+import { loadTailorHistory } from "@/lib/db/tailor";
 import { markLessonDoneAction, markLessonUndoneAction } from "@/lib/actions/completion";
+import { findProposedPlanAction } from "@/lib/actions/tailor";
 import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
 import { requireLearner } from "@/lib/session";
 
@@ -42,6 +44,15 @@ export default async function CoursePage({ params }: PageProps<"/courses/[course
     tutorHistory[lessonRef] = turns.map((t) => ({ from: t.role, text: t.content }));
   }
 
+  /* The Tailor's conversation and the plan under review, if one is
+     proposed (#12). Separate tables, separate thread, same rule: the
+     server's history is what the pane shows on arrival. */
+  const tailorTurns = (await loadTailorHistory(db, user.id, courseId)).map((t) => ({
+    from: t.role,
+    text: t.content,
+  }));
+  const proposedPlan = await findProposedPlanAction(courseId);
+
   return (
     <Workspace
       course={reading}
@@ -49,6 +60,9 @@ export default async function CoursePage({ params }: PageProps<"/courses/[course
       onMark={(lessonId) => markLessonDoneAction(courseId, lessonId)}
       onUnmark={(lessonId) => markLessonUndoneAction(courseId, lessonId)}
       tutorHistory={tutorHistory}
+      tailorTurns={tailorTurns}
+      tailorPlan={proposedPlan}
+      onRefreshPlan={findProposedPlanAction.bind(null, courseId)}
     />
   );
 }

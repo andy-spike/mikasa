@@ -535,3 +535,96 @@ export const lessonFragments = pgTable(
 );
 
 export type LessonFragment = typeof lessonFragments.$inferSelect;
+
+/**
+ * The Tailor's conversation (ticket #12): one per Course, separate from
+ * the Tutor's per-Lesson threads. The Tailor talks about reshaping the
+ * Course; the Tutor talks about understanding it.
+ */
+export const tailorConversations = pgTable(
+  "tailor_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("tailor_conversations_course_id_key").on(table.courseId)],
+);
+
+/** The Tailor's canonical history. Only completed turns are stored. */
+export const tailorMessages = pgTable(
+  "tailor_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => tailorConversations.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    /** "learner" | "tailor" */
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("tailor_messages_conversation_seq_key").on(
+      table.conversationId,
+      table.seq,
+    ),
+  ],
+);
+
+/**
+ * A Change plan (ticket #12): the structured operations the Tailor
+ * proposed in one turn, reviewed operation by operation, and applied
+ * together or not at all (tickets #13/#14). `baseOutlineVersion` and
+ * `baseRevisionNumber` pin the plan to the Course the Learner was
+ * looking at; a later version or revision rejects the whole plan.
+ */
+export const changePlans = pgTable(
+  "change_plans",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    /** The Outline version the plan was drawn against. */
+    baseOutlineVersion: integer("base_outline_version").notNull(),
+    /** For a published Course: the revision it was drawn against. */
+    baseRevisionNumber: integer("base_revision_number"),
+    /** "proposed" | "applied" | "staged" | "published" | "failed" | "superseded" */
+    status: text("status").notNull().default("proposed"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("change_plans_course_id_idx").on(table.courseId)],
+);
+
+/**
+ * One operation of a Change plan. `payload` is the operation itself (an
+ * OutlineOp, or a content change) as stored by the Tailor; `undo` is
+ * filled at apply/publish time with what a later undo needs (#15).
+ */
+export const changeOperations = pgTable(
+  "change_operations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => changePlans.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    kind: text("kind").notNull(),
+    payload: jsonb("payload").$type<unknown>().notNull(),
+    /** "proposed" | "accepted" | "discarded" */
+    status: text("status").notNull().default("proposed"),
+    undo: jsonb("undo").$type<unknown>(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("change_operations_plan_position_key").on(table.planId, table.position)],
+);
+
+export type TailorConversation = typeof tailorConversations.$inferSelect;
+export type TailorMessage = typeof tailorMessages.$inferSelect;
+export type ChangePlan = typeof changePlans.$inferSelect;
+export type ChangeOperation = typeof changeOperations.$inferSelect;
