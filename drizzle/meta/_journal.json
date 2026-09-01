@@ -64,6 +64,13 @@
       "when": 1788233136258,
       "tag": "0008_tutor",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788234607903,
+      "tag": "0009_lesson-fragments",
+      "breakpoints": true
     }
   ]
 }

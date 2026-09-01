@@ -16,6 +16,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  vector,
 } from "drizzle-orm/pg-core";
 import type { CourseSpecification, OutlineData } from "../course/types";
 import type { OutlineDraft } from "../course/design";
@@ -505,3 +506,32 @@ export const tutorMessages = pgTable(
 
 export type TutorConversation = typeof tutorConversations.$inferSelect;
 export type TutorMessage = typeof tutorMessages.$inferSelect;
+
+/**
+ * A searchable fragment of a published Lesson (ticket #11): one block of
+ * the Lesson's content, embedded at 768 dimensions when the revision was
+ * published. Retrieval is exact pgvector cosine search over the owned
+ * Course's fragments — no index, perfect recall, Course-sized tables.
+ */
+export const lessonFragments = pgTable(
+  "lesson_fragments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    /** The stable Outline Lesson id the fragment came from. */
+    lessonRef: text("lesson_ref").notNull(),
+    /** Position of the fragment within its Lesson. */
+    ordinal: integer("ordinal").notNull(),
+    /** The fragment's text, as the Tutor reads it. */
+    content: text("content").notNull(),
+    embedding: vector("embedding", { dimensions: 768 }).notNull(),
+  },
+  (table) => [
+    index("lesson_fragments_course_id_idx").on(table.courseId),
+    index("lesson_fragments_course_lesson_idx").on(table.courseId, table.lessonRef),
+  ],
+);
+
+export type LessonFragment = typeof lessonFragments.$inferSelect;
