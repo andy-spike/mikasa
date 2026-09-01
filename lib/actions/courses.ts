@@ -9,7 +9,15 @@ import { eq } from "drizzle-orm";
 import { start } from "workflow/api";
 import { db } from "@/lib/db";
 import { courses, designRuns } from "@/lib/db/schema";
-import { failDesignRun, startDesignRun } from "@/lib/db/design";
+import {
+  failDesignRun,
+  latestDesignRun,
+  startDesignRun,
+} from "@/lib/db/design";
+import {
+  failGenerationRun,
+  latestGenerationRun,} from "@/lib/db/outline";
+import { resetGenerationRun } from "@/lib/db/review";
 import { findOwnedCourse } from "@/lib/db/courses";
 import { requireLearner } from "@/lib/session";
 import {
@@ -18,12 +26,9 @@ import {
   type CourseInputErrors,
 } from "@/lib/course/limits";
 import { designCourseWorkflow } from "@/workflows/course-design";
+import { generateCourseWorkflow } from "@/workflows/course-generation";
 
 export type CreateCourseResult =
-  | { ok: true; courseId: string }
-  | { ok: false; errors: CourseInputErrors };
-
-export type RetryDesignResult =
   | { ok: true; courseId: string }
   | { ok: false; errors: CourseInputErrors };
 
@@ -75,17 +80,73 @@ export async function createCourseAction(
 }
 
 /**
- * Runs design again over a failed Course. Ticket #7 owns the full retry
- * experience; this is the minimal wiring the failure state needs so the
- * button on the progress screen is not a lie.
+ * Runs work again over a failed Course: the dispatching retry of ticket
+ * #7. The stage the failure came from decides what runs again — design
+ * resumes past its persisted steps; generation keeps written Lessons and
+ * a passed review; nothing valid is regenerated.
  */
-export async function retryDesignAction(courseId: string): Promise<RetryDesignResult> {
+export type RetryResult =
+  | { ok: true; courseId: string }
+  | { ok: false; errors: CourseInputErrors };
+
+export async function retryCourseAction(courseId: string): Promise<RetryResult> {
   const { user } = await requireLearner();
 
   const course = await findOwnedCourse(db, user.id, courseId);
   if (!course) return { ok: false, errors: { form: "Course not found." } };
 
-  const errors = await startDesign(course.id);
-  if (errors) return { ok: false, errors };
-  return { ok: true, courseId: course.id };
+  if (course.status !== "failed") {
+    return { ok: false, errors: { form: "This Course has nothing to retry." } };
+  }
+
+  /* A failed generation (lessons, review, publication) outranks design:
+     it means the Course had already reached the generation stage. */
+  const generation = await latestGenerationRun(db, courseId);
+  if (generation && generation.status === "failed") {
+    const reopened = await resetGenerationRun(db, courseId, generation.id);
+    if (!reopened) {
+      return { ok: false, errors: { form: "This run cannot be retried." } };
+    }
+    try {
+      await start(generateCourseWorkflow, [courseId, generation.id, generation.outlineVersion]);
+      return { ok: true, courseId };
+    } catch {
+      await failGenerationRun(
+        db,
+        courseId,
+        generation.id,
+        "The generation engine could not start this retry.",
+      );
+      return { ok: false, errors: { form: "The generation engine could not start this retry. Try again." } };
+    }
+  }
+
+  const design = await latestDesignRun(db, courseId);
+  if (!design) return { ok: false, errors: { form: "This Course has no run to retry." } };
+
+  /* A design that failed before anything persisted starts over; one that
+     failed later resumes past its persisted steps. */
+  const RESUMABLE = new Set(["outline", "specification", "persist"]);
+  const resumeFrom: "sources" | "outline" | "specification" | "persist" =
+    RESUMABLE.has(design.currentStep)
+      ? (design.currentStep as "outline" | "specification" | "persist")
+      : "sources";
+
+  const newRun = await startDesignRun(db, courseId);
+  try {
+    const started = await start(designCourseWorkflow, [courseId, newRun.id, resumeFrom]);
+    await db
+      .update(designRuns)
+      .set({ workflowRunId: started.runId })
+      .where(eq(designRuns.id, newRun.id));
+    return { ok: true, courseId };
+  } catch {
+    await failDesignRun(
+      db,
+      courseId,
+      newRun.id,
+      "The design engine could not start this retry.",
+    );
+    return { ok: false, errors: { form: "The design engine could not start this retry. Try again." } };
+  }
 }

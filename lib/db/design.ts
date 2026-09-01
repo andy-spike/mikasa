@@ -22,7 +22,10 @@ import type {
   CourseSpecification,
   CourseStatus,
   DesignOutcome,
+  GatheredSource,
+  OutlineData,
 } from "../course/types";
+import type { OutlineDraft } from "../course/design";
 
 /**
  * Server-side Course lookup for the Workflow, which runs without a
@@ -71,29 +74,20 @@ export async function recordDesignStep(
 }
 
 /**
- * Persists everything a successful design produced, in one transaction:
- * Sources replace any earlier run's, the Outline is appended as a new
- * version (stable ids belong to one version), and the Course reaches the
- * Outline checkpoint.
+ * Persists the gathered Sources right away: a design that fails later
+ * keeps them, and its retry reuses them instead of fetching again
+ * (ticket #7). Like the earlier behaviour, a new run replaces the rows.
  */
-export async function saveDesignResult(
+export async function saveDesignSources(
   db: Db,
   courseId: string,
-  runId: string,
-  outcome: DesignOutcome,
-): Promise<Outline> {
-  return db.transaction(async (tx) => {
-    const [previous] = await tx
-      .select({ version: outlines.version })
-      .from(outlines)
-      .where(eq(outlines.courseId, courseId))
-      .orderBy(desc(outlines.version))
-      .limit(1);
-
+  gathered: GatheredSource[],
+): Promise<void> {
+  await db.transaction(async (tx) => {
     await tx.delete(sources).where(eq(sources.courseId, courseId));
-    if (outcome.sources.length > 0) {
+    if (gathered.length > 0) {
       await tx.insert(sources).values(
-        outcome.sources.map((s) => ({
+        gathered.map((s) => ({
           courseId,
           ref: s.ref,
           title: s.title,
@@ -103,39 +97,87 @@ export async function saveDesignResult(
         })),
       );
     }
+  });
+}
 
-    const [outline] = await tx
+/** Persists a drafted, bounds-checked Outline as the next version. */
+export async function saveDesignOutline(
+  db: Db,
+  courseId: string,
+  outline: OutlineData,
+  draft?: OutlineDraft,
+): Promise<Outline> {
+  return db.transaction(async (tx) => {
+    const [previous] = await tx
+      .select({ version: outlines.version })
+      .from(outlines)
+      .where(eq(outlines.courseId, courseId))
+      .orderBy(desc(outlines.version))
+      .limit(1);
+    return tx
       .insert(outlines)
       .values({
         courseId,
         version: (previous?.version ?? 0) + 1,
-        data: outcome.outline,
+        data: outline,
+        draft: draft ?? null,
       })
-      .returning();
+      .returning()
+      .then((rows) => rows[0]);
+  });
+}
 
-    await tx
-      .insert(courseSpecs)
-      .values({
-        courseId,
-        spec: outcome.specification,
-        outlineVersion: outline.version,
-      })
-      .onConflictDoUpdate({
-        target: courseSpecs.courseId,
-        set: { spec: outcome.specification, outlineVersion: outline.version },
-      });
+/** Persists the private specification, aligned to the given Outline version. */
+export async function saveDesignSpecification(
+  db: Db,
+  courseId: string,
+  specification: CourseSpecification,
+  outlineVersion: number,
+): Promise<void> {
+  await db
+    .insert(courseSpecs)
+    .values({ courseId, spec: specification, outlineVersion })
+    .onConflictDoUpdate({
+      target: courseSpecs.courseId,
+      set: { spec: specification, outlineVersion },
+    });
+}
 
+/**
+ * Lands the whole outcome of a design pass in order: Sources, Outline
+ * version, specification, and the Course's move to the Outline checkpoint.
+ * The Workflow calls the pieces; tests and retry paths compose the same
+ * pieces so there is one behaviour.
+ */
+export async function saveDesignResult(
+  db: Db,
+  courseId: string,
+  runId: string,
+  outcome: DesignOutcome,
+  draft?: OutlineDraft,
+): Promise<Outline> {
+  await saveDesignSources(db, courseId, outcome.sources);
+  const outline = await saveDesignOutline(db, courseId, outcome.outline, draft);
+  await saveDesignSpecification(db, courseId, outcome.specification, outline.version);
+  await completeDesignRun(db, courseId, runId);
+  return outline;
+}
+
+/** The final design step: the Course reaches the Outline checkpoint. */
+export async function completeDesignRun(
+  db: Db,
+  courseId: string,
+  runId: string,
+): Promise<void> {
+  await db.transaction(async (tx) => {
     await tx
       .update(courses)
       .set({ status: "awaiting-outline-approval", updatedAt: new Date() })
       .where(eq(courses.id, courseId));
-
     await tx
       .update(designRuns)
       .set({ status: "succeeded", currentStep: "persist", updatedAt: new Date() })
       .where(eq(designRuns.id, runId));
-
-    return outline;
   });
 }
 

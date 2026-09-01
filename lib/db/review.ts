@@ -196,6 +196,17 @@ export async function publishRevision(
       .where(eq(revisions.courseId, courseId));
     const nextNumber = (current?.revisionNumber ?? 0) + 1;
 
+    /* A revision of this Outline version already exists: publication is
+       idempotent, and a repeated retry cannot mint a second one. */
+    const [existing] = await tx
+      .select()
+      .from(revisions)
+      .where(
+        and(eq(revisions.courseId, courseId), eq(revisions.outlineVersion, outlineVersion)),
+      )
+      .limit(1);
+    if (existing) return { ok: true as const, revision: existing };
+
     const [revision] = await tx
       .insert(revisions)
       .values({ courseId, revisionNumber: nextNumber, outlineVersion })
@@ -252,6 +263,38 @@ export async function latestReviewRun(
     .orderBy(desc(reviewRuns.startedAt))
     .limit(1);
   return run;
+}
+
+/**
+ * Reopens a failed generation run for retry (ticket #7): running again
+ * with the error cleared, same id and Outline version, so the Lessons it
+ * already wrote are the ones a retry skips.
+ */
+export async function resetGenerationRun(
+  db: Db,
+  courseId: string,
+  runId: string,
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [run] = await tx
+      .select()
+      .from(generationRuns)
+      .where(
+        and(eq(generationRuns.id, runId), eq(generationRuns.courseId, courseId)),
+      )
+      .limit(1);
+    if (!run || run.status !== "failed") return false;
+
+    await tx
+      .update(generationRuns)
+      .set({ status: "running", error: null, currentStep: "resuming", updatedAt: new Date() })
+      .where(eq(generationRuns.id, runId));
+    await tx
+      .update(courses)
+      .set({ status: "generating", updatedAt: new Date() })
+      .where(eq(courses.id, courseId));
+    return true;
+  });
 }
 
 /**

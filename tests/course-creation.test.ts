@@ -38,7 +38,7 @@ vi.mock("workflow/api", () => ({
 const { auth, requireLearner } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
 const { courses, designRuns } = await import("@/lib/db/schema");
-const { createCourseAction, retryDesignAction } = await import("@/lib/actions/courses");
+const { createCourseAction, retryCourseAction } = await import("@/lib/actions/courses");
 const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
 
 const ORIGIN = "http://localhost:3000";
@@ -188,12 +188,12 @@ describe("createCourseAction", () => {
   });
 });
 
-describe("retryDesignAction", () => {
+describe("retryCourseAction", () => {
   it("reads another Learner's Course as not-found", async () => {
     const cookie = await signInWithGoogle("stranger@example.com");
     headerState.current = new Headers({ cookie });
 
-    const result = await retryDesignAction("00000000-0000-0000-0000-000000000000");
+    const result = await retryCourseAction("00000000-0000-0000-0000-000000000000");
     expect(result.ok).toBe(false);
     expect(workflowStarts.calls).toHaveLength(0);
   });
@@ -214,7 +214,7 @@ describe("retryDesignAction", () => {
       .where(eq(courses.id, courseId));
 
     const before = workflowStarts.calls.length;
-    const result = await retryDesignAction(courseId);
+    const result = await retryCourseAction(courseId);
     expect(result.ok).toBe(true);
 
     const [course] = await db

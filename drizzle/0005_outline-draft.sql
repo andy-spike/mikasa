@@ -1,0 +1,1 @@
+ALTER TABLE "outlines" ADD COLUMN "draft" jsonb;

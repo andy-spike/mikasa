@@ -18,6 +18,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import type { CourseSpecification, OutlineData } from "../course/types";
+import type { OutlineDraft } from "../course/design";
 import type { ContentBlock } from "../course/content";
 
 export const users = pgTable("users", {
@@ -189,6 +190,13 @@ export const outlines = pgTable(
       .references(() => courses.id, { onDelete: "cascade" }),
     version: integer("version").notNull().default(1),
     data: jsonb("data").$type<OutlineData>().notNull(),
+    /**
+     * The design draft the Outline was built from (terminal performances,
+     * throughline, exclusions). The specification step consumes it, so a
+     * retry that resumes at the specification keeps the Outline's own
+     * draft instead of drafting anew (ticket #7).
+     */
+    draft: jsonb("draft").$type<OutlineDraft | null>(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [uniqueIndex("outlines_course_id_version_key").on(table.courseId, table.version)],

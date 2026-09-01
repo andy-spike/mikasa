@@ -273,6 +273,46 @@ async function stepOpenReviewRun(
 }
 
 /**
+ * Where a retry re-enters (ticket #7). A review that already passed with
+ * no open findings is not run again: the run resumes at publication. A
+ * Course whose revision is already published has nothing left to do.
+ */
+async function stepReviewResumePoint(
+  courseId: string,
+  outlineVersion: number,
+): Promise<
+  | { action: "review" }
+  | { action: "publish"; reviewRunId: string }
+  | { action: "done"; revisionNumber: number }
+> {
+  "use step";
+  const { db } = await import("@/lib/db");
+  const { latestReviewRun, currentRevision } = await import("@/lib/db/review");
+  const { reviewFindings } = await import("@/lib/db/schema");
+  const { and, eq } = await import("drizzle-orm");
+
+  const revision = await currentRevision(db, courseId);
+  if (revision && revision.outlineVersion === outlineVersion) {
+    return { action: "done", revisionNumber: revision.revisionNumber };
+  }
+
+  const review = await latestReviewRun(db, courseId);
+  if (review && review.outlineVersion === outlineVersion && review.status === "succeeded") {
+    const open = await db
+      .select({ id: reviewFindings.id })
+      .from(reviewFindings)
+      .where(
+        and(eq(reviewFindings.reviewRunId, review.id), eq(reviewFindings.status, "open")),
+      )
+      .limit(1);
+    if (open.length === 0) {
+      return { action: "publish", reviewRunId: review.id };
+    }
+  }
+  return { action: "review" };
+}
+
+/**
  * One durable pass over an approved Outline version: load, order, write
  * every Lesson in dependency order (Module by Module — the Outline's
  * order within a Module is the Learner's approved order), then review the
@@ -299,8 +339,15 @@ export async function generateCourseWorkflow(
 
     const extraSources: PromptSource[] = [];
     const priorLessons: { title: string; summary: string }[] = [];
+    const already = new Set(context.written);
 
     for (let i = 0; i < order.length; i++) {
+      /* Resume (ticket #7): a Lesson the failed run already wrote is
+         kept, not regenerated. */
+      if (already.has(order[i].id)) {
+        priorLessons.push({ title: order[i].title, summary: order[i].summary });
+        continue;
+      }
       const { newSource } = await stepGenerateLesson(
         context,
         runId,
@@ -323,11 +370,24 @@ export async function generateCourseWorkflow(
     }
 
     /* Review: structural + factual and code + learning design, then at
-       most two rounds of targeted corrections. */
-    const reviewRunId = await stepOpenReviewRun(courseId, outlineVersion);
-    let round = 0;
-    let review = await stepReviewRound(courseId, outlineVersion, reviewRunId, round);
+       most two rounds of targeted corrections. A retry whose review
+       already passed resumes at publication instead. */
+    const resume = await stepReviewResumePoint(courseId, outlineVersion);
+    if (resume.action === "done") {
+      return { ok: true as const, revisionNumber: resume.revisionNumber };
+    }
 
+    let reviewRunId: string;
+    let review: ReviewPayload;
+    if (resume.action === "publish") {
+      reviewRunId = resume.reviewRunId;
+      review = { runId: reviewRunId, round: 0, findings: [] };
+    } else {
+      reviewRunId = await stepOpenReviewRun(courseId, outlineVersion);
+      review = await stepReviewRound(courseId, outlineVersion, reviewRunId, 0);
+    }
+
+    let round = review.round;
     while (review.findings.length > 0 && round < MAX_CORRECTION_ROUNDS) {
       round += 1;
       await stepMarkStep(runId, `corrections:${round}`);

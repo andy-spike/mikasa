@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { retryDesignAction } from "@/lib/actions/courses";
+import { retryCourseAction } from "@/lib/actions/courses";
 
 /**
  * The Course before its Outline exists: design runs durably on the server
@@ -52,7 +52,7 @@ export function CourseDesignProgress({ courseId, topic, goal, status, step, erro
   function retry() {
     setRetrying(true);
     startTransition(async () => {
-      await retryDesignAction(courseId);
+      await retryCourseAction(courseId);
       setRetrying(false);
       router.refresh();
     });

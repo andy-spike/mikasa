@@ -13,6 +13,10 @@
  * Arguments and return values of every step are JSON-only (Workflow ships
  * them across process boundaries); that is why providers are resolved
  * inside each step rather than injected from the workflow body.
+ *
+ * Resume (ticket #7): `resumeFrom` names the first step a retry must
+ * actually run. Work the failed run already persisted — Sources, Outline
+ * and its draft — is reused from the database instead of regenerated.
  */
 import type { DesignCourse, OutlineDraft } from "@/lib/course/design";
 import type {
@@ -21,6 +25,9 @@ import type {
   GatheredSource,
   OutlineData,
 } from "@/lib/course/types";
+
+/** The steps a design runs, in order. */
+export type DesignStep = "sources" | "outline" | "specification" | "persist";
 
 /** What the workflow body needs before any step runs. */
 type Loaded = { course: DesignCourse };
@@ -56,28 +63,77 @@ async function stepMarkStep(runId: string, step: string): Promise<void> {
   await recordDesignStep(db, runId, step);
 }
 
-/** Sources only exist when Grounding is on; the lib function is the guard. */
-async function stepDesignSources(course: DesignCourse): Promise<GatheredSource[]> {
+/**
+ * Sources only exist when Grounding is on; the lib function is the guard.
+ * A resume past this step loads the persisted Sources instead.
+ */
+async function stepDesignSources(
+  course: DesignCourse,
+  courseId: string,
+  reuse: boolean,
+): Promise<GatheredSource[]> {
   "use step";
-  const { collectSources, firecrawlSearcher } = await import("@/lib/course/design");
+  const { db } = await import("@/lib/db");
+  const { collectSources, firecrawlSearcher } = await import(
+    "@/lib/course/design"
+  );
   const { groundingModel } = await import("@/lib/model");
-  return collectSources(firecrawlSearcher(), groundingModel(), course);
+  const { listCourseSources } = await import("@/lib/db/design");
+
+  if (reuse) {
+    const rows = await listCourseSources(db, courseId);
+    return rows.map((r) => ({
+      ref: r.ref,
+      title: r.title,
+      url: r.url,
+      fetchedAt: r.fetchedAt.toISOString(),
+      excerpt: r.excerpt,
+    }));
+  }
+
+  const sources = await collectSources(firecrawlSearcher(), groundingModel(), course);
+  const { saveDesignSources } = await import("@/lib/db/design");
+  await saveDesignSources(db, courseId, sources);
+  return sources;
 }
 
 /**
  * Drafts and bounds-checks the Outline in one step: a draft outside the
  * Depth bounds fails the step, which the engine retries — effectively a
- * fresh sample — before the run is allowed to fail for good.
+ * fresh sample — before the run is allowed to fail for good. A resume
+ * past this step loads the persisted Outline and its draft instead; if
+ * the persisted Outline carries no draft (nothing to build a
+ * specification from), the step drafts fresh rather than generating a
+ * hollow specification.
  */
 async function stepDesignOutline(
   course: DesignCourse,
+  courseId: string,
   sources: GatheredSource[],
-): Promise<{ outline: OutlineData; draft: OutlineDraft }> {
+  reuse: boolean,
+): Promise<{ outline: OutlineData; draft: OutlineDraft; outlineVersion: number }> {
   "use step";
+  const { db } = await import("@/lib/db");
   const { draftOutline, buildOutline } = await import("@/lib/course/design");
   const { designModel } = await import("@/lib/model");
+  const { latestOutline, saveDesignOutline } = await import("@/lib/db/design");
+
+  if (reuse) {
+    const existing = await latestOutline(db, courseId);
+    if (existing && existing.draft) {
+      return {
+        outline: existing.data,
+        draft: existing.draft,
+        outlineVersion: existing.version,
+      };
+    }
+    /* Nothing usable persisted: fall through and draft. */
+  }
+
   const draft = await draftOutline(designModel(), course, sources);
-  return { outline: buildOutline(draft, course.depth), draft };
+  const outline = buildOutline(draft, course.depth);
+  const saved = await saveDesignOutline(db, courseId, outline, draft);
+  return { outline, draft, outlineVersion: saved.version };
 }
 
 async function stepDesignSpecification(
@@ -92,16 +148,21 @@ async function stepDesignSpecification(
   return designSpecification(designModel(), course, outline, draft, sources);
 }
 
-/** Lands the whole outcome in Postgres and flips the Course to Outline-ready. */
+/** Persists the specification and flips the Course to Outline-ready. */
 async function stepPersist(
   courseId: string,
   runId: string,
   outcome: DesignOutcome,
+  outlineVersion: number,
 ): Promise<void> {
   "use step";
-  const { saveDesignResult } = await import("@/lib/db/design");
   const { db } = await import("@/lib/db");
-  await saveDesignResult(db, courseId, runId, outcome);
+  const {
+    saveDesignSpecification,
+    completeDesignRun,
+  } = await import("@/lib/db/design");
+  await saveDesignSpecification(db, courseId, outcome.specification, outlineVersion);
+  await completeDesignRun(db, courseId, runId);
 }
 
 /** Records the failure so the Course stays retryable-looking (ticket #7). */
@@ -113,11 +174,17 @@ async function stepFail(courseId: string, runId: string, message: string): Promi
 }
 
 /**
- * One full design pass: Sources (when Grounding is on) → Outline → private
- * specification → persist. A step that exhausts its retries fails the run;
- * the Course records the failure and waits for retry.
+ * One design pass: Sources (when Grounding is on) → Outline → private
+ * specification → persist. `resumeFrom` starts the pass at a later step,
+ * reusing what the failed run already persisted. A step that exhausts its
+ * retries fails the run; the Course records the failure and waits for
+ * retry.
  */
-export async function designCourseWorkflow(courseId: string, runId: string) {
+export async function designCourseWorkflow(
+  courseId: string,
+  runId: string,
+  resumeFrom: DesignStep = "sources",
+) {
   "use workflow";
 
   const loaded = await stepLoadCourse(courseId);
@@ -126,19 +193,43 @@ export async function designCourseWorkflow(courseId: string, runId: string) {
     return { ok: false as const, reason: "course-not-found" };
   }
 
+  const order: DesignStep[] = ["sources", "outline", "specification", "persist"];
+  const reached = (step: DesignStep) =>
+    order.indexOf(step) >= order.indexOf(resumeFrom);
+
   try {
-    const sources = await stepDesignSources(loaded.course);
+    /* A resume past a step reuses what the failed run persisted; a fresh
+       run (or a resume to its first unfinished step) runs the step. */
+    await stepMarkStep(runId, "sources");
+    const sources = await stepDesignSources(
+      loaded.course,
+      courseId,
+      !reached("sources"),
+    );
+
     await stepMarkStep(runId, "outline");
-    const { outline, draft } = await stepDesignOutline(loaded.course, sources);
+    const built = await stepDesignOutline(
+      loaded.course,
+      courseId,
+      sources,
+      !reached("outline"),
+    );
+
     await stepMarkStep(runId, "specification");
     const specification = await stepDesignSpecification(
       loaded.course,
-      outline,
-      draft,
+      built.outline,
+      built.draft,
       sources,
     );
+
     await stepMarkStep(runId, "persist");
-    await stepPersist(courseId, runId, { outline, specification, sources });
+    await stepPersist(
+      courseId,
+      runId,
+      { outline: built.outline, specification, sources },
+      built.outlineVersion,
+    );
     return { ok: true as const };
   } catch (error) {
     await stepFail(courseId, runId, errorMessage(error));
