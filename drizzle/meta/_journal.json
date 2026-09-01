@@ -22,6 +22,13 @@
       "when": 1788228408993,
       "tag": "0002_outline-versions-and-generation-runs",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788229417810,
+      "tag": "0003_lessons-candidate",
+      "breakpoints": true
     }
   ]
 }

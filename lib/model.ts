@@ -52,3 +52,11 @@ export function designModel(): LanguageModel {
 export function groundingModel(): LanguageModel {
   return openrouter()(MODEL_PROFILES.grounding.model);
 }
+
+/**
+ * The model that writes Lesson content. Same profile as design: planning
+ * a Course and writing its Lessons are the same class of work.
+ */
+export function generationModel(): LanguageModel {
+  return openrouter()(MODEL_PROFILES.design.model);
+}

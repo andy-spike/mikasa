@@ -18,6 +18,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import type { CourseSpecification, OutlineData } from "../course/types";
+import type { ContentBlock } from "../course/content";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -253,3 +254,43 @@ export type SourceRow = typeof sources.$inferSelect;
 export type DesignRun = typeof designRuns.$inferSelect;
 export type CourseSpecRow = typeof courseSpecs.$inferSelect;
 export type GenerationRun = typeof generationRuns.$inferSelect;
+
+/**
+ * One generated Lesson's content: the candidate that review (ticket #6)
+ * judges and publication turns into the readable Course. Keyed to the
+ * stable Outline lesson id plus the Outline version it was written for,
+ * so a staged revision (ticket #14) writes new rows instead of touching
+ * what the Learner may be reading. No Learner-facing read exists for rows
+ * whose Outline version is not the published one.
+ */
+export const lessons = pgTable(
+  "lessons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    outlineVersion: integer("outline_version").notNull(),
+    /** The stable Outline Lesson id (lib/course/structure identity rules). */
+    lessonRef: text("lesson_ref").notNull(),
+    title: text("title").notNull(),
+    body: jsonb("body").$type<ContentBlock[]>().notNull(),
+    workedExample: jsonb("worked_example").$type<ContentBlock[]>().notNull(),
+    recallPrompt: text("recall_prompt").notNull(),
+    selfExplanationPrompt: text("self_explanation_prompt").notNull(),
+    exercise: jsonb("exercise").$type<{ task: string; check: string }>().notNull(),
+    bridge: text("bridge").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("lessons_course_version_ref_key").on(
+      table.courseId,
+      table.outlineVersion,
+      table.lessonRef,
+    ),
+    index("lessons_course_id_idx").on(table.courseId),
+  ],
+);
+
+export type LessonRow = typeof lessons.$inferSelect;

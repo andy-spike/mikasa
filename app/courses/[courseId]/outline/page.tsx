@@ -5,6 +5,7 @@ import { OutlineEditor } from "@/components/outline-editor";
 import { db } from "@/lib/db";
 import { findOwnedCourse } from "@/lib/db/courses";
 import { latestDesignRun, latestOutline } from "@/lib/db/design";
+import { latestGenerationRun } from "@/lib/db/outline";
 import { outlineToEditorCourse } from "@/lib/course/view";
 import { requireLearner } from "@/lib/session";
 
@@ -43,11 +44,19 @@ export default async function OutlinePage({
      nothing to checkpoint yet. */
   if (!outline) notFound();
 
-  if (course.status === "generating") {
+  if (course.status === "generating" || course.status === "reviewing") {
+    const run = await latestGenerationRun(db, courseId);
     return (
       <AppShell section={course.topic}>
         <OutlineEditor
-          course={outlineToEditorCourse(course, outline.version, outline.data, "generating")}
+          course={outlineToEditorCourse(
+            course,
+            outline.version,
+            outline.data,
+            course.status === "generating" ? "generating" : "reviewing",
+          )}
+          key={course.status}
+          runStep={run?.currentStep ?? null}
         />
       </AppShell>
     );

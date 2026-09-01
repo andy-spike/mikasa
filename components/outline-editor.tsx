@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";import {
+import { useEffect, useMemo, useState, useTransition } from "react";import {
   ArrowDown,
   ArrowUp,
   Combine,
@@ -40,7 +40,13 @@ import {
 
 type Module = OutlineEditorCourse["modules"][number];
 
-export function OutlineEditor({ course }: { course: OutlineEditorCourse }) {
+type Props = {
+  course: OutlineEditorCourse;
+  /** The durable run's current step, while the Course is generating. */
+  runStep?: string | null;
+};
+
+export function OutlineEditor({ course, runStep }: Props) {
   const router = useRouter();
   const [modules, setModules] = useState<Module[]>(course.modules);
   const [version, setVersion] = useState(course.version);
@@ -48,7 +54,9 @@ export function OutlineEditor({ course }: { course: OutlineEditorCourse }) {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [splitting, setSplitting] = useState<Module["lessons"][number] | null>(null);
-  const [generating, setGenerating] = useState(course.phase === "generating");
+  const [generating, setGenerating] = useState(
+    course.phase === "generating" || course.phase === "reviewing",
+  );
   const [pending, startTransition] = useTransition();
 
   /* The server is the source of truth: after a conflict the refresh lands
@@ -63,6 +71,15 @@ export function OutlineEditor({ course }: { course: OutlineEditorCourse }) {
   }
 
   const lessons = useMemo(() => modules.flatMap((m) => m.lessons), [modules]);
+
+  /* Durable work continues with the page closed, so while the Course is
+     generating this screen polls — same courtesy as the design screen. */
+  const polling = course.phase === "generating";
+  useEffect(() => {
+    if (!polling) return;
+    const timer = setInterval(() => router.refresh(), 4000);
+    return () => clearInterval(timer);
+  }, [polling, router]);
 
   function run(op: OutlineOp) {
     setError(null);
@@ -115,8 +132,22 @@ export function OutlineEditor({ course }: { course: OutlineEditorCourse }) {
           {course.topic}
         </h1>
         <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-          Generating all {lessons.length} Lessons in one pass, against the shape
-          you just approved.
+          {course.phase === "reviewing"
+            ? `All ${lessons.length} Lessons are written. The review pass is next: structure, accuracy, learning design.`
+            : `Generating all ${lessons.length} Lessons in one pass, against the shape you just approved.`}
+        </p>
+        {runStep ? (
+          <p className="tnum mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
+            {runStep.startsWith("lesson:")
+              ? `Lesson ${Math.min(
+                  lessons.findIndex((l) => runStep.slice(7) === l.id) + 1 || 1,
+                  lessons.length,
+                )} of ${lessons.length}.`
+              : "Starting."}
+          </p>
+        ) : null}
+        <p className="mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
+          You can leave this page. The Course will be here when you come back.
         </p>
         <div className="mt-9 space-y-2.5">
           {[10, 6, 8, 5, 9].map((w, i) => (

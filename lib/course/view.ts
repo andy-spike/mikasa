@@ -17,8 +17,8 @@ export type OutlineEditorCourse = {
   id: string;
   topic: string;
   goal: string;
-  /** "editing" at the checkpoint; "generating" once approval opened the run. */
-  phase: "editing" | "generating";
+  /** "editing" at the checkpoint; then the durable stage the Course is in. */
+  phase: "editing" | "generating" | "reviewing";
   /** The Outline version this shape is, so edits can detect conflicts. */
   version: number;
   modules: OutlineModule[];
@@ -32,7 +32,7 @@ export function outlineToEditorCourse(
   course: Course,
   outlineVersion: number,
   outline: OutlineData,
-  phase: "editing" | "generating" = "editing",
+  phase: "editing" | "generating" | "reviewing" = "editing",
 ): OutlineEditorCourse {
   return {
     id: course.id,
