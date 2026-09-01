@@ -8,20 +8,29 @@ import "server-only";
  * the Course has moved past that. Reviewing — accepting or discarding
  * operations — writes nothing to the Course itself.
  */
-import { and, asc, desc, eq, max } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, max } from "drizzle-orm";
 import type { Db } from "./index";
 import {
   changeOperations,
   changePlans,
+  completions,
   courses,
   generationRuns,
   lessons,
   outlines,
+  revisions,
   tailorConversations,
   tailorMessages,
 } from "./schema";
 import { applyOutlineOps, StructureError } from "@/lib/course/structure";
-import { validatePlanOps, isStructureOp, affectedLessonSets } from "@/lib/course/change-plan";
+import {
+  validatePlanOps,
+  isStructureOp,
+  affectedLessonSets,
+  completionResetRefs,
+  touchedIdentities,
+  undoOutline,
+} from "@/lib/course/change-plan";
 import type { ChangePlanOp } from "@/lib/course/change-plan";
 import { applyOutlineChange } from "./outline";
 import type { LessonAdjustment, OutlineData } from "@/lib/course/types";
@@ -50,6 +59,13 @@ export type ChangePlanRow = {
   baseRevisionNumber: number | null;
   /** Set once the plan has become a staged revision (#14). */
   stagedOutlineVersion: number | null;
+  /** Set when the staged revision publishes (#14/#15). */
+  publishedRevisionNumber: number | null;
+  /** The identities the accepted operations touch (#15). */
+  touchedLessons: string[] | null;
+  touchedModules: string[] | null;
+  /** Lessons whose content the plan regenerated (#15). */
+  regeneratedLessons: string[] | null;
   operations: ChangeOperationRow[];
   createdAt: Date;
 };
@@ -253,6 +269,10 @@ export async function createChangePlan(
       baseOutlineVersion: plan.baseOutlineVersion,
       baseRevisionNumber: plan.baseRevisionNumber,
       stagedOutlineVersion: plan.stagedOutlineVersion,
+      publishedRevisionNumber: plan.publishedRevisionNumber,
+      touchedLessons: plan.touchedLessons,
+      touchedModules: plan.touchedModules,
+      regeneratedLessons: plan.regeneratedLessons,
       createdAt: plan.createdAt,
       operations: operations.map(toOperationRow),
     },
@@ -300,6 +320,10 @@ export async function findProposedPlan(
     baseOutlineVersion: plan.change_plans.baseOutlineVersion,
     baseRevisionNumber: plan.change_plans.baseRevisionNumber,
     stagedOutlineVersion: plan.change_plans.stagedOutlineVersion,
+    publishedRevisionNumber: plan.change_plans.publishedRevisionNumber,
+    touchedLessons: plan.change_plans.touchedLessons,
+    touchedModules: plan.change_plans.touchedModules,
+    regeneratedLessons: plan.change_plans.regeneratedLessons,
     createdAt: plan.change_plans.createdAt,
     operations: operations.map(toOperationRow),
   };
@@ -366,6 +390,10 @@ export async function findPlan(
     baseOutlineVersion: plan.change_plans.baseOutlineVersion,
     baseRevisionNumber: plan.change_plans.baseRevisionNumber,
     stagedOutlineVersion: plan.change_plans.stagedOutlineVersion,
+    publishedRevisionNumber: plan.change_plans.publishedRevisionNumber,
+    touchedLessons: plan.change_plans.touchedLessons,
+    touchedModules: plan.change_plans.touchedModules,
+    regeneratedLessons: plan.change_plans.regeneratedLessons,
     createdAt: plan.change_plans.createdAt,
     operations: operations.map(toOperationRow),
   };
@@ -394,6 +422,10 @@ export async function listPlansWithOperations(
       baseOutlineVersion: plan.baseOutlineVersion,
       baseRevisionNumber: plan.baseRevisionNumber,
       stagedOutlineVersion: plan.stagedOutlineVersion,
+      publishedRevisionNumber: plan.publishedRevisionNumber,
+      touchedLessons: plan.touchedLessons,
+      touchedModules: plan.touchedModules,
+      regeneratedLessons: plan.regeneratedLessons,
       createdAt: plan.createdAt,
       operations: operations.map(toOperationRow),
     });
@@ -542,6 +574,39 @@ export async function activeContentAdjustments(
   }
   const live = new Set(outline.modules.flatMap((m) => m.lessons.map((l) => l.id)));
   return [...byLesson.values()].filter((a) => live.has(a.lessonId));
+}
+
+/**
+ * One plan's accepted content demands, as LessonAdjustments: the prose
+ * instruction or the exact Exercise, per Lesson. The staged revision's
+ * reconciliation (#17) bakes these into the specification, so generation
+ * honors what the Learner accepted for the Lessons it regenerates.
+ */
+export async function planContentAdjustments(
+  db: Db,
+  planId: string,
+): Promise<LessonAdjustment[]> {
+  const operations = await db
+    .select()
+    .from(changeOperations)
+    .where(eq(changeOperations.planId, planId))
+    .orderBy(asc(changeOperations.position));
+  const byLesson = new Map<string, LessonAdjustment>();
+  for (const operation of operations) {
+    if (operation.status !== "accepted") continue;
+    const op = operation.payload as ChangePlanOp;
+    if (op.kind === "lessonProse") {
+      const existing = byLesson.get(op.lessonId) ?? { lessonId: op.lessonId };
+      byLesson.set(op.lessonId, { ...existing, prose: op.instruction });
+    } else if (op.kind === "exercise") {
+      const existing = byLesson.get(op.lessonId) ?? { lessonId: op.lessonId };
+      byLesson.set(op.lessonId, {
+        ...existing,
+        exercise: { task: op.task, check: op.check },
+      });
+    }
+  }
+  return [...byLesson.values()];
 }
 
 export type StageRevisionResult =
@@ -740,9 +805,25 @@ export async function stagePlanRevision(
       .values({ courseId, outlineVersion: stagedVersion })
       .returning();
 
+    /* The identities the accepted operations touch, for the undo rule
+       (#15): the operations' own ids, the Lessons of removed Modules,
+       and the Lessons the plan adds. */
+    const touched = touchedIdentities(accepted, baseOutline.data);
+    for (const m of nextData.modules)
+      for (const l of m.lessons)
+        if (!baseOutline.data.modules.some((bm) => bm.lessons.some((bl) => bl.id === l.id)))
+          touched.lessons.push(l.id);
+
     await tx
       .update(changePlans)
-      .set({ status: "staged", stagedOutlineVersion: stagedVersion, updatedAt: new Date() })
+      .set({
+        status: "staged",
+        stagedOutlineVersion: stagedVersion,
+        touchedLessons: touched.lessons,
+        touchedModules: touched.modules,
+        regeneratedLessons: affected.regenerate,
+        updatedAt: new Date(),
+      })
       .where(eq(changePlans.id, planId));
 
     return {
@@ -788,6 +869,10 @@ export async function findStagedPlan(
     baseOutlineVersion: plan.change_plans.baseOutlineVersion,
     baseRevisionNumber: plan.change_plans.baseRevisionNumber,
     stagedOutlineVersion: plan.change_plans.stagedOutlineVersion,
+    publishedRevisionNumber: plan.change_plans.publishedRevisionNumber,
+    touchedLessons: plan.change_plans.touchedLessons,
+    touchedModules: plan.change_plans.touchedModules,
+    regeneratedLessons: plan.change_plans.regeneratedLessons,
     createdAt: plan.change_plans.createdAt,
     operations: operations.map(toOperationRow),
   };
@@ -888,4 +973,328 @@ export async function resumeStagedRevision(
     regenerateLessonRefs: affected.regenerate,
     embedLessonRefs: affected.embed,
   };
+}
+
+/**
+ * Records a staged revision's publication and applies the Completion
+ * rules (#15), in the transaction: the Course's Completion state is
+ * snapshotted exactly as the revision swaps (undo restores it), and the
+ * operations that redefine "done" — Exercise rewrites, splits, merges —
+ * reset the Lessons they touched. Prose, renames, and moves preserve;
+ * added Lessons start incomplete; removed Lessons keep their Completion
+ * with their content, orphaned but retained.
+ */
+export async function markRevisionPublished(
+  db: Db,
+  planId: string,
+  revisionNumber: number,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [plan] = await tx
+      .select()
+      .from(changePlans)
+      .where(eq(changePlans.id, planId))
+      .limit(1);
+    if (!plan) throw new Error("The published plan vanished.");
+
+    const operations = await tx
+      .select()
+      .from(changeOperations)
+      .where(eq(changeOperations.planId, planId))
+      .orderBy(asc(changeOperations.position));
+    const accepted = operations
+      .filter((o) => o.status === "accepted")
+      .map((o) => o.payload as ChangePlanOp);
+
+    /* The resets resolve against the Outline the plan was drawn against:
+       a merge's survivor depends on the direction and the shape then. */
+    const [baseOutline] = await tx
+      .select()
+      .from(outlines)
+      .where(
+        and(eq(outlines.courseId, plan.courseId), eq(outlines.version, plan.baseOutlineVersion)),
+      )
+      .limit(1);
+    if (!baseOutline) throw new Error("The plan's base Outline vanished.");
+    const resetRefs = completionResetRefs(accepted, baseOutline.data);
+
+    const rows = await tx
+      .select()
+      .from(completions)
+      .where(eq(completions.courseId, plan.courseId));
+    const snapshot = rows.map((r) => ({
+      lessonRef: r.lessonRef,
+      doneAt: r.doneAt.toISOString(),
+    }));
+
+    await tx
+      .update(changePlans)
+      .set({
+        status: "published",
+        publishedRevisionNumber: revisionNumber,
+        completionSnapshot: snapshot,
+        updatedAt: new Date(),
+      })
+      .where(eq(changePlans.id, planId));
+
+    if (resetRefs.length > 0) {
+      await tx
+        .delete(completions)
+        .where(
+          and(
+            eq(completions.courseId, plan.courseId),
+            inArray(completions.lessonRef, resetRefs),
+          ),
+        );
+    }
+  });
+}
+
+export type UndoResult =
+  | { ok: true; revisionNumber: number; restoredLessons: string[] }
+  | {
+      ok: false;
+      reason:
+        | "not-found"
+        | "not-undoable"
+        | "blocked-overlap"
+        | "blocked-inflight"
+        | "invalid";
+      message: string;
+    };
+
+/**
+ * Undoes a published plan (#15), in one transaction: a new current
+ * revision whose Outline is the current shape with the plan's touched
+ * identities restored to what the base revision had — later, independent
+ * changes keep their place, which is exactly what the overlap rule
+ * guarantees is safe. Content comes back from the base revision for
+ * everything the plan regenerated or removed; Completion comes back from
+ * the plan's snapshot for the touched identities. Any refusal leaves the
+ * current revision and Completion untouched.
+ */
+export async function undoPlanRevision(
+  db: Db,
+  ownerId: string,
+  courseId: string,
+  planId: string,
+): Promise<UndoResult> {
+  return db.transaction(async (tx) => {
+    const [course] = await tx
+      .select()
+      .from(courses)
+      .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
+      .limit(1);
+    if (!course) {
+      return { ok: false, reason: "not-found", message: "Course not found." };
+    }
+
+    const [plan] = await tx
+      .select()
+      .from(changePlans)
+      .where(eq(changePlans.id, planId))
+      .limit(1);
+    if (!plan || plan.courseId !== courseId) {
+      return { ok: false, reason: "not-found", message: "Plan not found." };
+    }
+    if (
+      plan.status !== "published" ||
+      !plan.publishedRevisionNumber ||
+      !plan.baseRevisionNumber ||
+      !plan.touchedLessons ||
+      !plan.touchedModules
+    ) {
+      return {
+        ok: false,
+        reason: "not-undoable",
+        message: "Only a published change with a recorded shape can be undone.",
+      };
+    }
+
+    /* Nothing may be in flight: a staged candidate is being built on top
+       of the very revision this undo would swap away. */
+    const [inflight] = await tx
+      .select({ id: changePlans.id })
+      .from(changePlans)
+      .where(and(eq(changePlans.courseId, courseId), eq(changePlans.status, "staged")))
+      .limit(1);
+    if (inflight) {
+      return {
+        ok: false,
+        reason: "blocked-inflight",
+        message: "A revision is being prepared; undo is unavailable until it settles.",
+      };
+    }
+
+    /* The overlap rule: a later published plan that touched the same
+       Module or Lesson identities blocks the undo. */
+    const later = await tx
+      .select()
+      .from(changePlans)
+      .where(and(eq(changePlans.courseId, courseId), eq(changePlans.status, "published")));
+    const overlapping = later
+      .filter(
+        (q) =>
+          q.id !== planId &&
+          q.publishedRevisionNumber !== null &&
+          q.publishedRevisionNumber > plan.publishedRevisionNumber! &&
+          (q.touchedLessons ?? []).some((l) => plan.touchedLessons!.includes(l)),
+      )
+      .map((q) => q.id);
+    const overlappingModules = later
+      .filter(
+        (q) =>
+          q.id !== planId &&
+          q.publishedRevisionNumber !== null &&
+          q.publishedRevisionNumber > plan.publishedRevisionNumber! &&
+          (q.touchedModules ?? []).some((m) => plan.touchedModules!.includes(m)),
+      )
+      .map((q) => q.id);
+    if (overlapping.length > 0 || overlappingModules.length > 0) {
+      return {
+        ok: false,
+        reason: "blocked-overlap",
+        message:
+          "A later change touched the same Lessons or Modules; undoing this one would undo that too.",
+      };
+    }
+
+    /* The overlap rule above is the staleness guard, so an older plan
+       undoes fine once nothing overlapping stands after it: the undo
+       rebuilds only the touched identities and leaves independent later
+       changes exactly where they are. */
+    const revision = await currentRevision(tx, courseId);
+    if (!revision) {
+      return { ok: false, reason: "invalid", message: "The Course has no current revision." };
+    }
+
+    const [baseOutline] = await tx
+      .select()
+      .from(outlines)
+      .where(
+        and(eq(outlines.courseId, courseId), eq(outlines.version, plan.baseOutlineVersion)),
+      )
+      .limit(1);
+    const [currentOutline] = await tx
+      .select()
+      .from(outlines)
+      .where(
+        and(
+          eq(outlines.courseId, courseId),
+          eq(outlines.version, revision.outlineVersion),
+        ),
+      )
+      .limit(1);
+    if (!baseOutline || !currentOutline) {
+      return { ok: false, reason: "invalid", message: "The Outline to undo from is gone." };
+    }
+
+    let inverted;
+    try {
+      inverted = undoOutline(
+        baseOutline.data,
+        currentOutline.data,
+        plan.touchedLessons,
+        plan.touchedModules,
+      );
+    } catch (error) {
+      if (error instanceof StructureError) {
+        return { ok: false, reason: "invalid", message: error.message };
+      }
+      throw error;
+    }
+
+    /* Content: everything the plan regenerated or removed comes back
+       from the base revision; every other Lesson keeps the content the
+       current revision has. */
+    const restored = new Set([...(plan.regeneratedLessons ?? []), ...plan.touchedLessons]);
+    const baseRows = await tx
+      .select()
+      .from(lessons)
+      .where(
+        and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, baseOutline.version)),
+      );
+    const currentRows = await tx
+      .select()
+      .from(lessons)
+      .where(
+        and(
+          eq(lessons.courseId, courseId),
+          eq(lessons.outlineVersion, currentOutline.version),
+        ),
+      );
+    const baseByRef = new Map(baseRows.map((r) => [r.lessonRef, r]));
+    const currentByRef = new Map(currentRows.map((r) => [r.lessonRef, r]));
+
+    const undoVersion = currentOutline.version + 1;
+    await tx.insert(outlines).values({ courseId, version: undoVersion, data: inverted });
+
+    const restoredLessons: string[] = [];
+    const rows: (typeof lessons.$inferInsert)[] = [];
+    for (const m of inverted.modules) {
+      for (const l of m.lessons) {
+        const source = restored.has(l.id) ? baseByRef.get(l.id) : currentByRef.get(l.id);
+        if (!source) {
+          return {
+            ok: false,
+            reason: "invalid",
+            message: `The Lesson "${l.title}" has no content to restore.`,
+          };
+        }
+        if (restored.has(l.id)) restoredLessons.push(l.id);
+        rows.push({
+          courseId,
+          outlineVersion: undoVersion,
+          lessonRef: source.lessonRef,
+          title: l.title,
+          body: source.body,
+          workedExample: source.workedExample,
+          recallPrompt: source.recallPrompt,
+          selfExplanationPrompt: source.selfExplanationPrompt,
+          exercise: source.exercise,
+          bridge: source.bridge,
+        });
+      }
+    }
+    if (rows.length > 0) await tx.insert(lessons).values(rows);
+
+    /* The swap: a new revision number over the undo version. */
+    const [newest] = await tx
+      .select({ n: max(revisions.revisionNumber) })
+      .from(revisions)
+      .where(eq(revisions.courseId, courseId));
+    const nextNumber = (newest?.n ?? 0) + 1;
+    await tx
+      .insert(revisions)
+      .values({ courseId, revisionNumber: nextNumber, outlineVersion: undoVersion });
+
+    /* Completion: the touched identities go back to the moment before
+       the plan published. */
+    await tx
+      .delete(completions)
+      .where(
+        and(
+          eq(completions.courseId, courseId),
+          inArray(completions.lessonRef, plan.touchedLessons),
+        ),
+      );
+    const snapshot = plan.completionSnapshot ?? [];
+    const back = snapshot.filter((s) => plan.touchedLessons!.includes(s.lessonRef));
+    if (back.length > 0) {
+      await tx.insert(completions).values(
+        back.map((s) => ({
+          courseId,
+          lessonRef: s.lessonRef,
+          doneAt: new Date(s.doneAt),
+        })),
+      );
+    }
+
+    await tx
+      .update(changePlans)
+      .set({ status: "undone", updatedAt: new Date() })
+      .where(eq(changePlans.id, planId));
+
+    return { ok: true, revisionNumber: nextNumber, restoredLessons };
+  });
 }

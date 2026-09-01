@@ -598,6 +598,21 @@ export const changePlans = pgTable(
     /** Set when the plan becomes a staged revision (#14): the Outline
         version the staged candidate is written against. */
     stagedOutlineVersion: integer("staged_outline_version"),
+    /** Set when the revision publishes (#14): the revision number this
+        plan produced — the one an undo must still be current against. */
+    publishedRevisionNumber: integer("published_revision_number"),
+    /** The Lesson and Module identities the accepted operations touch
+        (#15): the overlap rule for undo reads these. */
+    touchedLessons: jsonb("touched_lessons").$type<string[]>(),
+    touchedModules: jsonb("touched_modules").$type<string[]>(),
+    /** Lessons whose content the plan regenerated (#15): undo restores
+        their pre-plan content from the base revision. */
+    regeneratedLessons: jsonb("regenerated_lessons").$type<string[]>(),
+    /** The Course's Completion state, taken the moment the revision
+        published (#15): undo restores it for the touched identities. */
+    completionSnapshot: jsonb("completion_snapshot").$type<
+      { lessonRef: string; doneAt: string }[]
+    >(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

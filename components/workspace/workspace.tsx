@@ -10,7 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ReadingCourse, SourceLink } from "@/lib/course/reading";
 import type { CompletionActionResult } from "@/lib/actions/completion";
-import { reviewTailorOperationAction, stagePlanRevisionAction } from "@/lib/actions/tailor";
+import {
+  listPublishedPlansAction,
+  reviewTailorOperationAction,
+  stagePlanRevisionAction,
+  undoPlanRevisionAction,
+  type PublishedPlanRow,
+} from "@/lib/actions/tailor";
 import type { PlanView, Turn } from "./panel";
 import { Outline, type ModuleView } from "./outline";
 import { LessonPane } from "./lesson";
@@ -238,6 +244,33 @@ export function Workspace({
      the durable engine regenerates; the current Course stays readable. */
   const [staged, setStaged] = useState(false);
   const [, startStaging] = useTransition();
+
+  /* The published changes, with their undo availability (#15). */
+  const [published, setPublished] = useState<PublishedPlanRow[]>([]);
+  const [publishedKey, setPublishedKey] = useState(0);
+  useEffect(() => {
+    let live = true;
+    listPublishedPlansAction(course.id)
+      .then((rows) => {
+        if (live) setPublished(rows);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [course.id, publishedKey]);
+
+  function undoPlan(planId: string) {
+    startStaging(async () => {
+      const result = await undoPlanRevisionAction(course.id, planId);
+      if (result.ok) {
+        setStaged(false);
+        setPublishedKey((k) => k + 1);
+        router.refresh();
+      }
+      setPublished(await listPublishedPlansAction(course.id));
+    });
+  }
 
   async function reviewOperation(
     operationId: string,
@@ -483,6 +516,39 @@ export function Workspace({
           onDiscard={(id) => reviewOperation(id, "discarded")}
           onRestore={(id) => reviewOperation(id, "proposed")}
           tailorStatus={tailorStatus ?? undefined}
+          publishedSlot={
+            published.length > 0 ? (
+              <div className="mt-5">
+                <p className="label text-fg-3">Published changes</p>
+                <ul className="mt-3 space-y-3.5">
+                  {published.map((row) => (
+                    <li key={row.plan.id} className="text-[0.8125rem] leading-[1.5]">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="text-fg-2">
+                          Revision {row.publishedRevisionNumber} ·{" "}
+                          {row.plan.operations.length}{" "}
+                          {row.plan.operations.length === 1 ? "change" : "changes"}
+                        </span>
+                        {row.canUndo ? (
+                          <Button
+                            variant="quiet"
+                            onClick={() => undoPlan(row.plan.id)}
+                            className="shrink-0"
+                          >
+                            Undo
+                          </Button>
+                        ) : (
+                          <span className="text-[0.75rem] text-fg-3">
+                            {row.blockedReason}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null
+          }
           tailorApply={
             plan ? (
               <Button
@@ -492,6 +558,7 @@ export function Workspace({
                     if (result.ok) {
                       setPlan(null);
                       setStaged(true);
+                      setPublishedKey((k) => k + 1);
                     } else {
                       setPlan(await onRefreshPlan());
                     }

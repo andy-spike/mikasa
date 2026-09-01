@@ -7,9 +7,9 @@
  * Lesson's prose or Exercise.
  */
 import { z } from "zod";
-import { applyOutlineOps, StructureError } from "./structure";
+import { applyOutlineOps, renumberOutline, StructureError } from "./structure";
 import type { OutlineOp } from "./structure";
-import type { OutlineData } from "./types";
+import type { OutlineData, OutlineLesson, OutlineModule } from "./types";
 
 /** A Lesson prose rewrite: an instruction the generator carries out. */
 export type LessonProseOp = {
@@ -287,4 +287,147 @@ export function preservesCompletion(op: ChangePlanOp): boolean {
     op.kind === "moveLesson" ||
     op.kind === "lessonProse"
   );
+}
+
+/**
+ * The Lesson a merge absorbs, resolved against the Outline the plan was
+ * drawn against: "next" takes the Lesson after the named one, "previous"
+ * the one before it. Null when the plan does not apply — the grammar
+ * refuses that before anything is stored.
+ */
+function mergeAbsorbedId(
+  op: Extract<ChangePlanOp, { kind: "mergeLesson" }>,
+  base: OutlineData,
+): string | null {
+  for (const m of base.modules) {
+    const index = m.lessons.findIndex((l) => l.id === op.lessonId);
+    if (index === -1) continue;
+    const neighbor = op.direction === "next" ? m.lessons[index + 1] : m.lessons[index - 1];
+    return neighbor?.id ?? null;
+  }
+  return null;
+}
+
+/**
+ * The Lessons whose Completion the plan's accepted operations reset
+ * (#15), resolved against the Outline the plan was drawn against: an
+ * Exercise rewrite changes what "done" means, and split and merge
+ * rearrange whole Lessons. A merge resets the surviving Lesson — it now
+ * covers the absorbed Lesson's material, whichever side of it the
+ * absorbed one came from; the absorbed Lesson's Completion is kept, like
+ * a removed Lesson's, and undo restores it. Prose, renames, and moves
+ * preserve; added Lessons start incomplete on their own.
+ */
+export function completionResetRefs(accepted: ChangePlanOp[], base: OutlineData): string[] {
+  const reset = new Set<string>();
+  for (const op of accepted) {
+    if (op.kind === "exercise" || op.kind === "splitLesson") {
+      reset.add(op.lessonId);
+    } else if (op.kind === "mergeLesson") {
+      const survivor = op.direction === "next" ? op.lessonId : mergeAbsorbedId(op, base);
+      if (survivor) reset.add(survivor);
+    }
+  }
+  return [...reset];
+}
+
+/** The identities a plan's accepted operations touch, for the undo rule. */
+export function touchedIdentities(
+  accepted: ChangePlanOp[],
+  base: OutlineData,
+): { lessons: string[]; modules: string[] } {
+  const lessons = new Set<string>();
+  const modules = new Set<string>();
+  for (const op of accepted) {
+    for (const id of opLessonIds(op)) lessons.add(id);
+    for (const id of opModuleIds(op)) modules.add(id);
+    /* A merge takes the absorbed Lesson's identity with it: undo has to
+       bring that Lesson back, and the overlap rule has to guard it. */
+    if (op.kind === "mergeLesson") {
+      const absorbed = mergeAbsorbedId(op, base);
+      if (absorbed) lessons.add(absorbed);
+    }
+  }
+  /* A removed Module takes its Lessons' identities with it. */
+  for (const op of accepted) {
+    if (op.kind !== "removeModule") continue;
+    const removed = base.modules.find((m) => m.id === op.moduleId);
+    if (removed) for (const l of removed.lessons) lessons.add(l.id);
+  }
+  return { lessons: [...lessons], modules: [...modules] };
+}
+
+/**
+ * The Outline as it should be after undoing a published plan (#15): the
+ * current shape with every touched identity restored to what the base
+ * revision had — touched Lessons back at their base place and name,
+ * plan-added Lessons and Modules gone, plan-removed ones back where they
+ * were. Untouched identities keep whatever later changes made of them;
+ * that is exactly what the overlap rule guarantees is safe.
+ */
+export function undoOutline(
+  base: OutlineData,
+  current: OutlineData,
+  touchedLessons: string[],
+  touchedModules: string[],
+): OutlineData {
+  const lessons = new Set(touchedLessons);
+  const modules = new Set(touchedModules);
+  const baseLessons = new Map<
+    string,
+    { module: string; index: number; lesson: OutlineLesson }
+  >();
+  for (const m of base.modules) {
+    for (const [index, l] of m.lessons.entries()) {
+      baseLessons.set(l.id, { module: m.id, index, lesson: l });
+    }
+  }
+  const baseModules = new Map(base.modules.map((m) => [m.id, m]));
+
+  /* Surgical pass over a copy of the current shape. Plan-added Lessons
+     and Modules leave; touched Lessons come out (they go back in at
+     their base place below). Untouched Lessons — including those inside
+     touched Modules — keep whatever later changes made of them. */
+  let working: OutlineModule[] = current.modules
+    .filter((m) => !(modules.has(m.id) && !baseModules.has(m.id)))
+    .map((m) => ({
+      ...m,
+      lessons: m.lessons.filter((l) => !lessons.has(l.id)),
+    }));
+
+  /* Touched surviving Modules get their base name back. */
+  working = working.map((m) => {
+    if (!modules.has(m.id)) return m;
+    const baseModule = baseModules.get(m.id);
+    return baseModule ? { ...m, title: baseModule.title } : m;
+  });
+
+  /* Touched Modules the plan removed come back where the base revision
+     had them, with the Lessons the base revision had in them. */
+  for (const m of base.modules) {
+    if (!modules.has(m.id) || working.some((w) => w.id === m.id)) continue;
+    const baseIndex = base.modules.findIndex((b) => b.id === m.id);
+    working.splice(Math.min(baseIndex, working.length), 0, {
+      ...m,
+      lessons: m.lessons.map((l) => ({ ...l })),
+    });
+  }
+
+  /* Every touched Lesson the base revision had goes back to its base
+     place, name, and size. */
+  for (const [id, at] of baseLessons) {
+    if (!lessons.has(id)) continue;
+    const targetIndex = working.findIndex((m) => m.id === at.module);
+    if (targetIndex === -1) continue;
+    working[targetIndex] = {
+      ...working[targetIndex],
+      lessons: [
+        ...working[targetIndex].lessons.slice(0, at.index),
+        { ...at.lesson },
+        ...working[targetIndex].lessons.slice(at.index),
+      ],
+    };
+  }
+
+  return renumberOutline(working);
 }

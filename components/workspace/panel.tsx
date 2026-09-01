@@ -42,6 +42,8 @@ type Props = {
   tailorApply?: ReactNode;
   /** One line of pane-level status, e.g. that a revision is staging. */
   tailorStatus?: string;
+  /** The published changes and their undo affordances (#15). */
+  publishedSlot?: ReactNode;
   onMode: (mode: PanelMode) => void;
   onClose: () => void;
   /** the drag strip on the panel's inner edge; the workspace owns the width */
@@ -60,6 +62,7 @@ export function Panel({
   onRestore,
   tailorApply,
   tailorStatus,
+  publishedSlot,
   onMode,
   onClose,
   resizer,
@@ -117,6 +120,7 @@ export function Panel({
             onDiscard={onDiscard}
             onRestore={onRestore}
             applySlot={tailorApply}
+            publishedSlot={publishedSlot}
           />
         )}
       </SidebarContent>

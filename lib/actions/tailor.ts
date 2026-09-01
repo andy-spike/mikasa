@@ -7,15 +7,19 @@
  * the Course; application and staging are the only doors that do.
  */
 import { z } from "zod";
+import { and, eq } from "drizzle-orm";
 import { start } from "workflow/api";
 import { db } from "@/lib/db";
 import { requireLearner } from "@/lib/session";
+import { courses } from "@/lib/db/schema";
 import {
   applyPlanToOutline,
   findProposedPlan,
+  listPlansWithOperations,
   resumeStagedRevision,
   setOperationStatus,
   stagePlanRevision,
+  undoPlanRevision,
 } from "@/lib/db/tailor";
 import type { ChangePlanRow } from "@/lib/db/tailor";
 import type { PlanView } from "@/components/workspace/panel";
@@ -107,6 +111,79 @@ export async function applyPlanToOutlineAction(
 export type StageRevisionActionResult =
   | { ok: true; stagedOutlineVersion: number }
   | { ok: false; reason: string; message: string };
+
+export type UndoPlanResult =
+  | { ok: true; revisionNumber: number }
+  | { ok: false; reason: string; message: string };
+
+/**
+ * Undoes a published plan (#15): the touched identities go back to what
+ * the base revision had — shape, content, and Completion — and the Course
+ * moves to a new revision carrying that restored state. Only possible
+ * while no later published change has touched the same identities.
+ */
+export async function undoPlanRevisionAction(
+  courseId: string,
+  planId: string,
+): Promise<UndoPlanResult> {
+  const { user } = await requireLearner();
+  const parsed = planSchema.safeParse({ courseId, planId });
+  if (!parsed.success) {
+    return { ok: false, reason: "invalid", message: "That undo does not fit the plan." };
+  }
+  const result = await undoPlanRevision(db, user.id, courseId, parsed.data.planId);
+  return result.ok
+    ? { ok: true, revisionNumber: result.revisionNumber }
+    : result;
+}
+
+export type PublishedPlanRow = {
+  plan: PlanView;
+  publishedRevisionNumber: number;
+  canUndo: boolean;
+  blockedReason?: string;
+};
+
+/**
+ * The Course's published plans, newest first, each with its undo
+ * availability (#15) — the pane's Published changes section.
+ */
+export async function listPublishedPlansAction(
+  courseId: string,
+): Promise<PublishedPlanRow[]> {
+  const { user } = await requireLearner();
+  /* The plans belong to the Course, and the Course to the caller: an
+     unknown or foreign Course reads as no published changes. */
+  const [course] = await db
+    .select({ id: courses.id })
+    .from(courses)
+    .where(and(eq(courses.id, courseId), eq(courses.ownerId, user.id)))
+    .limit(1);
+  if (!course) return [];
+  const plans = await listPlansWithOperations(db, courseId);
+  const published = plans
+    .filter((p) => p.status === "published" && p.publishedRevisionNumber !== null)
+    .sort((a, b) => b.publishedRevisionNumber! - a.publishedRevisionNumber!);
+
+  return published.map((plan) => {
+    const laterOverlap = published.some(
+      (q) =>
+        q.id !== plan.id &&
+        q.publishedRevisionNumber! > plan.publishedRevisionNumber! &&
+        ((q.touchedLessons ?? []).some((l) => (plan.touchedLessons ?? []).includes(l)) ||
+          (q.touchedModules ?? []).some((m) => (plan.touchedModules ?? []).includes(m))),
+    );
+    return {
+      plan: toPlanView(plan),
+      publishedRevisionNumber: plan.publishedRevisionNumber!,
+      canUndo: !laterOverlap,
+      blockedReason: laterOverlap
+        ? "A later change touched the same Lessons or Modules."
+        : undefined,
+    };
+  });
+}
+
 
 /**
  * Stages a published Course's accepted plan as a new revision (#14) and

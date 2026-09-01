@@ -57,6 +57,44 @@ async function stepOrder(context: GenerationContext): Promise<OutlineLesson[]> {
   return generationOrder(context.spec, context.outline.data);
 }
 
+/**
+ * Brings the specification to the staged shape (#17): the plan's accepted
+ * prose/Exercise demands and every Lesson the staged Outline has —
+ * including the ids its adds and splits invented at staging — reconciled
+ * by the model and saved, so generation reads a specification that joins
+ * to the Outline it writes. Skipped when the specification already
+ * covers the shape and carries exactly the plan's demands: a rename-only
+ * plan spends no model call. A failed reconciliation fails the run like
+ * any other step; the retry runs it again.
+ */
+async function stepReconcileSpec(
+  planId: string,
+  context: GenerationContext,
+): Promise<GenerationContext> {
+  "use step";
+  const { db } = await import("@/lib/db");
+  const { generationModel } = await import("@/lib/model");
+  const { reconcileSpecification, specNeedsReconciliation } = await import(
+    "@/lib/course/reconcile"
+  );
+  const { planContentAdjustments } = await import("@/lib/db/tailor");
+  const { saveReconciledSpec } = await import("@/lib/db/outline");
+
+  const adjustments = await planContentAdjustments(db, planId);
+  if (!specNeedsReconciliation(context.spec, context.outline.data, adjustments)) {
+    return context;
+  }
+
+  const reconciled = await reconcileSpecification(
+    generationModel(),
+    context.outline.data,
+    context.spec,
+    adjustments,
+  );
+  await saveReconciledSpec(db, context.course.id, reconciled, context.outline.version);
+  return { ...context, spec: reconciled };
+}
+
 /* One affected Lesson: the main workflow's own step. The copied Lessons
    are already written for this version, so the resume check in the
    workflow body skips them — "only affected Lessons rerun". */
@@ -359,8 +397,18 @@ async function stepEmbedAffected(
 async function stepMarkPlan(
   planId: string,
   status: "published" | "failed",
+  revisionNumber?: number,
 ): Promise<void> {
   "use step";
+  if (status === "published") {
+    /* Publication and the Completion rules land together (#15): the
+       snapshot is taken exactly as the swap lands, and the operations
+       that redefine "done" reset their Lessons. */
+    const { markRevisionPublished } = await import("@/lib/db/tailor");
+    const { db } = await import("@/lib/db");
+    await markRevisionPublished(db, planId, revisionNumber!);
+    return;
+  }
   const { db } = await import("@/lib/db");
   const { changePlans } = await import("@/lib/db/schema");
   const { eq } = await import("drizzle-orm");
@@ -414,12 +462,17 @@ export async function stageRevisionWorkflow(
   }
 
   try {
-    const order = await stepOrder(context);
+    /* The staged shape must join to the specification before anything
+       reads it: Lessons the plan added or split have no alignment yet,
+       removed ones may still sit in the graph, and the plan's accepted
+       prose/Exercise demands must ride into generation (#17). */
+    const prepared = await stepReconcileSpec(planId, context);
+    const order = await stepOrder(prepared);
     await stepMarkStep(runId, "lessons");
 
     const extraSources: PromptSource[] = [];
     const priorLessons: { title: string; summary: string }[] = [];
-    const already = new Set(context.written);
+    const already = new Set(prepared.written);
 
     for (let i = 0; i < order.length; i++) {
       /* Copied Lessons are written for this version: they are kept, not
@@ -430,7 +483,7 @@ export async function stageRevisionWorkflow(
       }
       const nextLesson = order[i + 1] ?? null;
       const { newSource } = await stepGenerateLesson(
-        context,
+        prepared,
         runId,
         order[i],
         nextLesson,
@@ -513,7 +566,7 @@ export async function stageRevisionWorkflow(
     }
 
     await stepEmbedAffected(courseId, outlineVersion, embedLessonRefs);
-    await stepMarkPlan(planId, "published");
+    await stepMarkPlan(planId, "published", published.revisionNumber);
     return { ok: true as const, revisionNumber: published.revisionNumber };
   } catch (error) {
     /* The current Course is untouched; the plan stays staged, and a

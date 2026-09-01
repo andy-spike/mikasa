@@ -107,8 +107,7 @@ const { parseLessonContent } = await import("@/lib/course/content");
 const { saveLessonContent } = await import("@/lib/db/lessons");
 const { publishRevision, currentRevision } = await import("@/lib/db/review");
 const { createChangePlan } = await import("@/lib/db/tailor");
-const { embedCourseFragments } = await import("@/lib/course/fragments");
-const {
+const { embedCourseFragments } = await import("@/lib/course/fragments");const {
   reviewTailorOperationAction,
   retryPlanRevisionAction,
   stagePlanRevisionAction,
@@ -176,6 +175,20 @@ function lessonJson(title: string): string {
     selfExplanationPrompt: "Why this order?",
     exercise: { task: `Do ${title}.`, check: "It runs." },
     bridge: "Next.",
+  });
+}
+
+/** One reconcile response (#17): an alignment entry per staged Lesson. */
+function reconcileJson(lessonIds: string[]): string {
+  return json({
+    learningGraph: [],
+    alignment: lessonIds.map((id) => ({
+      lessonId: id,
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    })),
   });
 }
 
@@ -353,8 +366,12 @@ describe("stageRevisionWorkflow", () => {
     expect(staged).toMatchObject({ ok: true, stagedOutlineVersion: 2 });
     embedCalls.count = 0;
 
-    /* The regenerated Lesson's new content, scripted. */
-    revisionModelState.current = scriptedModel([lessonJson("Lesson one")]);
+    /* The regenerated Lesson's new content, scripted; the reconcile
+       call (#17) comes first and covers the staged Lessons l1 and l3. */
+    revisionModelState.current = scriptedModel([
+      reconcileJson(["l1", "l3"]),
+      lessonJson("Lesson one"),
+    ]);
 
     const [run] = await db
       .select()
@@ -416,8 +433,11 @@ describe("stageRevisionWorkflow", () => {
     expect(staged).toMatchObject({ ok: true, stagedOutlineVersion: 2 });
 
     /* The regeneration model answers with nonsense: the run fails, and
-       nothing published moves. */
-    revisionModelState.current = scriptedModel(["this is not the JSON you are looking for"]);
+       nothing published moves. The reconcile call comes first. */
+    revisionModelState.current = scriptedModel([
+      reconcileJson(["l1", "l3"]),
+      "this is not the JSON you are looking for",
+    ]);
     const [run] = await db
       .select()
       .from(generationRuns)
@@ -446,7 +466,10 @@ describe("stageRevisionWorkflow", () => {
     const retried = await retryPlanRevisionAction(courseId, planId);
     expect(retried).toMatchObject({ ok: true, stagedOutlineVersion: 2 });
 
-    /* This time the model cooperates, and the resumed run publishes. */
+    /* This time the model cooperates, and the resumed run publishes.
+       The failed run's reconcile step already saved the reconciled
+       specification, so the retry skips that model call entirely and
+       spends its one scripted response on the Lesson (#17). */
     revisionModelState.current = scriptedModel([lessonJson("Lesson one")]);
     const [reopened] = await db
       .select()

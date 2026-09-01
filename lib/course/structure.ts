@@ -100,6 +100,11 @@ function renumber(modules: OutlineModule[]): OutlineData {
   };
 }
 
+/** Re-derives ordinals and numerals after surgery on the shape (#15). */
+export function renumberOutline(modules: OutlineModule[]): OutlineData {
+  return renumber(modules);
+}
+
 function clone(data: OutlineData): OutlineModule[] {
   return data.modules.map((m) => ({ ...m, lessons: m.lessons.map((l) => ({ ...l })) }));
 }

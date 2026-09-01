@@ -137,3 +137,31 @@ export async function reconcileSpecification(
     adjustments: live,
   };
 }
+
+/** Whether two adjustment lists carry the same demands, order aside. */
+function sameAdjustments(a: LessonAdjustment[], b: LessonAdjustment[]): boolean {
+  if (a.length !== b.length) return false;
+  const key = (x: LessonAdjustment) =>
+    JSON.stringify([x.lessonId, x.prose ?? null, x.exercise ?? null]);
+  const left = new Set(a.map(key));
+  if (left.size !== a.length) return false;
+  return b.every((x) => left.has(key(x)));
+}
+
+/**
+ * Whether the specification can drive generation for this Outline as it
+ * is (#17): every Lesson has an alignment entry, every graph node points
+ * at a Lesson the Outline has, and the specification's demands are
+ * exactly the ones the caller wants baked in. Staged revisions check
+ * this before spending a model call on reconciliation.
+ */
+export function specNeedsReconciliation(
+  spec: CourseSpecification,
+  outline: OutlineData,
+  adjustments: LessonAdjustment[],
+): boolean {
+  const lessons = outline.modules.flatMap((m) => m.lessons);
+  if (lessons.some((l) => !spec.alignment.some((a) => a.lessonId === l.id))) return true;
+  if (spec.learningGraph.some((n) => !lessons.some((l) => l.id === n.lessonId))) return true;
+  return !sameAdjustments(spec.adjustments ?? [], adjustments);
+}

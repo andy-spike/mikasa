@@ -76,6 +76,10 @@ _Avoid_: patch, edit list, mutation plan
 A complete version of a Course that can be prepared while the current version remains readable, then published as one change.
 _Avoid_: snapshot, draft version, content version
 
+**Undo**:
+Reversing one published Change plan. Available while no later change has touched the same Lessons or Modules; it puts those Lessons' shape, content, and Completion back to what the plan's base revision had, and leaves every other Lesson where later changes put it.
+_Avoid_: rollback, revert, restore
+
 **Completion**:
 The Learner's record that an Exercise is done. A Lesson is complete when its Exercise is done, and a Course is complete when every Lesson is complete.
 _Avoid_: progress flag, done state

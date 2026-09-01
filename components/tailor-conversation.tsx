@@ -203,6 +203,7 @@ export function TailorConversation({
   onDiscard,
   onRestore,
   applySlot,
+  publishedSlot,
 }: {
   turns: Turn[];
   onAsk?: (text: string, onDelta: (chunk: string) => void) => Promise<boolean>;
@@ -211,6 +212,8 @@ export function TailorConversation({
   onDiscard: (operationId: string) => void;
   onRestore: (operationId: string) => void;
   applySlot?: ReactNode;
+  /** The revision's published changes and their undo affordances (#15). */
+  publishedSlot?: ReactNode;
 }) {
   const open = plan?.operations ?? [];
   const acceptedCount = open.filter((o) => o.status === "accepted").length;
@@ -225,10 +228,11 @@ export function TailorConversation({
       sendLabel="Tell the Tailor"
       pendingText="Working on a plan…"
       below={
-        open.length > 0 ? (
-          <div className="mt-5">
-            <p className="label text-fg-3">Change plan</p>
-            <ul className="-mx-3.5 mt-2 border-t border-hair">
+        <>
+          {open.length > 0 ? (
+            <div className="mt-5">
+              <p className="label text-fg-3">Change plan</p>
+              <ul className="-mx-3.5 mt-2 border-t border-hair">
               {open.map((operation) => (
                 <li
                   key={operation.id}
@@ -284,10 +288,12 @@ export function TailorConversation({
                   </div>
                 </li>
               ))}
-            </ul>
-            {applySlot && acceptedCount > 0 ? <div className="mt-4">{applySlot}</div> : null}
-          </div>
-        ) : null
+              </ul>
+              {applySlot && acceptedCount > 0 ? <div className="mt-4">{applySlot}</div> : null}
+            </div>
+          ) : null}
+          {publishedSlot}
+        </>
       }
     />
   );
