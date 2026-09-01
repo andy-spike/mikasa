@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { LogOut, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./workspace/theme-toggle";
+import { SignOutButton } from "./sign-out-button";
 
 /**
  * The chrome every screen outside the workspace wears.
@@ -50,14 +51,7 @@ export function AppShell({
           >
             <Settings className="h-4 w-4" strokeWidth={1.75} />
           </Button>
-          <Button
-            variant="icon"
-            render={<Link href="/" />}
-            aria-label="Sign out"
-            title="Sign out"
-          >
-            <LogOut className="h-4 w-4" strokeWidth={1.75} />
-          </Button>
+          <SignOutButton />
         </div>
       </header>
 

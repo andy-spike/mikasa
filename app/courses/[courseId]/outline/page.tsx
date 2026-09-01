@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { OutlineEditor } from "@/components/outline-editor";
 import { findCourse } from "@/lib/demo-library";
+import { requireLearner } from "@/lib/session";
 
 export default async function OutlinePage({
   params,
 }: PageProps<"/courses/[courseId]/outline">) {
+  await requireLearner();
   const { courseId } = await params;
   const course = findCourse(courseId);
   if (!course) notFound();

@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { Workspace } from "@/components/workspace/workspace";
 import { findCourse } from "@/lib/demo-library";
+import { requireLearner } from "@/lib/session";
 
 export default async function CoursePage({ params }: PageProps<"/courses/[courseId]">) {
+  await requireLearner();
   const { courseId } = await params;
   const course = findCourse(courseId);
   if (!course) notFound();

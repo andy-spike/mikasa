@@ -1,9 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { GoogleMark } from "@/components/google-mark";
 import { ThemeToggle } from "@/components/workspace/theme-toggle";
+import { authClient } from "@/lib/auth-client";
 
 /**
  * The door, not a pitch.
@@ -13,7 +14,17 @@ import { ThemeToggle } from "@/components/workspace/theme-toggle";
  * repeating the same button under a different heading.
  */
 export default function Landing() {
-  const router = useRouter();
+  const [signingIn, setSigningIn] = useState(false);
+
+  /* Better Auth answers with the Google consent screen; the callback comes
+     back through /api/auth/callback/google and lands on /courses. */
+  function signIn() {
+    if (signingIn) return;
+    setSigningIn(true);
+    authClient.signIn
+      .social({ provider: "google", callbackURL: "/courses" })
+      .finally(() => setSigningIn(false));
+  }
 
   return (
     <div className="flex h-full flex-col bg-canvas">
@@ -31,11 +42,7 @@ export default function Landing() {
           <p className="text-[0.9375rem] leading-[1.66] text-fg-2">
             Mikasa generates structured courses from a Topic and a Goal.
           </p>
-          <Button
-            variant="hero"
-            onClick={() => router.push("/courses")}
-            className="mt-6 w-full"
-          >
+          <Button variant="hero" onClick={signIn} disabled={signingIn} className="mt-6 w-full">
             <GoogleMark />
             Continue with Google
           </Button>

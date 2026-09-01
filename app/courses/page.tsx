@@ -3,10 +3,13 @@ import { Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { LiveMark, UnsetMark } from "@/components/workspace/marks";
 import { Button } from "@/components/ui/button";
-import { library, stats } from "@/lib/demo-library";
+import { listOwnedCourses } from "@/lib/db/courses";
+import { db } from "@/lib/db";
+import { requireLearner } from "@/lib/session";
 
-export default function CoursesPage() {
-  const rows = library.map((c) => ({ course: c, ...stats(c.modules) }));
+export default async function CoursesPage() {
+  const { user } = await requireLearner();
+  const owned = await listOwnedCourses(db, user.id);
 
   return (
     <AppShell
@@ -23,41 +26,55 @@ export default function CoursesPage() {
           Courses
         </h1>
 
-        {/* Hairline-divided rows on the canvas. Not a grid of cards. */}
-        <ul className="mt-8 border-t border-hair">
-          {rows.map(({ course: c, total, done }) => (
-            <li key={c.id} className="border-b border-hair">
-              <Link
-                href={c.phase === "reading" ? `/courses/${c.id}` : `/courses/${c.id}/outline`}
-                className="row grid grid-cols-[0.75rem_1fr_auto] items-start gap-x-4 px-2 py-5 hover:bg-panel"
-              >
-                <span className="flex h-5 w-3 items-center justify-center">
-                  {/* The accent still means one thing: where you are up to. */}
-                  {c.phase === "reading" ? <LiveMark /> : <UnsetMark />}
-                </span>
+        {owned.length === 0 ? (
+          <div className="mt-8 border-t border-hair pt-10">
+            <p className="text-[0.9375rem] leading-[1.66] text-fg-2">
+              No Courses yet.
+            </p>
+            <p className="mt-2 max-w-(--measure) text-[0.8125rem] leading-[1.55] text-fg-3">
+              Name a Topic and a Goal, and Mikasa drafts the Outline. You shape
+              it before a Lesson is written.
+            </p>
+            <Button variant="hero" render={<Link href="/courses/new" />} className="mt-6">
+              Start a Course
+            </Button>
+          </div>
+        ) : (
+          /* Hairline-divided rows on the canvas. Not a grid of cards. */
+          <ul className="mt-8 border-t border-hair">
+            {owned.map((c) => {
+              const reading = c.status === "reading";
+              return (
+                <li key={c.id} className="border-b border-hair">
+                  <Link
+                    href={reading ? `/courses/${c.id}` : `/courses/${c.id}/outline`}
+                    className="row grid grid-cols-[0.75rem_1fr_auto] items-start gap-x-4 px-2 py-5 hover:bg-panel"
+                  >
+                    <span className="flex h-5 w-3 items-center justify-center">
+                      {/* The accent still means one thing: where you are up to. */}
+                      {reading ? <LiveMark /> : <UnsetMark />}
+                    </span>
 
-                <span className="min-w-0">
-                  <span className="block truncate text-[0.9375rem] leading-snug font-semibold tracking-[-0.011em] text-fg">
-                    {c.topic}
-                  </span>
-                  <span className="mt-1.5 block truncate text-[0.8125rem] leading-[1.5] text-fg-3">
-                    {c.goal}
-                  </span>
-                </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[0.9375rem] leading-snug font-semibold tracking-[-0.011em] text-fg">
+                        {c.topic}
+                      </span>
+                      <span className="mt-1.5 block truncate text-[0.8125rem] leading-[1.5] text-fg-3">
+                        {c.goal}
+                      </span>
+                    </span>
 
-                <span className="tnum shrink-0 text-[0.8125rem] text-fg-3">
-                  {c.phase === "reading" ? (
-                    <>
-                      <span className="text-fg-2">{done}</span>/{total}
-                    </>
-                  ) : (
-                    "Outline"
-                  )}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                    {/* The done fraction needs the Lessons, which arrive with
+                        generation; a reading Course holds its place until then. */}
+                    <span className="tnum shrink-0 text-[0.8125rem] text-fg-3">
+                      {reading ? "—" : "Outline"}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
       </div>
     </AppShell>

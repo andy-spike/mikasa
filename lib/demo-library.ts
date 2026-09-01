@@ -424,23 +424,3 @@ export function applyPlan(
 export function findCourse(id: string): LibraryCourse | undefined {
   return library.find((c) => c.id === id);
 }
-
-/** Everything the list rows and the Outline head count, derived not stored. */
-export function stats(modules: Module[]) {
-  const lessons = modules.flatMap((m) => m.lessons);
-  const done = lessons.filter((l) => l.stampedOn).length;
-  const live = lessons.find((l) => l.status !== "unset" && !l.stampedOn) ?? null;
-  return {
-    total: lessons.length,
-    done,
-    live,
-    liveN: live ? lessons.indexOf(live) + 1 : 0,
-    minutes: lessons.reduce((sum, l) => sum + l.minutes, 0),
-  };
-}
-
-/** The account behind the chrome. Auth is not wired up in this build. */
-export const account = {
-  name: "Andy Spike",
-  email: "ansanabria12@gmail.com",
-};
