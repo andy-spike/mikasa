@@ -19,6 +19,7 @@ import {
   sources,
 } from "./schema";
 import type { LessonContent, ContentBlock } from "../course/content";
+import { parseLessonContent } from "../course/content";
 import type { CourseSpecification } from "../course/types";
 import { newLessonSourceRef, type PromptSource } from "../course/generate";
 
@@ -287,4 +288,41 @@ export async function getLessonsForVersion(
     exercise: r.exercise,
     bridge: r.bridge,
   }));
+}
+
+/** The candidate as review and correction consume it, in Outline order. */
+export async function getLessonContentsForVersion(
+  db: Db,
+  courseId: string,
+  outlineVersion: number,
+): Promise<LessonContent[]> {
+  const [outline] = await db
+    .select()
+    .from(outlines)
+    .where(and(eq(outlines.courseId, courseId), eq(outlines.version, outlineVersion)))
+    .limit(1);
+  if (!outline) return [];
+
+  const rows = await db
+    .select()
+    .from(lessons)
+    .where(
+      and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)),
+    );
+  const byRef = new Map(rows.map((r) => [r.lessonRef, r]));
+  const planned = outline.data.modules.flatMap((m) => m.lessons.map((l) => l.id));
+
+  return planned
+    .map((ref) => byRef.get(ref))
+    .filter((r): r is NonNullable<typeof r> => Boolean(r))
+    .map((r) =>
+      parseLessonContent(r.lessonRef, r.title, {
+        body: r.body,
+        workedExample: r.workedExample,
+        recallPrompt: r.recallPrompt,
+        selfExplanationPrompt: r.selfExplanationPrompt,
+        exercise: r.exercise,
+        bridge: r.bridge,
+      }),
+    );
 }

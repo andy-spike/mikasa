@@ -1,18 +1,20 @@
 "use client";
 
 import { ArrowRight } from "lucide-react";
-import type { Lesson as LessonType } from "@/lib/demo-course";
+import type { ReadingLesson, SourceLink } from "@/lib/course/reading";
 import { Button } from "@/components/ui/button";
 import { DoneCheck } from "./marks";
 import { Inline, LessonBlock } from "./prose";
 
 type Props = {
-  lesson: LessonType & { n: number; moduleNumeral: string; moduleTitle: string };
+  lesson: ReadingLesson & { n: number; moduleNumeral: string; moduleTitle: string };
   total: number;
   stamp?: string;
   /** true only on the Lesson just marked, so the check strokes once */
   striking: boolean;
   next: { id: string; n: number; title: string } | null;
+  /** Resolves a Source ref to its link; absent, citations stay plain text. */
+  sourceFor?: (ref: string) => SourceLink | undefined;
   onMark: () => void;
   onUnmark: () => void;
   onOpen: (id: string) => void;
@@ -24,6 +26,7 @@ export function LessonPane({
   stamp,
   striking,
   next,
+  sourceFor,
   onMark,
   onUnmark,
   onOpen,
@@ -44,7 +47,7 @@ export function LessonPane({
 
         <div className="mt-9 space-y-6">
           {lesson.body?.map((block, i) => (
-            <LessonBlock key={i} block={block} />
+            <LessonBlock key={i} block={block} sourceFor={sourceFor} />
           ))}
         </div>
 

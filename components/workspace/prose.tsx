@@ -1,5 +1,25 @@
 import type { CSSProperties, ReactNode } from "react";
-import type { Block } from "@/lib/demo-course";
+import type { ReadingBlock, SourceLink } from "@/lib/course/reading";
+
+/** Where a cited claim comes from: the Source's title, at its URL. */
+export function SourceLinks({ sources }: { sources: SourceLink[] }) {
+  return (
+    <p className="flex max-w-(--measure) flex-wrap items-center gap-x-3 gap-y-1">
+      {sources.map((source) => (
+        <a
+          key={source.ref}
+          href={source.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[0.75rem] text-fg-3 underline decoration-hair underline-offset-2 transition-colors hover:text-fg-2 focus-visible:text-fg-2"
+        >
+          <span className="label">Source</span>
+          <span className="truncate">{source.title}</span>
+        </a>
+      ))}
+    </p>
+  );
+}
 
 /** `code` and **emphasis** inside a Lesson paragraph. */
 export function Inline({ text }: { text: string }) {
@@ -72,43 +92,70 @@ function highlightSql(code: string): ReactNode[] {
   return out;
 }
 
-export function LessonBlock({ block }: { block: Block }) {
+export function LessonBlock({
+  block,
+  sourceFor,
+}: {
+  block: ReadingBlock;
+  /** Resolves a Source ref to its link; absent, citations render as text only. */
+  sourceFor?: (ref: string) => SourceLink | undefined;
+}) {
+  const sources =
+    "sourceRefs" in block && block.sourceRefs && sourceFor
+      ? block.sourceRefs.map(sourceFor).filter((s): s is SourceLink => Boolean(s))
+      : [];
+
+  const links = sources.length > 0 ? <SourceLinks sources={sources} /> : null;
+
   if (block.kind === "p") {
     return (
-      <p className="max-w-(--measure) text-[1rem] leading-[1.72] text-fg-2">
-        <Inline text={block.text} />
-      </p>
+      <>
+        <p className="max-w-(--measure) text-[1rem] leading-[1.72] text-fg-2">
+          <Inline text={block.text} />
+        </p>
+        {links}
+      </>
     );
   }
 
-  if (block.kind === "sql") {
-    /* Code sits one luminance step up. No border, no chrome. */
+  if (block.kind === "code" || block.kind === "sql") {
+    const language = block.kind === "sql" ? "sql" : block.language;
     return (
-      <div className="max-w-(--measure) overflow-hidden rounded-md bg-panel">
-        <div className="flex items-center border-b border-hair px-3.5 py-2">
-          <span className="label text-fg-3">sql</span>
+      <figure className="max-w-(--measure)">
+        <div className="overflow-hidden rounded-md bg-panel">
+          <div className="flex items-center border-b border-hair px-3.5 py-2">
+            <span className="label text-fg-3">{language}</span>
+          </div>
+          <pre
+            className="scroll-thin scroll-x"
+            style={{ "--scroll-bg": "var(--panel)" } as CSSProperties}
+          >
+            <code className="block w-max min-w-full px-3.5 py-3.5 font-mono text-[0.8125rem] leading-[1.72] text-fg-2">
+              {language === "sql" ? highlightSql(block.code) : block.code}
+            </code>
+          </pre>
         </div>
-        <pre
-          className="scroll-thin scroll-x"
-          style={{ "--scroll-bg": "var(--panel)" } as CSSProperties}
-        >
-          <code className="block w-max min-w-full px-3.5 py-3.5 font-mono text-[0.8125rem] leading-[1.72] text-fg-2">
-            {highlightSql(block.code)}
-          </code>
-        </pre>
-      </div>
+        {"caption" in block && block.caption ? (
+          <figcaption className="mt-2.5 text-[0.8125rem] leading-[1.55] text-fg-3">
+            {block.caption}
+          </figcaption>
+        ) : null}
+      </figure>
     );
   }
 
   if (block.kind === "note") {
     /* Set into the flow at one step up, with a hairline. Not a callout card. */
     return (
-      <aside className="max-w-(--measure) border-l border-rule py-1 pl-4">
-        <h3 className="label mb-2 text-fg-3">{block.title}</h3>
-        <p className="text-[0.9375rem] leading-[1.66] text-fg-2">
-          <Inline text={block.text} />
-        </p>
-      </aside>
+      <>
+        <aside className="max-w-(--measure) border-l border-rule py-1 pl-4">
+          <h3 className="label mb-2 text-fg-3">{block.title}</h3>
+          <p className="text-[0.9375rem] leading-[1.66] text-fg-2">
+            <Inline text={block.text} />
+          </p>
+        </aside>
+        {links}
+      </>
     );
   }
 

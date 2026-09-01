@@ -8,19 +8,13 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { course } from "@/lib/demo-course";
-import { applyPlan, findCourse } from "@/lib/demo-library";
+import type { ReadingCourse, SourceLink } from "@/lib/course/reading";
 import { Outline, type ModuleView } from "./outline";
 import { LessonPane } from "./lesson";
 import { Panel, type PanelMode } from "./panel";
 import { Resizer } from "./resizer";
 import { CommandPalette, type Command } from "./palette";
 import { ThemeToggle } from "./theme-toggle";
-
-/* The demo Course's Tailor plan, with the operations each change performs.
-   The Outline is always base + approved changes, here and on the Outline
-   screen, so one function serves both. */
-const plan = findCourse(course.id)!.plan;
 
 /** Demonstration clock. Real completions carry the day the learner marked one. */
 const TODAY = "28 AUG";
@@ -34,7 +28,14 @@ const RAIL_MAX = 28;
 const PANEL_MIN = 18;
 const PANEL_MAX = 30;
 
-export function Workspace() {
+type Props = {
+  /** The published Course, in reading order (lib/course/reading). */
+  course: ReadingCourse;
+  /** The Course's Sources, for the Lesson's inline links. */
+  sources?: Map<string, SourceLink>;
+};
+
+export function Workspace({ course, sources }: Props) {
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
   const [doneAt, setDoneAt] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
@@ -42,7 +43,7 @@ export function Workspace() {
       for (const l of m.lessons) if (l.stampedOn) seed[l.id] = l.stampedOn;
     return seed;
   });
-  const [openId, setOpenId] = useState("l5");
+  const [openId, setOpenId] = useState<string | null>(null);
   /* null until the learner collapses or expands; the width decides until then. */
   const [railChoice, setRailChoice] = useState<boolean | null>(null);
   const [panel, setPanel] = useState<PanelMode | null>(null);
@@ -61,12 +62,12 @@ export function Workspace() {
 
   const modules: ModuleView[] = useMemo(() => {
     let n = 0;
-    return applyPlan(course.modules, applied, plan).map((m) => ({
+    return course.modules.map((m) => ({
       numeral: m.numeral,
       title: m.title,
       lessons: m.lessons.map((l) => ({ ...l, n: ++n })),
     }));
-  }, [applied]);
+  }, [course]);
 
   const flat = useMemo(
     () =>
@@ -175,8 +176,7 @@ export function Workspace() {
         label: "Shape the Outline",
         group: "Actions",
         run: () => router.push(`/courses/${course.id}/outline`),
-      },
-    );
+      },    );
     for (const l of flat) {
       if (l.status === "unset") continue;
       list.push({
@@ -204,6 +204,8 @@ export function Workspace() {
       }
     >
       <Outline
+        topic={course.topic}
+        goal={course.goal}
         modules={modules}
         openId={open.id}
         liveId={live?.id ?? null}
@@ -304,6 +306,7 @@ export function Workspace() {
               stamp={doneAt[open.id]}
               striking={justDone === open.id}
               next={next ? { id: next.id, n: next.n, title: next.title } : null}
+              sourceFor={sources ? (ref) => sources.get(ref) : undefined}
               onMark={markDone}
               onUnmark={unmark}
               onOpen={openLesson}
@@ -313,6 +316,7 @@ export function Workspace() {
 
         <Panel
           mode={panel ?? lastMode}
+          tailorPlan={[]}
           applied={applied}
           onMode={(m) => {
             setLastMode(m);

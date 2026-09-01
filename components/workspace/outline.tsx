@@ -4,8 +4,7 @@ import Link from "next/link";
 import { ChevronLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import type { Lesson } from "@/lib/demo-course";
-import { course } from "@/lib/demo-course";
+import type { ReadingLesson } from "@/lib/course/reading";
 import {
   Sidebar,
   SidebarContent,
@@ -24,10 +23,13 @@ import { DoneCheck, LiveMark, UnsetMark } from "./marks";
 export type ModuleView = {
   numeral: string;
   title: string;
-  lessons: (Lesson & { n: number })[];
+  lessons: (ReadingLesson & { n: number })[];
 };
 
 type Props = {
+  /** The Course's own header: the rail carries it, there is no other chrome. */
+  topic: string;
+  goal: string;
   modules: ModuleView[];
   openId: string;
   liveId: string | null;
@@ -45,6 +47,8 @@ type Props = {
 };
 
 export function Outline({
+  topic,
+  goal,
   modules,
   openId,
   liveId,
@@ -93,7 +97,7 @@ export function Outline({
 
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-[0.9375rem] leading-snug font-semibold tracking-[-0.011em] text-fg">
-            {course.topic}
+            {topic}
           </h1>
           <Button
             variant="icon-raised"
@@ -109,7 +113,7 @@ export function Outline({
             anything else. Depth, Grounding and the done count were creation
             settings and a number the checks already tell you. */}
         <p className="mt-2 text-[0.8125rem] leading-[1.5] text-fg-3">
-          {course.goal}
+          {goal}
         </p>
       </SidebarHeader>
 

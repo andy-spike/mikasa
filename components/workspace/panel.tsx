@@ -11,17 +11,18 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Inline } from "./prose";
-import {
-  tailorPlan,
-  tutorPlaceholderReply,
-  tutorThread,
-  type TutorTurn,
-} from "@/lib/demo-course";
+import type { TailorChange, TutorTurn } from "@/lib/demo-course";
 
 export type PanelMode = "tutor" | "tailor";
 
 type Props = {
   mode: PanelMode;
+  /** The Tutor conversation so far; server-owned history arrives with ticket #10. */
+  tutorTurns?: TutorTurn[];
+  /** Absent until the Tutor is wired: the composer then stands down. */
+  onAsk?: (text: string) => void;
+  /** The Tailor's pending changes; empty until ticket #12. */
+  tailorPlan?: TailorChange[];
   applied: ReadonlySet<string>;
   onMode: (mode: PanelMode) => void;
   onClose: () => void;
@@ -33,6 +34,9 @@ type Props = {
 
 export function Panel({
   mode,
+  tutorTurns,
+  onAsk,
+  tailorPlan,
   applied,
   onMode,
   onClose,
@@ -74,9 +78,9 @@ export function Panel({
 
       <SidebarContent className="gap-0 overflow-hidden">
         {mode === "tutor" ? (
-          <TutorPane />
+          <TutorPane turns={tutorTurns ?? []} onAsk={onAsk} />
         ) : (
-          <TailorPane applied={applied} onApprove={onApprove} onUndo={onUndo} />
+          <TailorPane plan={tailorPlan ?? []} applied={applied} onApprove={onApprove} onUndo={onUndo} />
         )}
       </SidebarContent>
 
@@ -86,32 +90,32 @@ export function Panel({
   );
 }
 
-function TutorPane() {
-  const [thread, setThread] = useState<TutorTurn[]>(tutorThread);
+function TutorPane({
+  turns,
+  onAsk,
+}: {
+  turns: TutorTurn[];
+  onAsk?: (text: string) => void;
+}) {
+  const [thread, setThread] = useState<TutorTurn[]>(turns);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const foot = useRef<HTMLDivElement>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
 
   useEffect(() => {
     foot.current?.scrollIntoView({ block: "end", behavior: "smooth" });
   }, [thread.length, pending]);
 
+  const connected = Boolean(onAsk);
+
   function ask(text: string) {
     setThread((t) => [...t, { from: "learner", text }]);
     setDraft("");
+    if (!onAsk) return;
     setPending(true);
-    timer.current = setTimeout(() => {
-      setThread((t) => [...t, { from: "tutor", text: tutorPlaceholderReply }]);
-      setPending(false);
-    }, 900);
+    /* The reply arrives through the streaming handler (ticket #10); until
+       then the turn stands alone rather than pretending one came back. */
+    onAsk(text);
   }
 
   return (
@@ -150,7 +154,7 @@ function TutorPane() {
         onSubmit={(e) => {
           e.preventDefault();
           const text = draft.trim();
-          if (text && !pending) ask(text);
+          if (text && !pending && connected) ask(text);
         }}
       >
         <div className="flex items-end gap-2 rounded-md bg-canvas px-2.5 py-2 transition-colors focus-within:bg-raised">
@@ -162,17 +166,18 @@ function TutorPane() {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 const text = draft.trim();
-                if (text && !pending) ask(text);
+                if (text && !pending && connected) ask(text);
               }
             }}
             placeholder="Ask about this Lesson"
             aria-label="Ask the Tutor about this Lesson"
-            className="min-h-[2.5rem] flex-1 bg-transparent px-0 py-0 focus:bg-transparent"
+            disabled={!connected}
+            className="min-h-[2.5rem] flex-1 bg-transparent px-0 py-0 focus:bg-transparent disabled:opacity-60"
           />
           <Button
             type="submit"
             variant="icon-raised"
-            disabled={!draft.trim() || pending}
+            disabled={!draft.trim() || pending || !connected}
             aria-label="Ask the Tutor"
             className="mb-0.5 disabled:opacity-40"
           >
@@ -185,16 +190,18 @@ function TutorPane() {
 }
 
 function TailorPane({
+  plan,
   applied,
   onApprove,
   onUndo,
 }: {
+  plan: TailorChange[];
   applied: ReadonlySet<string>;
   onApprove: (id: string) => void;
   onUndo: (id: string) => void;
 }) {
   const [discarded, setDiscarded] = useState<string[]>([]);
-  const open = tailorPlan.filter((c) => !discarded.includes(c.id));
+  const open = plan.filter((c) => !discarded.includes(c.id));
 
   return (
     <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-3.5 py-4">

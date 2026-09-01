@@ -12,6 +12,7 @@ import type { LessonContent } from "@/lib/course/content";
 import type { PromptSource } from "@/lib/course/generate";
 import type { GenerationContext } from "@/lib/db/lessons";
 import type { OutlineLesson } from "@/lib/course/types";
+import { MAX_CORRECTION_ROUNDS } from "@/lib/course/review";
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
@@ -133,11 +134,151 @@ async function stepFail(courseId: string, runId: string, message: string): Promi
   await failGeneration(db, courseId, runId, message);
 }
 
+/* ------------------------------------------------------------------ */
+/* Review and publication (ticket #6).                                 */
+
+type ReviewPayload = {
+  runId: string;
+  round: number;
+  findings: { kind: string; lessonRef: string | null; detail: string; correction: string }[];
+};
+
+/** One full review pass: structural (pure), factual and code, learning design. */
+async function stepReviewRound(
+  courseId: string,
+  outlineVersion: number,
+  runId: string,
+  round: number,
+): Promise<ReviewPayload> {
+  "use step";
+  const { db } = await import("@/lib/db");
+  const { structuralFindings, factualFindings, designFindings } = await import(
+    "@/lib/course/review"
+  );
+  const { generationModel } = await import("@/lib/model");
+  const { loadGenerationContext, getLessonContentsForVersion } = await import(
+    "@/lib/db/lessons"
+  );
+  const { saveFindings, recordReviewStep } = await import("@/lib/db/review");
+
+  const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
+  const lessonContents = await getLessonContentsForVersion(db, courseId, outlineVersion);
+
+  const model = generationModel();
+  const courseMeta = {
+    topic: context.course.topic,
+    goal: context.course.goal,
+    language: context.course.language,
+  };
+
+  const found = [
+    ...structuralFindings({
+      spec: context.spec,
+      outline: context.outline.data,
+      lessons: lessonContents,
+    }),
+    ...(await factualFindings(model, courseMeta, context.spec, context.sources, lessonContents)),
+    ...(await designFindings(model, courseMeta, context.spec, context.outline.data, lessonContents)),
+  ];
+
+  await recordReviewStep(db, runId, round);
+  await saveFindings(db, runId, courseId, outlineVersion, round, found);
+  return { runId, round, findings: found };
+}
+
+/** Rewrites one affected Lesson against its findings and saves it. */
+async function stepCorrectLesson(
+  courseId: string,
+  outlineVersion: number,
+  runId: string,
+  lessonRef: string,
+  findings: ReviewPayload["findings"],
+): Promise<void> {
+  "use step";
+  const { db } = await import("@/lib/db");
+  const { correctLesson } = await import("@/lib/course/review");
+  const { generationModel } = await import("@/lib/model");
+  const { loadGenerationContext, getLessonContentsForVersion, saveLessonContent } =
+    await import("@/lib/db/lessons");
+
+  const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
+  const all = await getLessonContentsForVersion(db, courseId, outlineVersion);
+  const current = all.find((l) => l.lessonId === lessonRef);
+  if (!current) return;
+
+  const corrected = await correctLesson(
+    generationModel(),
+    {
+      topic: context.course.topic,
+      goal: context.course.goal,
+      language: context.course.language,
+    },
+    context.spec,
+    current,
+    findings as Parameters<typeof correctLesson>[4],
+    all
+      .filter((l) => l.lessonId !== lessonRef)
+      .map((l) => ({ title: l.title, summary: l.body.map(summaryOfBlock).join(" ").slice(0, 120) })),
+  );
+  await saveLessonContent(db, courseId, outlineVersion, runId, corrected);
+}
+
+function summaryOfBlock(block: unknown): string {
+  const b = block as { text?: string };
+  return b.text ?? "";
+}
+
+/** The findings just corrected become "corrected"; the next round starts clean. */
+async function stepMarkCorrected(runId: string, round: number): Promise<void> {
+  "use step";
+  const { markFindingsCorrected } = await import("@/lib/db/review");
+  const { db } = await import("@/lib/db");
+  await markFindingsCorrected(db, runId, round);
+}
+
+async function stepPublish(
+  courseId: string,
+  outlineVersion: number,
+  reviewRunId: string,
+): Promise<{ ok: boolean; reason?: string; revisionNumber?: number }> {
+  "use step";
+  const { publishRevision } = await import("@/lib/db/review");
+  const { db } = await import("@/lib/db");
+  const result = await publishRevision(db, courseId, outlineVersion, reviewRunId);
+  return result.ok
+    ? { ok: true, revisionNumber: result.revision.revisionNumber }
+    : { ok: false, reason: result.reason };
+}
+
+async function stepFailReview(
+  courseId: string,
+  runId: string,
+  message: string,
+): Promise<void> {
+  "use step";
+  const { failReview } = await import("@/lib/db/review");
+  const { db } = await import("@/lib/db");
+  await failReview(db, courseId, runId, message);
+}
+
+async function stepOpenReviewRun(
+  courseId: string,
+  outlineVersion: number,
+): Promise<string> {
+  "use step";
+  const { openReviewRun } = await import("@/lib/db/review");
+  const { db } = await import("@/lib/db");
+  const run = await openReviewRun(db, courseId, outlineVersion);
+  return run.id;
+}
+
 /**
- * One full generation pass over an approved Outline version: load, order,
- * write every Lesson in dependency order (Module by Module — the Outline's
- * order within a Module is the Learner's approved order), then close the
- * run only if the candidate is whole.
+ * One durable pass over an approved Outline version: load, order, write
+ * every Lesson in dependency order (Module by Module — the Outline's
+ * order within a Module is the Learner's approved order), then review the
+ * complete candidate, correct at most twice, and publish atomically. A
+ * candidate that still has findings after the second correction round
+ * fails the Course, unpublished and retryable.
  */
 export async function generateCourseWorkflow(
   courseId: string,
@@ -173,9 +314,51 @@ export async function generateCourseWorkflow(
     }
 
     const finished = await stepFinish(courseId, outlineVersion, runId);
-    return finished.ok
-      ? { ok: true as const }
-      : { ok: false as const, reason: "incomplete-candidate", missing: finished.missing };
+    if (!finished.ok) {
+      return {
+        ok: false as const,
+        reason: "incomplete-candidate",
+        missing: finished.missing,
+      };
+    }
+
+    /* Review: structural + factual and code + learning design, then at
+       most two rounds of targeted corrections. */
+    const reviewRunId = await stepOpenReviewRun(courseId, outlineVersion);
+    let round = 0;
+    let review = await stepReviewRound(courseId, outlineVersion, reviewRunId, round);
+
+    while (review.findings.length > 0 && round < MAX_CORRECTION_ROUNDS) {
+      round += 1;
+      await stepMarkStep(runId, `corrections:${round}`);
+
+      const byLesson = new Map<string, ReviewPayload["findings"]>();
+      for (const finding of review.findings) {
+        if (!finding.lessonRef) continue;
+        const list = byLesson.get(finding.lessonRef) ?? [];
+        list.push(finding);
+        byLesson.set(finding.lessonRef, list);
+      }
+      for (const [lessonRef, findings] of byLesson) {
+        await stepCorrectLesson(courseId, outlineVersion, runId, lessonRef, findings);
+      }
+      await stepMarkCorrected(reviewRunId, round - 1);
+
+      review = await stepReviewRound(courseId, outlineVersion, reviewRunId, round);
+    }
+
+    if (review.findings.length > 0) {
+      const message = `The review still finds ${review.findings.length} problem(s) after ${MAX_CORRECTION_ROUNDS} correction rounds. The Course was not published.`;
+      await stepFailReview(courseId, reviewRunId, message);
+      return { ok: false as const, reason: "review-failed" };
+    }
+
+    const published = await stepPublish(courseId, outlineVersion, reviewRunId);
+    if (!published.ok) {
+      await stepFailReview(courseId, reviewRunId, published.reason ?? "Publication failed.");
+      return { ok: false as const, reason: "publish-failed" };
+    }
+    return { ok: true as const, revisionNumber: published.revisionNumber };
   } catch (error) {
     await stepFail(courseId, runId, errorMessage(error));
     return { ok: false as const, reason: "generation-failed" };

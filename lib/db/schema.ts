@@ -293,4 +293,86 @@ export const lessons = pgTable(
   ],
 );
 
+/**
+ * One review pass over a complete candidate (ticket #6). Findings are
+ * kept per round so the two-round cap is checkable from the data, and a
+ * failed review keeps its message here.
+ */
+export const reviewRuns = pgTable(
+  "review_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    outlineVersion: integer("outline_version").notNull(),
+    /** "running" | "succeeded" | "failed" */
+    status: text("status").notNull().default("running"),
+    /** 0-based; corrections happen between rounds. */
+    round: integer("round").notNull().default(0),
+    /** Why the review failed; null while running or succeeded. */
+    error: text("error"),
+    startedAt: timestamp("started_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("review_runs_course_id_idx").on(table.courseId)],
+);
+
+/**
+ * One finding from one review round. `lessonRef` is null for findings
+ * about the Course as a whole; corrections (at most two rounds) target
+ * exactly the Lessons findings point at.
+ */
+export const reviewFindings = pgTable(
+  "review_findings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reviewRunId: uuid("review_run_id")
+      .notNull()
+      .references(() => reviewRuns.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    outlineVersion: integer("outline_version").notNull(),
+    round: integer("round").notNull(),
+    /** "structural" | "factual" | "learning-design" */
+    kind: text("kind").notNull(),
+    lessonRef: text("lesson_ref"),
+    detail: text("detail").notNull(),
+    /** What the correction should do about it. */
+    correction: text("correction").notNull(),
+    /** "open" | "corrected" | "obsolete" */
+    status: text("status").notNull().default("open"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [index("review_findings_run_id_idx").on(table.reviewRunId)],
+);
+
+/**
+ * A published Course revision: immutable by construction (its Lessons are
+ * the rows keyed to `outlineVersion`), with the highest revision number
+ * being the one the Learner reads, the Tutor retrieves against, and the
+ * Tailor changes. Publication is one transaction: insert the row, set the
+ * Course "ready" — there is no moment where a partial Course is readable.
+ */
+export const revisions = pgTable(
+  "revisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    revisionNumber: integer("revision_number").notNull(),
+    outlineVersion: integer("outline_version").notNull(),
+    publishedAt: timestamp("published_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("revisions_course_id_number_key").on(table.courseId, table.revisionNumber),
+    index("revisions_course_id_idx").on(table.courseId),
+  ],
+);
+
+export type ReviewRun = typeof reviewRuns.$inferSelect;
+export type ReviewFindingRow = typeof reviewFindings.$inferSelect;
+export type Revision = typeof revisions.$inferSelect;
 export type LessonRow = typeof lessons.$inferSelect;

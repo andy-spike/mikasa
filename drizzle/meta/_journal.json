@@ -29,6 +29,13 @@
       "when": 1788229417810,
       "tag": "0003_lessons-candidate",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788230579955,
+      "tag": "0004_review-and-revisions",
+      "breakpoints": true
     }
   ]
 }
