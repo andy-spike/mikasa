@@ -448,3 +448,60 @@ export const codeVerifications = pgTable(
 );
 
 export type CodeVerification = typeof codeVerifications.$inferSelect;
+
+/**
+ * One Tutor conversation, one per Lesson of a Course (ticket #10). The
+ * server owns the canonical thread; the client only ever names the
+ * Conversation it is continuing (Course + Lesson identity).
+ */
+export const tutorConversations = pgTable(
+  "tutor_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    /** The stable Outline Lesson id the conversation is about. */
+    lessonRef: text("lesson_ref").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("tutor_conversations_course_lesson_key").on(
+      table.courseId,
+      table.lessonRef,
+    ),
+    index("tutor_conversations_course_id_idx").on(table.courseId),
+  ],
+);
+
+/**
+ * The Tutor's canonical history (ticket #10). Only completed turns live
+ * here: a Learner message and the Tutor's answer are written together,
+ * after the Tutor's stream has finished cleanly. An interrupted or failed
+ * stream leaves nothing behind, so a retry starts a clean turn.
+ */
+export const tutorMessages = pgTable(
+  "tutor_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => tutorConversations.id, { onDelete: "cascade" }),
+    /** Monotonic within the conversation; the Learner's message is even. */
+    seq: integer("seq").notNull(),
+    /** "learner" | "tutor" */
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("tutor_messages_conversation_seq_key").on(
+      table.conversationId,
+      table.seq,
+    ),
+    index("tutor_messages_conversation_id_idx").on(table.conversationId),
+  ],
+);
+
+export type TutorConversation = typeof tutorConversations.$inferSelect;
+export type TutorMessage = typeof tutorMessages.$inferSelect;

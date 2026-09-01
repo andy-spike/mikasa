@@ -25,6 +25,10 @@ export const MODEL_PROFILES = {
     model: "anthropic/claude-sonnet-4.5",
     reasoning: { effort: "low" },
   },
+  tutor: {
+    model: "anthropic/claude-sonnet-4.5",
+    reasoning: { effort: "low" },
+  },
 } as const;
 
 function openrouter() {
@@ -59,4 +63,14 @@ export function groundingModel(): LanguageModel {
  */
 export function generationModel(): LanguageModel {
   return openrouter()(MODEL_PROFILES.design.model);
+}
+
+/** The model the Tutor converses on: fast to first word, still sharp. */
+export function tutorModel(): LanguageModel {
+  return openrouter()(MODEL_PROFILES.tutor.model);
+}
+
+/** OpenRouter provider options for the Tutor: low reasoning effort. */
+export function tutorProviderOptions(): { openrouter: OpenRouterProviderOptions } {
+  return { openrouter: { reasoning: { ...MODEL_PROFILES.tutor.reasoning } } };
 }

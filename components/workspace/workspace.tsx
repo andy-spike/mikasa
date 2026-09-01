@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ReadingCourse, SourceLink } from "@/lib/course/reading";
 import type { CompletionActionResult } from "@/lib/actions/completion";
+import type { TutorTurn } from "./panel";
 import { Outline, type ModuleView } from "./outline";
 import { LessonPane } from "./lesson";
 import { Panel, type PanelMode } from "./panel";
@@ -37,9 +38,11 @@ type Props = {
   onMark: (lessonId: string) => Promise<CompletionActionResult>;
   /** Undoes one Exercise's completion on the server. */
   onUnmark: (lessonId: string) => Promise<CompletionActionResult>;
+  /** The Tutor's restored conversations, keyed by the Lesson id (#10). */
+  tutorHistory?: Record<string, TutorTurn[]>;
 };
 
-export function Workspace({ course, sources, onMark, onUnmark }: Props) {
+export function Workspace({ course, sources, onMark, onUnmark, tutorHistory }: Props) {
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
   const [doneAt, setDoneAt] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
@@ -137,6 +140,43 @@ export function Workspace({ course, sources, onMark, onUnmark }: Props) {
       }
     });
   }
+
+  /* The Tutor's turn (#10): the client posts only the Lesson it is
+     reading and the message; the server owns the conversation, the
+     history, and the authorization. The answer streams back as plain
+     text and grows in the pane's open turn. */
+  async function askTutor(
+    lessonId: string,
+    text: string,
+    onDelta: (chunk: string) => void,
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(`/api/courses/${course.id}/tutor`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ lessonId, message: text }),
+      });
+      if (!response.ok || !response.body) return false;
+
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return true;
+        if (value) onDelta(value);
+      }
+    } catch {
+      /* Network dropped mid-stream: the turn is not stored server-side,
+         and the pane says so. */
+      return false;
+    }
+  }
+
+  /* The open Lesson's restored conversation, identity-stable between
+     renders so the pane's live thread survives a re-render mid-stream. */
+  const tutorTurnsFor = useMemo<TutorTurn[]>(
+    () => tutorHistory?.[open.id] ?? [],
+    [tutorHistory, open.id],
+  );
 
   /* Two keys, and both are navigation: the palette, and the Outline. */
   useEffect(() => {
@@ -338,6 +378,8 @@ export function Workspace({ course, sources, onMark, onUnmark }: Props) {
 
         <Panel
           mode={panel ?? lastMode}
+          tutorTurns={tutorTurnsFor}
+          onAsk={(text, onDelta) => askTutor(open.id, text, onDelta)}
           tailorPlan={[]}
           applied={applied}
           onMode={(m) => {

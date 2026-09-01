@@ -11,16 +11,23 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Inline } from "./prose";
-import type { TailorChange, TutorTurn } from "@/lib/demo-course";
+import type { TailorChange } from "@/lib/demo-course";
 
 export type PanelMode = "tutor" | "tailor";
 
+/** One side of the Tutor conversation, as the pane renders it. */
+export type TutorTurn = { from: "learner" | "tutor"; text: string };
+
 type Props = {
   mode: PanelMode;
-  /** The Tutor conversation so far; server-owned history arrives with ticket #10. */
+  /** The restored conversation for the open Lesson; server-owned history. */
   tutorTurns?: TutorTurn[];
-  /** Absent until the Tutor is wired: the composer then stands down. */
-  onAsk?: (text: string) => void;
+  /**
+   * Sends one Learner message and streams the Tutor's answer through
+   * `onDelta`; resolves true when the answer completed. Absent until the
+   * Tutor is wired: the composer then stands down.
+   */
+  onAsk?: (text: string, onDelta: (chunk: string) => void) => Promise<boolean>;
   /** The Tailor's pending changes; empty until ticket #12. */
   tailorPlan?: TailorChange[];
   applied: ReadonlySet<string>;
@@ -95,27 +102,69 @@ function TutorPane({
   onAsk,
 }: {
   turns: TutorTurn[];
-  onAsk?: (text: string) => void;
+  onAsk?: (text: string, onDelta: (chunk: string) => void) => Promise<boolean>;
 }) {
   const [thread, setThread] = useState<TutorTurn[]>(turns);
+  const [failed, setFailed] = useState(false);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [restored, setRestored] = useState(turns);
   const foot = useRef<HTMLDivElement>(null);
+  const tail = thread[thread.length - 1]?.text.length;
+
+  /* The server owns the thread: restored history replaces the local one
+     whenever a new conversation arrives (a Lesson switch, a refresh). */
+  if (turns !== restored) {
+    setRestored(turns);
+    setThread(turns);
+    setFailed(false);
+  }
 
   useEffect(() => {
     foot.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [thread.length, pending]);
+  }, [thread.length, tail, pending, streaming]);
 
   const connected = Boolean(onAsk);
 
-  function ask(text: string) {
-    setThread((t) => [...t, { from: "learner", text }]);
-    setDraft("");
+  async function ask(text: string) {
     if (!onAsk) return;
+    setThread((t) => [...t, { from: "learner", text }, { from: "tutor", text: "" }]);
+    setDraft("");
     setPending(true);
-    /* The reply arrives through the streaming handler (ticket #10); until
-       then the turn stands alone rather than pretending one came back. */
-    onAsk(text);
+    setStreaming(false);
+
+    let seen = false;
+    const ok = await onAsk(text, (chunk) => {
+      if (chunk.length > 0) {
+        if (!seen) {
+          seen = true;
+          setPending(false);
+          setStreaming(true);
+        }
+        /* The answer grows in place, in the turn that was opened for it. */
+        setThread((t) => {
+          const copy = [...t];
+          const last = copy[copy.length - 1];
+          if (last && last.from === "tutor") copy[copy.length - 1] = { ...last, text: last.text + chunk };
+          return copy;
+        });
+      }
+    });
+
+    setPending(false);
+    setStreaming(false);
+    if (!ok) {
+      /* The turn never completed: nothing was stored. Drop the empty
+         reply and say so, rather than leaving a hole in the thread. */
+      setThread((t) => {
+        const copy = [...t];
+        const last = copy[copy.length - 1];
+        if (last && last.from === "tutor" && last.text === "") copy.pop();
+        return copy;
+      });
+      setFailed(true);
+    }
   }
 
   return (
@@ -143,6 +192,11 @@ function TutorPane({
           {pending ? (
             <p className="text-[0.8125rem] text-fg-3" aria-live="polite">
               Working on an answer…
+            </p>
+          ) : null}
+          {failed ? (
+            <p className="text-[0.8125rem] text-fg-3" aria-live="polite">
+              The Tutor could not answer just now — ask again.
             </p>
           ) : null}
         </div>

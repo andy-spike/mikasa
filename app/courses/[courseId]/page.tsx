@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { findOwnedCourse } from "@/lib/db/courses";
 import { findOwnedPublishedCourse } from "@/lib/db/review";
 import { listCompletions } from "@/lib/db/completion";
+import { loadTutorHistory } from "@/lib/db/tutor";
 import { markLessonDoneAction, markLessonUndoneAction } from "@/lib/actions/completion";
 import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
 import { requireLearner } from "@/lib/session";
@@ -33,12 +34,21 @@ export default async function CoursePage({ params }: PageProps<"/courses/[course
   );
   const sources = toSourceLinks(published.sourceRows);
 
+  /* The Tutor's conversations, restored turn by turn (#10): the server's
+     history is what the threads show on arrival. */
+  const stored = await loadTutorHistory(db, user.id, courseId);
+  const tutorHistory: Record<string, { from: "learner" | "tutor"; text: string }[]> = {};
+  for (const [lessonRef, turns] of stored) {
+    tutorHistory[lessonRef] = turns.map((t) => ({ from: t.role, text: t.content }));
+  }
+
   return (
     <Workspace
       course={reading}
       sources={sources}
       onMark={(lessonId) => markLessonDoneAction(courseId, lessonId)}
       onUnmark={(lessonId) => markLessonUndoneAction(courseId, lessonId)}
+      tutorHistory={tutorHistory}
     />
   );
 }
