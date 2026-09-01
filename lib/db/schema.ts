@@ -414,3 +414,37 @@ export type ReviewFindingRow = typeof reviewFindings.$inferSelect;
 export type Revision = typeof revisions.$inferSelect;
 export type LessonRow = typeof lessons.$inferSelect;
 export type Completion = typeof completions.$inferSelect;
+
+/**
+ * One Sandbox verification pass over a candidate's executable claims
+ * (ticket #9). The evidence — commands, their output, the files present —
+ * is kept verbatim: review reads it, and a failed pass blocks publication
+ * until a later round's pass passes. Keyed per round, so a Workflow retry
+ * reuses the row instead of re-running the Sandbox.
+ */
+export const codeVerifications = pgTable(
+  "code_verifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    outlineVersion: integer("outline_version").notNull(),
+    /** The review round this pass belongs to. */
+    round: integer("round").notNull().default(0),
+    /** "passed" | "failed" */
+    status: text("status").notNull(),
+    evidence: jsonb("evidence").$type<unknown>().notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("code_verifications_course_version_round_key").on(
+      table.courseId,
+      table.outlineVersion,
+      table.round,
+    ),
+    index("code_verifications_course_id_idx").on(table.courseId),
+  ],
+);
+
+export type CodeVerification = typeof codeVerifications.$inferSelect;

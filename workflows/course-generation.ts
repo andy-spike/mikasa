@@ -143,7 +143,7 @@ type ReviewPayload = {
   findings: { kind: string; lessonRef: string | null; detail: string; correction: string }[];
 };
 
-/** One full review pass: structural (pure), factual and code, learning design. */
+/** One full review pass: structural (pure), factual and code, learning design, and — for a coding Course — the Sandbox. */
 async function stepReviewRound(
   courseId: string,
   outlineVersion: number,
@@ -155,11 +155,23 @@ async function stepReviewRound(
   const { structuralFindings, factualFindings, designFindings } = await import(
     "@/lib/course/review"
   );
+  const {
+    needsCodeVerification,
+    planVerification,
+    runVerification,
+    verificationFindings,
+  } = await import("@/lib/course/sandbox-verify");
+  const { vercelSandboxProvider } = await import("@/lib/sandbox");
   const { generationModel } = await import("@/lib/model");
   const { loadGenerationContext, getLessonContentsForVersion } = await import(
     "@/lib/db/lessons"
   );
-  const { saveFindings, recordReviewStep } = await import("@/lib/db/review");
+  const {
+    saveFindings,
+    recordReviewStep,
+    saveCodeVerification,
+    findCodeVerification,
+  } = await import("@/lib/db/review");
 
   const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
   const lessonContents = await getLessonContentsForVersion(db, courseId, outlineVersion);
@@ -180,6 +192,50 @@ async function stepReviewRound(
     ...(await factualFindings(model, courseMeta, context.spec, context.sources, lessonContents)),
     ...(await designFindings(model, courseMeta, context.spec, context.outline.data, lessonContents)),
   ];
+
+  /* Executable claims (ticket #9): only a coding Course creates Sandbox
+     work; a coding Course re-verifies after every correction round, since
+     corrections may have rewritten the code. A pass already recorded for
+     this round is reused, so a Workflow retry does not re-run the
+     Sandbox. */
+  if (needsCodeVerification(context.course, lessonContents)) {
+    const existing = await findCodeVerification(db, courseId, outlineVersion, round);
+    if (!existing) {
+      const plan = await planVerification(model, context.course, context.spec, lessonContents);
+      const result = await runVerification(vercelSandboxProvider(), plan);
+      await saveCodeVerification(db, courseId, outlineVersion, round, result);
+      found.push(
+        ...verificationFindings(result).map((f) => ({
+          kind: "code-execution" as const,
+          lessonRef: f.lessonRef,
+          detail: f.detail,
+          correction: f.correction,
+        })),
+      );
+    } else {
+      const evidence = existing.evidence as {
+        commands?: {
+          run: string;
+          lessonRef: string;
+          exitCode: number;
+          stderr: string;
+          proves?: string;
+        }[];
+      };
+      found.push(
+        ...(evidence.commands ?? [])
+          .filter((c) => c.exitCode !== 0)
+          .map((c) => ({
+            kind: "code-execution" as const,
+            lessonRef: c.lessonRef,
+            detail: `The command "${c.run}" exited with code ${c.exitCode}${
+              c.stderr ? `: ${c.stderr.trim().slice(0, 300)}` : ""
+            }. It was meant to prove: ${c.proves ?? "the Lesson's claim"}`,
+            correction: `Fix the Lesson's code so that "${c.run}" runs cleanly.`,
+          })),
+      );
+    }
+  }
 
   await recordReviewStep(db, runId, round);
   await saveFindings(db, runId, courseId, outlineVersion, round, found);

@@ -8,6 +8,7 @@ import { and, desc, eq, max } from "drizzle-orm";
 import type { Db } from "./index";
 import {
   courses,
+  codeVerifications,
   generationRuns,
   lessons,
   outlines,
@@ -15,6 +16,7 @@ import {
   reviewRuns,
   revisions,
   sources,
+  type CodeVerification,
   type Course,
   type Revision,
   type ReviewFindingRow,
@@ -190,6 +192,26 @@ export async function publishRevision(
       return { ok: false as const, reason: "Refusing to publish with open review findings." };
     }
 
+    /* Executable claims (ticket #9): the newest Sandbox pass for this
+       Outline version must not be a failure. */
+    const verification = await tx
+      .select()
+      .from(codeVerifications)
+      .where(
+        and(
+          eq(codeVerifications.courseId, courseId),
+          eq(codeVerifications.outlineVersion, outlineVersion),
+        ),
+      )
+      .orderBy(desc(codeVerifications.round))
+      .limit(1);
+    if (verification[0]?.status === "failed") {
+      return {
+        ok: false as const,
+        reason: "Refusing to publish: the code did not run cleanly in the Sandbox.",
+      };
+    }
+
     const [current] = await tx
       .select({ revisionNumber: max(revisions.revisionNumber) })
       .from(revisions)
@@ -221,8 +243,84 @@ export async function publishRevision(
   });
 }
 
-/** A failed review keeps the Course unpublished with a usable message. */
-export async function failReview(
+/**
+ * Saves a Sandbox verification pass for a round. A row for the same
+ * (course, version, round) already existing means a Workflow retry
+ * re-entered this step: the row is reused, and the Sandbox does not run
+ * twice for the same round.
+ */
+export async function saveCodeVerification(
+  db: Db,
+  courseId: string,
+  outlineVersion: number,
+  round: number,
+  result: { passed: boolean; evidence: unknown },
+): Promise<{ created: boolean }> {
+  const [existing] = await db
+    .select()
+    .from(codeVerifications)
+    .where(
+      and(
+        eq(codeVerifications.courseId, courseId),
+        eq(codeVerifications.outlineVersion, outlineVersion),
+        eq(codeVerifications.round, round),
+      ),
+    )
+    .limit(1);
+  if (existing) return { created: false };
+
+  await db.insert(codeVerifications).values({
+    courseId,
+    outlineVersion,
+    round,
+    status: result.passed ? "passed" : "failed",
+    evidence: result.evidence,
+  });
+  return { created: true };
+}
+
+/** The verification pass recorded for a round, if any. */
+export async function findCodeVerification(
+  db: Db,
+  courseId: string,
+  outlineVersion: number,
+  round: number,
+): Promise<CodeVerification | undefined> {
+  const [row] = await db
+    .select()
+    .from(codeVerifications)
+    .where(
+      and(
+        eq(codeVerifications.courseId, courseId),
+        eq(codeVerifications.outlineVersion, outlineVersion),
+        eq(codeVerifications.round, round),
+      ),
+    )
+    .limit(1);
+  return row;
+}
+
+/** The newest verification pass for an Outline version. */
+export async function latestCodeVerification(
+  db: Db,
+  courseId: string,
+  outlineVersion: number,
+): Promise<CodeVerification | undefined> {
+  const [row] = await db
+    .select()
+    .from(codeVerifications)
+    .where(
+      and(
+        eq(codeVerifications.courseId, courseId),
+        eq(codeVerifications.outlineVersion, outlineVersion),
+      ),
+    )
+    .orderBy(desc(codeVerifications.round))
+    .limit(1);
+  return row;
+}
+
+/** A failed review keeps the Course unpublished with a usable message. */export async function failReview(
   db: Db,
   courseId: string,
   runId: string,

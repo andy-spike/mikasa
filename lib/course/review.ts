@@ -19,7 +19,7 @@ import { GenerationError } from "./generate";
 import type { LessonContent } from "./content";
 import type { CourseSpecification, OutlineData } from "./types";
 
-export type FindingKind = "structural" | "factual" | "learning-design";
+export type FindingKind = "structural" | "factual" | "learning-design" | "code-execution";
 
 export type Finding = {
   kind: FindingKind;

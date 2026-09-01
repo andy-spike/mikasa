@@ -50,6 +50,13 @@
       "when": 1788231980715,
       "tag": "0006_completions",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788232298824,
+      "tag": "0007_code-verifications",
+      "breakpoints": true
     }
   ]
 }
