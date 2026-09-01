@@ -1,0 +1,143 @@
+/**
+ * The documented limits for creating a Course. This module is shared by the
+ * form (instant feedback) and the server action (the authority), so both
+ * reject exactly the same input.
+ */
+
+export const TOPIC_MAX_LENGTH = 200;
+export const GOAL_MAX_LENGTH = 500;
+export const BACKGROUND_MAX_LENGTH = 2000;
+
+/**
+ * The supported Course Languages. The Learner's choice is immutable after
+ * creation: no update path exists for it anywhere in the app.
+ */
+export const COURSE_LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Spanish" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "pt", label: "Portuguese" },
+] as const;
+
+export type CourseLanguageCode = (typeof COURSE_LANGUAGES)[number]["code"];
+
+export const COURSE_LANGUAGE_CODES = COURSE_LANGUAGES.map((l) => l.code);
+
+export function courseLanguageLabel(code: string): string {
+  return COURSE_LANGUAGES.find((l) => l.code === code)?.label ?? code;
+}
+
+/**
+ * The three Depth choices, in the order the form offers them, with the same
+ * wording the library has always shown.
+ */
+export const DEPTH_CHOICES = [
+  {
+    id: "reach",
+    title: "Just enough to reach the Goal",
+    detail:
+      "The shortest line from where you are to the outcome. Nothing beside the point.",
+  },
+  {
+    id: "working",
+    title: "Solid working knowledge",
+    detail:
+      "The Goal, plus the surrounding ground you need to keep using this without a reference open.",
+  },
+  {
+    id: "mastery",
+    title: "Deep mastery",
+    detail:
+      "Past the Goal into the edges: the internals, the failure modes, the arguments.",
+  },
+] as const;
+
+export type DepthId = (typeof DEPTH_CHOICES)[number]["id"];
+
+export const DEPTH_IDS = DEPTH_CHOICES.map((d) => d.id);
+
+/**
+ * How much structure each Depth allows before the Learner reshapes it. The
+ * Outline a Course is born with must land inside these bounds; design fails
+ * and can be retried when a model draft misses them. Bounds are lessons
+ * *total* across the Course, not per Module. A reach Course is a short
+ * line to one outcome; working adds the ground to keep using the skill;
+ * mastery walks the edges, so it earns the most Modules and Lessons.
+ */
+export const DEPTH_BOUNDS: Record<
+  DepthId,
+  { minModules: number; maxModules: number; minLessons: number; maxLessons: number }
+> = {
+  reach: { minModules: 2, maxModules: 3, minLessons: 3, maxLessons: 6 },
+  working: { minModules: 3, maxModules: 5, minLessons: 6, maxLessons: 12 },
+  mastery: { minModules: 4, maxModules: 7, minLessons: 10, maxLessons: 18 },
+};
+
+export function depthBounds(depth: string) {
+  return DEPTH_BOUNDS[depth as DepthId];
+}
+
+/** The raw shape the form sends and the action receives. */
+export type CourseInput = {
+  topic: string;
+  goal: string;
+  background: string;
+  language: string;
+  depth: string;
+  grounding: boolean;
+};
+
+export type CourseInputErrors = Partial<
+  Record<keyof CourseInput | "form", string>
+>;
+
+const trim = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
+
+/**
+ * Validates one Course creation. Returns every field error at once, so the
+ * form can show them together. Empty Background is fine (it is optional);
+ * everything else has to be inside its documented limit.
+ */
+export function validateCourseInput(
+  raw: Partial<Record<keyof CourseInput, unknown>>,
+): { ok: true; value: CourseInput } | { ok: false; errors: CourseInputErrors } {
+  const errors: CourseInputErrors = {};
+
+  const topic = trim(raw.topic);
+  if (!topic) errors.topic = "Name the Topic the Course teaches.";
+  else if (topic.length > TOPIC_MAX_LENGTH)
+    errors.topic = `Keep the Topic under ${TOPIC_MAX_LENGTH} characters (currently ${topic.length}).`;
+
+  const goal = trim(raw.goal);
+  if (!goal) errors.goal = "Say what you want to be able to do.";
+  else if (goal.length > GOAL_MAX_LENGTH)
+    errors.goal = `Keep the Goal under ${GOAL_MAX_LENGTH} characters (currently ${goal.length}).`;
+
+  const background = trim(raw.background);
+  if (background.length > BACKGROUND_MAX_LENGTH)
+    errors.background = `Keep the Background under ${BACKGROUND_MAX_LENGTH} characters (currently ${background.length}).`;
+
+  const language = trim(raw.language);
+  if (!COURSE_LANGUAGE_CODES.includes(language as CourseLanguageCode))
+    errors.language = "Choose one of the supported Course Languages.";
+
+  const depth = trim(raw.depth);
+  if (!DEPTH_IDS.includes(depth as DepthId))
+    errors.depth = "Choose a Depth.";
+
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+  return {
+    ok: true,
+    value: {
+      topic,
+      goal,
+      background,
+      language,
+      depth,
+      grounding: raw.grounding !== false,
+    },
+  };
+}

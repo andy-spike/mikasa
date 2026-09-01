@@ -2,201 +2,357 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState, useTransition } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { field } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import { depths, library } from "@/lib/demo-library";
+import { createCourseAction } from "@/lib/actions/courses";
+import {
+  BACKGROUND_MAX_LENGTH,
+  COURSE_LANGUAGES,
+  DEPTH_CHOICES,
+  GOAL_MAX_LENGTH,
+  TOPIC_MAX_LENGTH,
+  validateCourseInput,
+  type CourseInput,
+  type CourseInputErrors,
+} from "@/lib/course/limits";
 
-/* The demo Course this form generates. The fields start on its values so the
-   click-through lands on an Outline that matches what the form says — no
-   generation runs in this build. Clear them to see the empty form. */
-const seed = library[1];
-
+/**
+ * Course creation. Validation is shared with the server action
+ * (`lib/course/limits`), so the form can reject the same input before the
+ * action would — the action stays the authority.
+ */
 export function NewCourseForm() {
   const router = useRouter();
-  const [topic, setTopic] = useState(seed.topic);
-  const [goal, setGoal] = useState(seed.goal);
-  const [depth, setDepth] = useState<string>("reach");
-  const [background, setBackground] = useState(seed.background);
-  const [grounding, setGrounding] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [values, setValues] = useState<CourseInput>({
+    topic: "",
+    goal: "",
+    background: "",
+    language: "en",
+    depth: "reach",
+    grounding: true,
+  });
+  /* A field shows its error once it has been left (or a submit failed),
+     so typing never yells at you mid-thought. */
+  const [touched, setTouched] = useState<Partial<Record<keyof CourseInput, boolean>>>({});
+  const [errors, setErrors] = useState<CourseInputErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [, startTransition] = useTransition();
 
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
+  function set<K extends keyof CourseInput>(key: K, value: CourseInput[K]) {
+    const next = { ...values, [key]: value };
+    setValues(next);
+    /* Re-validate what has been seen, so a fixed field stops complaining
+       the moment it is fixed. */
+    const fresh = validateCourseInput(next);
+    setErrors(() => {
+      if (fresh.ok) return {};
+      const kept: CourseInputErrors = {};
+      for (const field of Object.keys(fresh.errors) as (keyof CourseInputErrors)[]) {
+        if (field === "form" || touched[field]) kept[field] = fresh.errors[field];
+      }
+      return kept;
+    });
+  }
 
-  const ready = topic.trim().length > 0 && goal.trim().length > 0;
+  function blur(key: keyof CourseInput) {
+    setTouched((t) => ({ ...t, [key]: true }));
+    const fresh = validateCourseInput(values);
+    if (!fresh.ok && fresh.errors[key]) {
+      setErrors((e) => ({ ...e, [key]: fresh.errors[key] }));
+    }
+  }
 
-  function generate() {
-    setGenerating(true);
-    timer.current = setTimeout(() => router.push(`/courses/${seed.id}/outline`), 1400);
+  const errorsToShow = (key: keyof CourseInput) =>
+    (touched[key] && errors[key]) || undefined;
+
+  function submit() {
+    setTouched({ topic: true, goal: true, background: true, language: true, depth: true });
+    const fresh = validateCourseInput(values);
+    if (!fresh.ok) {
+      setErrors(fresh.errors);
+      return;
+    }
+    setSubmitting(true);
+    startTransition(async () => {
+      const result = await createCourseAction(values);
+      if (result.ok) {
+        router.push(`/courses/${result.courseId}/outline`);
+        return;
+      }
+      setSubmitting(false);
+      setTouched({ topic: true, goal: true, background: true, language: true, depth: true });
+      setErrors(result.errors);
+    });
+  }
+
+  if (submitting) {
+    /* The design now runs durably on the server; this screen is the
+       moment between handing it over and landing on the Course. */
+    return (
+      <div className="mx-auto w-full max-w-[38rem] px-5 pt-10 pb-24 sm:px-8" aria-live="polite">
+        <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
+          {values.topic.trim() || "New Course"}
+        </h1>
+        <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
+          Starting the design. You can leave this page — the Outline will be
+          waiting here when you come back.
+        </p>
+        <div className="mt-9 space-y-2.5">
+          {[10, 6, 8, 5, 9, 7, 4].map((w, i) => (
+            <Skeleton
+              key={i}
+              className="h-4 rounded-sm bg-panel"
+              style={{ width: `${w * 8 + 12}%` }}
+            />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="mx-auto w-full max-w-[38rem] px-5 pt-10 pb-24 sm:px-8">
-        {generating ? (
-          <section aria-live="polite">
-            <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
-              {topic}
-            </h1>
-            <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-              Drafting the Modules and the Lesson titles.
-            </p>
-            <div className="mt-9 space-y-2.5">
-              {[10, 6, 8, 5, 9, 7, 4].map((w, i) => (
-                <Skeleton
-                  key={i}
-                  className="h-4 rounded-sm bg-panel"
-                  style={{ width: `${w * 8 + 12}%` }}
-                />
-              ))}
-            </div>
-          </section>
-        ) : (
-          <>
-            <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
-              New Course
-            </h1>
-            <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-              Mikasa drafts the Outline from these answers and stops there. You
-              shape it before a Lesson is written.
-            </p>
+      <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
+        New Course
+      </h1>
+      <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
+        Mikasa drafts the Outline from these answers and stops there. You
+        shape it before a Lesson is written.
+      </p>
 
-            <form
-              className="mt-10"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (ready) generate();
-              }}
+      <form
+        className="mt-10"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+        noValidate
+      >
+        <div className="border-t border-hair py-6">
+          <label htmlFor="nc-topic" className="label block text-fg-3">
+            Topic
+          </label>
+          <input
+            id="nc-topic"
+            value={values.topic}
+            onChange={(e) => set("topic", e.target.value)}
+            onBlur={() => blur("topic")}
+            aria-invalid={errorsToShow("topic") ? true : undefined}
+            aria-describedby={errorsToShow("topic") ? "nc-topic-error" : undefined}
+            placeholder="the Vercel AI SDK"
+            className={`${field} mt-3`}
+          />
+          <FieldNote
+            id="nc-topic-error"
+            error={errorsToShow("topic")}
+            count={values.topic.trim().length}
+            max={TOPIC_MAX_LENGTH}
+          />
+        </div>
+
+        <div className="border-t border-hair py-6">
+          <label htmlFor="nc-goal" className="label block text-fg-3">
+            Goal
+          </label>
+          <p className="mt-1.5 text-[0.75rem] leading-[1.5] text-fg-3">
+            Decides where the Course stops, and what the last Exercise asks for.
+          </p>
+          <Textarea
+            id="nc-goal"
+            rows={2}
+            value={values.goal}
+            onChange={(e) => set("goal", e.target.value)}
+            onBlur={() => blur("goal")}
+            aria-invalid={errorsToShow("goal") ? true : undefined}
+            aria-describedby={errorsToShow("goal") ? "nc-goal-error" : undefined}
+            placeholder="build my own AI chat app"
+            className="mt-3"
+          />
+          <FieldNote
+            id="nc-goal-error"
+            error={errorsToShow("goal")}
+            count={values.goal.trim().length}
+            max={GOAL_MAX_LENGTH}
+          />
+        </div>
+
+        {/* Not a fieldset: a legend cuts the hairline it sits on, and the
+            hairline is the only thing separating these groups. */}
+        <div className="border-t border-hair py-6">
+          <p id="depth-label" className="label text-fg-3">
+            Depth
+          </p>
+          <RadioGroup
+            aria-labelledby="depth-label"
+            value={values.depth}
+            onValueChange={(v) => set("depth", v as CourseInput["depth"])}
+            className="mt-3"
+          >
+            {DEPTH_CHOICES.map((d) => (
+              <RadioGroupItem key={d.id} value={d.id}>
+                <span
+                  className={cn(
+                    "block text-[0.8125rem] leading-snug",
+                    values.depth === d.id ? "font-medium text-fg" : "text-fg-2",
+                  )}
+                >
+                  {d.title}
+                </span>
+                <span className="mt-1 block text-[0.75rem] leading-[1.5] text-fg-3">
+                  {d.detail}
+                </span>
+              </RadioGroupItem>
+            ))}
+          </RadioGroup>
+        </div>
+
+        <div className="border-t border-hair py-6">
+          <label htmlFor="nc-language" className="label block text-fg-3">
+            Course Language
+          </label>
+          <p className="mt-1.5 text-[0.75rem] leading-[1.5] text-fg-3">
+            The language of the Outline, the Lessons and every conversation.
+            Fixed once the Course is created.
+          </p>
+          <Select
+            value={values.language}
+            onValueChange={(v) => set("language", v as CourseInput["language"])}
+          >
+            <SelectTrigger
+              id="nc-language"
+              aria-label="Course Language"
+              className="mt-3 w-fit min-w-40"
             >
-              <div className="border-t border-hair py-6">
-                <label htmlFor="nc-topic" className="label block text-fg-3">
-                  Topic
-                </label>
-                <input
-                  id="nc-topic"
-                  required
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  placeholder="the Vercel AI SDK"
-                  className={`${field} mt-3`}
-                />
-              </div>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COURSE_LANGUAGES.map((l) => (
+                <SelectItem key={l.code} value={l.code}>
+                  {l.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-              <div className="border-t border-hair py-6">
-                <label htmlFor="nc-goal" className="label block text-fg-3">
-                  Goal
-                </label>
-                <p className="mt-1.5 text-[0.75rem] leading-[1.5] text-fg-3">
-                  Decides where the Course stops, and what the last Exercise asks for.
-                </p>
-                <Textarea
-                  id="nc-goal"
-                  required
-                  rows={2}
-                  value={goal}
-                  onChange={(e) => setGoal(e.target.value)}
-                  placeholder="build my own AI chat app"
-                  className="mt-3"
-                />
-              </div>
+        <div className="border-t border-hair py-6">
+          <label htmlFor="nc-background" className="label block text-fg-3">
+            Background <span className="font-normal text-fg-dim">optional</span>
+          </label>
+          <p className="mt-1.5 text-[0.75rem] leading-[1.5] text-fg-3">
+            The Outline skips fundamentals you name here.
+          </p>
+          <Textarea
+            id="nc-background"
+            rows={3}
+            value={values.background}
+            onChange={(e) => set("background", e.target.value)}
+            onBlur={() => blur("background")}
+            aria-invalid={errorsToShow("background") ? true : undefined}
+            aria-describedby={errorsToShow("background") ? "nc-background-error" : undefined}
+            placeholder="I write basic SELECTs and JOINs…"
+            className="mt-3"
+          />
+          <FieldNote
+            id="nc-background-error"
+            error={errorsToShow("background")}
+            count={values.background.trim().length}
+            max={BACKGROUND_MAX_LENGTH}
+          />
+        </div>
 
-              {/* Not a fieldset: a legend cuts the hairline it sits on, and the
-                  hairline is the only thing separating these groups. */}
-              <div className="border-t border-hair py-6">
-                <p id="depth-label" className="label text-fg-3">
-                  Depth
-                </p>
-                <RadioGroup
-                  aria-labelledby="depth-label"
-                  value={depth}
-                  onValueChange={(v) => setDepth(v as string)}
-                  className="mt-3"
-                >
-                  {depths.map((d) => (
-                    <RadioGroupItem key={d.id} value={d.id}>
-                      <span
-                        className={cn(
-                          "block text-[0.8125rem] leading-snug",
-                          depth === d.id ? "font-medium text-fg" : "text-fg-2",
-                        )}
-                      >
-                        {d.title}
-                      </span>
-                      <span className="mt-1 block text-[0.75rem] leading-[1.5] text-fg-3">
-                        {d.detail}
-                      </span>
-                    </RadioGroupItem>
-                  ))}
-                </RadioGroup>
-              </div>
+        <div className="flex flex-wrap items-start justify-between gap-4 border-t border-b border-hair py-6">
+          <div className="min-w-0">
+            <p className="label text-fg-3">Grounding</p>
+            <p className="mt-1.5 max-w-[24rem] text-[0.75rem] leading-[1.5] text-fg-3">
+              Consult live web search while generating. Fixed once the
+              Course is created.
+            </p>
+          </div>
+          <ToggleGroup
+            multiple={false}
+            value={[values.grounding ? "on" : "off"]}
+            onValueChange={(v) => set("grounding", v[0] !== "off")}
+            aria-label="Grounding"
+          >
+            <ToggleGroupItem value="on">On</ToggleGroupItem>
+            <ToggleGroupItem value="off">Off</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
 
-              <div className="border-t border-hair py-6">
-                <label htmlFor="nc-background" className="label block text-fg-3">
-                  Background <span className="font-normal text-fg-dim">optional</span>
-                </label>
-                <p className="mt-1.5 text-[0.75rem] leading-[1.5] text-fg-3">
-                  The Outline skips fundamentals you name here.
-                </p>
-                <Textarea
-                  id="nc-background"
-                  rows={3}
-                  value={background}
-                  onChange={(e) => setBackground(e.target.value)}
-                  placeholder="I write basic SELECTs and JOINs…"
-                  className="mt-3"
-                />
-              </div>
+        {errors.form ? (
+          <p role="alert" className="mt-6 text-[0.8125rem] leading-[1.55] text-fg-2">
+            {errors.form}
+          </p>
+        ) : null}
 
-              <div className="flex flex-wrap items-start justify-between gap-4 border-t border-b border-hair py-6">
-                <div className="min-w-0">
-                  <p className="label text-fg-3">Grounding</p>
-                  <p className="mt-1.5 max-w-[24rem] text-[0.75rem] leading-[1.5] text-fg-3">
-                    Consult live web search while generating. Fixed once the
-                    Course is created.
-                  </p>
-                </div>
-                <ToggleGroup
-                  multiple={false}
-                  value={[grounding ? "on" : "off"]}
-                  onValueChange={(v) => setGrounding(v[0] !== "off")}
-                  aria-label="Grounding"
-                >
-                  <ToggleGroupItem value="on">On</ToggleGroupItem>
-                  <ToggleGroupItem value="off">Off</ToggleGroupItem>
-                </ToggleGroup>
-              </div>
+        <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
+          <Button type="submit">Generate the Outline</Button>
+          <Button
+            variant="quiet"
+            onClick={() => {
+              setValues({
+                topic: "",
+                goal: "",
+                background: "",
+                language: "en",
+                depth: "reach",
+                grounding: true,
+              });
+              setTouched({});
+              setErrors({});
+            }}
+          >
+            Clear
+          </Button>
+          <Button variant="quiet" render={<Link href="/courses" />} className="ml-auto">
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
-              <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
-                <Button type="submit" disabled={!ready}>
-                  Generate the Outline
-                </Button>
-                <Button
-                  variant="quiet"
-                  onClick={() => {
-                    setTopic("");
-                    setGoal("");
-                    setBackground("");
-                  }}
-                >
-                  Clear
-                </Button>
-                <Button variant="quiet" render={<Link href="/courses" />} className="ml-auto">
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </>
-        )}
-      </div>
+/**
+ * The one line under a field: its error when it has one, otherwise the
+ * character count once the field gets long enough to need one.
+ */
+function FieldNote({
+  id,
+  error,
+  count,
+  max,
+}: {
+  id: string;
+  error?: string;
+  count: number;
+  max: number;
+}) {
+  if (error) {
+    return (
+      <p id={id} className="mt-2 text-[0.75rem] leading-[1.5] text-fg-2">
+        {error}
+      </p>
+    );
+  }
+  if (count <= max * 0.7) return null;
+  return (
+    <p id={id} className="tnum mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
+      {count}/{max}
+    </p>
   );
 }

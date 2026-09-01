@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStickyFollow } from "@/hooks/use-sticky-follow";
 import { ArrowUp, Plus, X } from "lucide-react";
@@ -23,8 +22,6 @@ import { DoneCheck, LiveMark } from "./workspace/marks";
  * this is the surface where you decide what a Lesson is for.
  */
 export function OutlineEditor({ course }: { course: LibraryCourse }) {
-  const router = useRouter();
-
   const [applied, setApplied] = useState<ReadonlySet<string>>(new Set());
   const [discarded, setDiscarded] = useState<ReadonlySet<string>>(new Set());
   const [titles, setTitles] = useState<Record<string, string>>({});
@@ -32,7 +29,6 @@ export function OutlineEditor({ course }: { course: LibraryCourse }) {
   const [extra, setExtra] = useState<Record<string, Lesson[]>>({});
   const [editing, setEditing] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /* The Tailor column is taller than the viewport once a plan has a few
      changes in it, so it rides the scroll rather than pinning half of
      itself out of reach. */
@@ -42,13 +38,6 @@ export function OutlineEditor({ course }: { course: LibraryCourse }) {
   const added = useRef(0);
 
   useStickyFollow(tailor);
-
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
 
   /* Derived, never mutated: base Modules, plus the approved Tailor changes,
      plus this session's manual edits. Undo is dropping one of the three. */
@@ -100,11 +89,11 @@ export function OutlineEditor({ course }: { course: LibraryCourse }) {
     setExtra({});
   }
 
-  /* Approving the shape is where generation would start. In this build it
-     hands over to the one Course that has Lesson content. */
+  /* Approving the shape is where generation starts. The Outline is saved;
+     Lesson generation takes over from here in the product's next step, so
+     this stays on the checkpoint rather than handing over anywhere else. */
   function generate() {
     setGenerating(true);
-    timer.current = setTimeout(() => router.push("/courses/window-functions"), 1600);
   }
 
   if (generating) {

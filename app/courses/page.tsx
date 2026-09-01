@@ -7,6 +7,32 @@ import { listOwnedCourses } from "@/lib/db/courses";
 import { db } from "@/lib/db";
 import { requireLearner } from "@/lib/session";
 
+/**
+ * The one fact a library row adds: where the Course is in its life. A
+ * ready Course is read in the workspace; everything before that happens on
+ * the Outline — designing, failed, or waiting for approval.
+ */
+function rowFor(course: {
+  id: string;
+  status: string;
+}): { href: string; label: string; reading: boolean } {
+  if (course.status === "ready" || course.status === "reading") {
+    return { href: `/courses/${course.id}`, label: "—", reading: true };
+  }
+  if (course.status === "awaiting-outline-approval" || course.status === "outline") {
+    return { href: `/courses/${course.id}/outline`, label: "Outline", reading: false };
+  }
+  if (course.status === "designing") {
+    return { href: `/courses/${course.id}/outline`, label: "Designing", reading: false };
+  }
+  if (course.status === "failed") {
+    return { href: `/courses/${course.id}/outline`, label: "Failed", reading: false };
+  }
+  // "generating" and "reviewing": generation is later work; the Outline is
+  // still the screen that exists.
+  return { href: `/courses/${course.id}/outline`, label: "Generating", reading: false };
+}
+
 export default async function CoursesPage() {
   const { user } = await requireLearner();
   const owned = await listOwnedCourses(db, user.id);
@@ -43,11 +69,11 @@ export default async function CoursesPage() {
           /* Hairline-divided rows on the canvas. Not a grid of cards. */
           <ul className="mt-8 border-t border-hair">
             {owned.map((c) => {
-              const reading = c.status === "reading";
+              const { href, label, reading } = rowFor(c);
               return (
                 <li key={c.id} className="border-b border-hair">
                   <Link
-                    href={reading ? `/courses/${c.id}` : `/courses/${c.id}/outline`}
+                    href={href}
                     className="row grid grid-cols-[0.75rem_1fr_auto] items-start gap-x-4 px-2 py-5 hover:bg-panel"
                   >
                     <span className="flex h-5 w-3 items-center justify-center">
@@ -67,7 +93,7 @@ export default async function CoursesPage() {
                     {/* The done fraction needs the Lessons, which arrive with
                         generation; a reading Course holds its place until then. */}
                     <span className="tnum shrink-0 text-[0.8125rem] text-fg-3">
-                      {reading ? "—" : "Outline"}
+                      {label}
                     </span>
                   </Link>
                 </li>
