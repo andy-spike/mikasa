@@ -42,6 +42,20 @@ export type OutlineData = {
  * rows and the Source rows, so the spec stays joinable to what the
  * Learner can see.
  */
+/**
+ * A demand the Learner accepted from a Change plan, pinned to one Lesson
+ * and carried in the specification so generation honors it. Pre-generation
+ * there is no prose or Exercise to rewrite, so the demand is an
+ * instruction the generator carries out (#13).
+ */
+export type LessonAdjustment = {
+  lessonId: string;
+  /** What the Lesson's prose must do that it otherwise would not. */
+  prose?: string;
+  /** The Exercise, specified exactly. */
+  exercise?: { task: string; check: string };
+};
+
 export type CourseSpecification = {
   /** The Course contract: what the Course promises and what it skips. */
   contract: {
@@ -96,6 +110,12 @@ export type CourseSpecification = {
     task: string;
     acceptanceChecks: string[];
   };
+  /**
+   * The Learner's accepted content demands, per Lesson (#13). Set when an
+   * applied Change plan demanded prose or an Exercise before generation;
+   * carried through reconciliation, honored by generation.
+   */
+  adjustments?: LessonAdjustment[];
   /**
    * Evidence ledger: which Source supports which claims. Empty when
    * Grounding was off.

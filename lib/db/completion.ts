@@ -8,12 +8,11 @@ import { and, eq } from "drizzle-orm";
 import type { Db } from "./index";
 import { completions, courses, outlines } from "./schema";
 import { currentRevision } from "./review";
+import { formatDayStamp } from "@/lib/utils";
 
 /** The Lesson's day of completion, as the stamp reads it ("28 AUG"). */
 function stampOf(date: Date): string {
-  return date
-    .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-    .toUpperCase();
+  return formatDayStamp(date);
 }
 
 export type MarkResult =

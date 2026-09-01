@@ -13,6 +13,7 @@
 import type { ContentBlock } from "./content";
 import type { OutlineData } from "./types";
 import type { Course, LessonRow, SourceRow } from "@/lib/db/schema";
+import { formatDayStamp } from "@/lib/utils";
 
 /** A block the Lesson pane renders: the generated vocabulary plus the demo's sql block. */
 export type ReadingBlock = ContentBlock | { kind: "sql"; code: string };
@@ -103,9 +104,7 @@ export function toReadingCourse(
 
 /** The day a completion is stamped with, as the interface reads it. */
 function stampOf(date: Date): string {
-  return date
-    .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-    .toUpperCase();
+  return formatDayStamp(date);
 }
 
 /** Source refs resolve to links; unknown refs render as nothing. */

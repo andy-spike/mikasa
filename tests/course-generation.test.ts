@@ -253,6 +253,32 @@ describe("generateLesson", () => {
       }),
     ).rejects.toThrow(GenerationError);
   });
+
+  it("carries the learner's accepted demands into the Lesson's prompt", async () => {
+    const model = scriptedModel([lessonJson("Lesson one")]);
+    await generateLesson(model.model, {
+      course: { topic: "t", goal: "g", background: "", language: "en", depth: "reach" },
+      spec: {
+        ...SPEC,
+        adjustments: [
+          {
+            lessonId: "l1",
+            prose: "Lead with the failure mode.",
+            exercise: { task: "Stream by hand", check: "It prints chunks" },
+          },
+          { lessonId: "l2", prose: "Not this lesson." },
+        ],
+      },
+      lesson: { id: "l1", title: "Lesson one", summary: "First." },
+      nextLesson: null,
+      priorLessons: [],
+      sources: [],
+    });
+
+    expect(model.prompts[0]).toContain("Lead with the failure mode.");
+    expect(model.prompts[0]).toContain("Stream by hand");
+    expect(model.prompts[0]).not.toContain("Not this lesson.");
+  });
 });
 
 describe("a full candidate", () => {

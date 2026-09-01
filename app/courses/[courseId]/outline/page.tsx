@@ -7,6 +7,8 @@ import { db } from "@/lib/db";
 import { findOwnedCourse } from "@/lib/db/courses";
 import { latestDesignRun, latestOutline } from "@/lib/db/design";
 import { latestGenerationRun } from "@/lib/db/outline";
+import { loadTailorHistory } from "@/lib/db/tailor";
+import { findProposedPlanAction } from "@/lib/actions/tailor";
 import { outlineToEditorCourse } from "@/lib/course/view";
 import { requireLearner } from "@/lib/session";
 
@@ -104,7 +106,15 @@ export default async function OutlinePage({
 
   return (
     <AppShell section={course.topic}>
-      <OutlineEditor course={outlineToEditorCourse(course, outline.version, outline.data)} />
+      <OutlineEditor
+        course={outlineToEditorCourse(course, outline.version, outline.data)}
+        tailorTurns={(await loadTailorHistory(db, user.id, courseId)).map((t) => ({
+          from: t.role,
+          text: t.content,
+        }))}
+        tailorPlan={await findProposedPlanAction(courseId)}
+        onRefreshPlan={findProposedPlanAction.bind(null, courseId)}
+      />
     </AppShell>
   );
 }

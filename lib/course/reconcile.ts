@@ -18,7 +18,7 @@ import type { LanguageModel } from "ai";
 import { z } from "zod";
 import { designProviderOptions } from "@/lib/model";
 import { DesignError } from "./design";
-import type { CourseSpecification, OutlineData } from "./types";
+import type { CourseSpecification, LessonAdjustment, OutlineData } from "./types";
 
 const reconcileSchema = z.object({
   learningGraph: z.array(
@@ -44,15 +44,23 @@ const reconcileSchema = z.object({
  * Rewrites the graph and alignment against the current Outline. Throws
  * `DesignError` when the model skips a Lesson or invents ids: a spec that
  * does not join to the Outline would poison generation.
+ *
+ * `adjustments` are the Learner's accepted content demands (#13): they
+ * ride along into the reconciled specification verbatim, so generation
+ * honors them exactly as the Learner accepted them.
  */
 export async function reconcileSpecification(
   model: LanguageModel,
   outline: OutlineData,
   previous: CourseSpecification,
+  adjustments: LessonAdjustment[] = [],
 ): Promise<CourseSpecification> {
   const lessons = outline.modules.flatMap((m) =>
     m.lessons.map((l) => ({ ...l, module: m.title })),
   );
+  const titleFor = new Map(lessons.map((l) => [l.id, l.title]));
+  const lessonIds = new Set(lessons.map((l) => l.id));
+  const live = adjustments.filter((a) => lessonIds.has(a.lessonId));
 
   const { output } = await generateText({
     model,
@@ -81,6 +89,22 @@ export async function reconcileSpecification(
       "The Outline is now frozen. Use exactly these lesson ids:",
       ...lessons.map((l) => `- ${l.id} — Module "${l.module}", "${l.title}": ${l.summary}`),
       "",
+      ...(live.length
+        ? [
+            "The learner also set concrete demands for specific Lessons. Honor",
+            "them exactly, and reflect them in the alignment you produce:",
+            ...live.map((a) => {
+              const parts: string[] = [];
+              if (a.prose) parts.push(`its prose must: ${a.prose}`);
+              if (a.exercise)
+                parts.push(
+                  `its Exercise becomes: "${a.exercise.task}", done when: ${a.exercise.check}`,
+                );
+              return `- ${a.lessonId} ("${titleFor.get(a.lessonId) ?? a.lessonId}"): ${parts.join("; ")}`;
+            }),
+            "",
+          ]
+        : []),
       "Produce:",
       "- learningGraph: one node per skill/concept, each introduced by exactly one",
       "  lessonId from the list above, with requires listing node ids that come first.",
@@ -94,7 +118,6 @@ export async function reconcileSpecification(
 
   if (!output) throw new DesignError("The model returned no reconciled specification.");
 
-  const lessonIds = new Set(lessons.map((l) => l.id));
   const missing = lessons.filter((l) => !output.alignment.some((a) => a.lessonId === l.id));
   if (missing.length > 0) {
     throw new DesignError(
@@ -111,5 +134,6 @@ export async function reconcileSpecification(
       .filter((n) => lessonIds.has(n.lessonId))
       .map((n) => ({ ...n, requires: n.requires.filter((r) => nodeIds.has(r)) })),
     alignment: output.alignment.filter((a) => lessonIds.has(a.lessonId)),
+    adjustments: live,
   };
 }

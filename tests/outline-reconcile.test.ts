@@ -116,4 +116,52 @@ describe("reconcileSpecification", () => {
       reconcileSpecification(model.model, OUTLINE, PREVIOUS),
     ).rejects.toThrow(/skipped 1 Lesson/);
   });
+
+  it("carries the learner's adjustments into the prompt and the specification, live Lessons only", async () => {
+    const model = scriptedModel([
+      json({
+        learningGraph: [
+          { id: "g1", skill: "Stream text", requires: [], lessonId: "l1" },
+          { id: "g2", skill: "The new part", requires: ["g1"], lessonId: "l5" },
+        ],
+        alignment: [
+          {
+            lessonId: "l1",
+            performance: "kept",
+            prerequisiteNodes: [],
+            moduleMilestone: "m",
+            exerciseContribution: "c",
+          },
+          {
+            lessonId: "l5",
+            performance: "new",
+            prerequisiteNodes: ["g1"],
+            moduleMilestone: "m",
+            exerciseContribution: "c",
+          },
+        ],
+      }),
+    ]);
+
+    const reconciled = await reconcileSpecification(model.model, OUTLINE, PREVIOUS, [
+      {
+        lessonId: "l1",
+        prose: "Say it with tables.",
+        exercise: { task: "Stream by hand", check: "It prints chunks" },
+      },
+      { lessonId: "l-gone", prose: "Dropped with its Lesson." },
+    ]);
+
+    /* The demand rides verbatim; the dead one goes nowhere. */
+    expect(reconciled.adjustments).toEqual([
+      {
+        lessonId: "l1",
+        prose: "Say it with tables.",
+        exercise: { task: "Stream by hand", check: "It prints chunks" },
+      },
+    ]);
+    expect(model.prompts[0]).toContain("Say it with tables.");
+    expect(model.prompts[0]).toContain("Stream by hand");
+    expect(model.prompts[0]).not.toContain("Dropped with its Lesson.");
+  });
 });

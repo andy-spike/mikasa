@@ -61,7 +61,7 @@ const STRUCTURE_KINDS = new Set([
 ]);
 
 /** A plan operation that is a plain Outline operation. */
-function isStructureOp(op: ChangePlanOp): op is OutlineOp {
+export function isStructureOp(op: ChangePlanOp): op is OutlineOp {
   return STRUCTURE_KINDS.has(op.kind);
 }
 

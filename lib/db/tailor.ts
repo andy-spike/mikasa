@@ -21,6 +21,10 @@ import {
 import { StructureError } from "@/lib/course/structure";
 import { validatePlanOps } from "@/lib/course/change-plan";
 import type { ChangePlanOp } from "@/lib/course/change-plan";
+import { applyOutlineChange } from "./outline";
+import type { LessonAdjustment } from "@/lib/course/types";
+import type { OutlineData } from "@/lib/course/types";
+import { isStructureOp } from "@/lib/course/change-plan";
 import { currentRevision } from "./review";
 
 export type TailorTurnRow = {
@@ -389,4 +393,147 @@ export async function listPlansWithOperations(
     });
   }
   return all;
+}
+
+/**
+ * Applies a plan's accepted operations to the Outline (ticket #13). All
+ * accepted operations land in one transaction — the Outline's own change
+ * door, so a conflict or a refused operation rejects the whole plan
+ * without partial application. Applying always produces a new Outline
+ * version (a content-only plan bumps the version with unchanged data), so
+ * the Course specification reads as stale and approval reconciles it.
+ *
+ * Discarded operations are simply not in the list; they change nothing.
+ */
+export async function applyPlanToOutline(
+  db: Db,
+  ownerId: string,
+  courseId: string,
+  planId: string,
+): Promise<
+  | { ok: true; outlineVersion: number; appliedCount: number }
+  | {
+      ok: false;
+      reason: "not-found" | "not-reviewable" | "nothing-accepted" | "conflict" | "invalid";
+      message: string;
+    }
+> {
+  return db.transaction(async (tx) => {
+    const [course] = await tx
+      .select()
+      .from(courses)
+      .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
+      .limit(1);
+    if (!course) {
+      return { ok: false, reason: "not-found", message: "Course not found." };
+    }
+
+    const [plan] = await tx
+      .select()
+      .from(changePlans)
+      .where(eq(changePlans.id, planId))
+      .limit(1);
+    if (!plan || plan.courseId !== courseId) {
+      return { ok: false, reason: "not-found", message: "Plan not found." };
+    }
+    if (plan.status !== "proposed") {
+      return {
+        ok: false,
+        reason: "not-reviewable",
+        message: "This plan is no longer under review.",
+      };
+    }
+    if (course.status !== "awaiting-outline-approval") {
+      return {
+        ok: false,
+        reason: "not-reviewable",
+        message:
+          "This Course has left the Outline checkpoint; it changes through revisions now.",
+      };
+    }
+
+    const operations = await tx
+      .select()
+      .from(changeOperations)
+      .where(eq(changeOperations.planId, planId))
+      .orderBy(asc(changeOperations.position));
+    const accepted = operations
+      .filter((o) => o.status === "accepted")
+      .map((o) => o.payload as ChangePlanOp);
+    if (accepted.length === 0) {
+      return {
+        ok: false,
+        reason: "nothing-accepted",
+        message: "Accept at least one operation to apply the plan.",
+      };
+    }
+
+    const structureOps = accepted.filter(isStructureOp);
+
+    /* The Outline's own door does the conflict check (base version),
+       applies the grammar, and inserts the next version — all inside
+       this transaction. Zero structure ops still bumps the version, so
+       a content-only plan marks the specification stale. */
+    const applied = await applyOutlineChange(
+      tx,
+      ownerId,
+      courseId,
+      plan.baseOutlineVersion,
+      structureOps,
+    );
+    if (!applied.ok) {
+      return {
+        ok: false,
+        reason: applied.reason === "conflict" ? "conflict" : "invalid",
+        message: applied.message,
+      };
+    }
+
+    /* The content demands ride in the plan until approval reconciles the
+       specification; applying freezes the plan as their record. */
+    await tx
+      .update(changePlans)
+      .set({ status: "applied", updatedAt: new Date() })
+      .where(eq(changePlans.id, planId));
+
+    return {
+      ok: true,
+      outlineVersion: applied.outline.version,
+      appliedCount: accepted.length,
+    };
+  });
+}
+
+/**
+ * The content demands still in force (ticket #13): every applied plan's
+ * accepted prose/Exercise operations, the latest demand per Lesson winning,
+ * filtered to Lessons the Outline still has. Approval feeds these to the
+ * reconciliation, which bakes them into the specification.
+ */
+export async function activeContentAdjustments(
+  db: Db,
+  courseId: string,
+  outline: OutlineData,
+): Promise<LessonAdjustment[]> {
+  const plans = await listPlansWithOperations(db, courseId);
+  const byLesson = new Map<string, LessonAdjustment>();
+  for (const plan of plans) {
+    if (plan.status !== "applied") continue;
+    for (const operation of plan.operations) {
+      if (operation.status !== "accepted") continue;
+      const op = operation.payload;
+      if (op.kind === "lessonProse") {
+        const existing = byLesson.get(op.lessonId) ?? { lessonId: op.lessonId };
+        byLesson.set(op.lessonId, { ...existing, prose: op.instruction });
+      } else if (op.kind === "exercise") {
+        const existing = byLesson.get(op.lessonId) ?? { lessonId: op.lessonId };
+        byLesson.set(op.lessonId, {
+          ...existing,
+          exercise: { task: op.task, check: op.check },
+        });
+      }
+    }
+  }
+  const live = new Set(outline.modules.flatMap((m) => m.lessons.map((l) => l.id)));
+  return [...byLesson.values()].filter((a) => live.has(a.lessonId));
 }

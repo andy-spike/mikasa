@@ -219,6 +219,9 @@ export async function generateLesson(
   const assumedSkills = alignment.prerequisiteNodes
     .map((id) => input.spec.learningGraph.find((n) => n.id === id)?.skill)
     .filter((s): s is string => Boolean(s));
+  const adjustment = input.spec.adjustments?.find(
+    (a) => a.lessonId === input.lesson.id,
+  );
 
   const { output } = await generateText({
     model,
@@ -253,6 +256,12 @@ export async function generateLesson(
         : "",
       `Module milestone it advances: ${alignment.moduleMilestone}`,
       `Its Exercise must: ${alignment.exerciseContribution}`,
+      adjustment?.prose
+        ? `The learner asked, for this Lesson's prose: ${adjustment.prose}`
+        : "",
+      adjustment?.exercise
+        ? `The learner set this Lesson's Exercise: "${adjustment.exercise.task}", done when: ${adjustment.exercise.check}. Make it the Exercise.`
+        : "",
       "",
       "Sources you may cite (cite by ref, only these):",
       ...(input.sources.length

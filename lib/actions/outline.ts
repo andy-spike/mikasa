@@ -24,6 +24,7 @@ import {
   type OutlineChangeResult,
   type OutlineRejection,
 } from "@/lib/db/outline";
+import { activeContentAdjustments } from "@/lib/db/tailor";
 import { generateCourseWorkflow } from "@/workflows/course-generation";
 
 const opSchema = z.discriminatedUnion("kind", [
@@ -136,13 +137,17 @@ export async function approveOutlineAction(
   }
 
   // Reconcile BEFORE anything changes: a failed model call leaves the
-  // Course awaiting approval, editable, with the old spec intact.
+  // Course awaiting approval, editable, with the old spec intact. The
+  // Learner's accepted content demands (#13) ride into the reconciled
+  // specification, so generation honors them.
+  const adjustments = await activeContentAdjustments(db, courseId, outline.data);
   if (specRow && specIsStale(specRow, outline.version)) {
     try {
       const reconciled = await reconcileSpecification(
         designModel(),
         outline.data,
         specRow.spec,
+        adjustments,
       );
       await saveReconciledSpec(db, courseId, reconciled, outline.version);
     } catch (error) {

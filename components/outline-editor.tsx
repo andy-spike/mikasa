@@ -10,8 +10,14 @@ import { useEffect, useMemo, useState, useTransition } from "react";import {
   Scissors,
   X,
 } from "lucide-react";
-import { applyOutlineOpAction, approveOutlineAction } from "@/lib/actions/outline";import type { OutlineEditorCourse } from "@/lib/course/view";
+import { applyOutlineOpAction, approveOutlineAction } from "@/lib/actions/outline";
+import {
+  applyPlanToOutlineAction,
+  reviewTailorOperationAction,
+} from "@/lib/actions/tailor";
+import type { OutlineEditorCourse } from "@/lib/course/view";
 import type { OutlineOp } from "@/lib/course/structure";
+import { TailorConversation, type PlanView, type Turn } from "./tailor-conversation";
 import { Button } from "./ui/button";
 import { field } from "@/lib/ui";
 import { Skeleton } from "./ui/skeleton";
@@ -44,9 +50,21 @@ type Props = {
   course: OutlineEditorCourse;
   /** The durable run's current step, while the Course is generating. */
   runStep?: string | null;
+  /** The Tailor's restored conversation (#12). */
+  tailorTurns?: Turn[];
+  /** The Change plan under review, as the server has it. */
+  tailorPlan?: PlanView | null;
+  /** The plan as the server has it now, after a turn may have proposed one. */
+  onRefreshPlan?: () => Promise<PlanView | null>;
 };
 
-export function OutlineEditor({ course, runStep }: Props) {
+export function OutlineEditor({
+  course,
+  runStep,
+  tailorTurns,
+  tailorPlan,
+  onRefreshPlan,
+}: Props) {
   const router = useRouter();
   const [modules, setModules] = useState<Module[]>(course.modules);
   const [version, setVersion] = useState(course.version);
@@ -58,6 +76,15 @@ export function OutlineEditor({ course, runStep }: Props) {
     course.phase === "generating" || course.phase === "reviewing",
   );
   const [pending, startTransition] = useTransition();
+
+  /* The Tailor's plan under review (#12): server-restored, then locally
+     amended by the review actions. A refresh delivers the server's truth. */
+  const [plan, setPlan] = useState<PlanView | null | undefined>(tailorPlan);
+  const [restoredPlan, setRestoredPlan] = useState(tailorPlan);
+  if (tailorPlan !== restoredPlan) {
+    setRestoredPlan(tailorPlan);
+    setPlan(tailorPlan);
+  }
 
   /* The server is the source of truth: after a conflict the refresh lands
      a newer version, and this render-time adjustment adopts it (the
@@ -102,6 +129,78 @@ export function OutlineEditor({ course, runStep }: Props) {
       const result = await approveOutlineAction(course.id, version);
       if (result.ok) {
         setGenerating(true);
+      } else {
+        setError(result.message);
+        if (result.reason === "conflict") router.refresh();
+      }
+    });
+  }
+
+  /* The Tailor's turn (#12): the client posts only the message; the
+     server owns the conversation. When a turn completes, the server may
+     have proposed a plan, so the review refreshes from it. */
+  async function askTailor(
+    text: string,
+    onDelta: (chunk: string) => void,
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(`/api/courses/${course.id}/tailor`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+      if (!response.ok || !response.body) return false;
+
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+          if (onRefreshPlan) setPlan(await onRefreshPlan());
+          return true;
+        }
+        if (value) onDelta(value);
+      }
+    } catch {
+      /* Network dropped mid-stream: the turn is not stored server-side. */
+      return false;
+    }
+  }
+
+  async function reviewOperation(
+    operationId: string,
+    status: "accepted" | "discarded" | "proposed",
+  ) {
+    if (!plan) return;
+    const result = await reviewTailorOperationAction(plan.id, operationId, status);
+    if (result.ok) {
+      setPlan((p) =>
+        p
+          ? {
+              ...p,
+              operations: p.operations.map((o) =>
+                o.id === operationId ? { ...o, status } : o,
+              ),
+            }
+          : p,
+      );
+    } else {
+      /* The review did not land: the server's state wins. */
+      if (onRefreshPlan) setPlan(await onRefreshPlan());
+    }
+  }
+
+  /* Applying the accepted operations (#13): all together, through the
+     Outline's own change door, or not at all. A conflict means the
+     Outline moved since the plan was drawn; the server's shape wins. */
+  function applyPlan() {
+    if (!plan) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await applyPlanToOutlineAction(course.id, plan.id);
+      if (result.ok) {
+        setEdits((n) => n + result.appliedCount);
+        setPlan(null);
+        router.refresh();
       } else {
         setError(result.message);
         if (result.reason === "conflict") router.refresh();
@@ -396,15 +495,29 @@ export function OutlineEditor({ course, runStep }: Props) {
         </div>
 
         {/* The Tailor. The Tutor is not here: there is no Lesson content for
-            it to be grounded in until the Outline is approved. */}
+            it to be grounded in until the Outline is approved. The plan's
+            accepted operations apply through the editor's own change door
+            (#13); nothing moves until then. */}
         <aside className="w-full shrink-0 border-t border-hair pt-8 pb-20 lg:sticky lg:top-0 lg:w-[20rem] lg:self-start lg:border-t-0 lg:border-l lg:pt-10 lg:pb-10 lg:pl-8">
           <h2 className="label text-fg-3">Tailor</h2>
           <p className="mt-2 text-[0.8125rem] leading-[1.6] text-fg-3">
-            Nothing is written until you approve it.
+            Nothing is written until you apply it.
           </p>
-          <p className="mt-6 border-t border-hair py-4 text-[0.8125rem] leading-[1.6] text-fg-3">
-            Nothing pending. Ask for a change and it will be drafted here.
-          </p>
+          <div className="mt-5 flex h-[min(36rem,70vh)] min-h-0 flex-col">
+            <TailorConversation
+              turns={tailorTurns ?? []}
+              onAsk={askTailor}
+              plan={plan ?? undefined}
+              onAccept={(id) => reviewOperation(id, "accepted")}
+              onDiscard={(id) => reviewOperation(id, "discarded")}
+              onRestore={(id) => reviewOperation(id, "proposed")}
+              applySlot={
+                <Button onClick={applyPlan} disabled={pending} className="w-full">
+                  Apply the accepted changes
+                </Button>
+              }
+            />
+          </div>
         </aside>
       </div>
 
