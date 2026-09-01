@@ -126,9 +126,50 @@ export const courseSpecs = pgTable(
       .notNull()
       .references(() => courses.id, { onDelete: "cascade" }),
     spec: jsonb("spec").$type<CourseSpecification>().notNull(),
+    /**
+     * The Outline version this specification was last aligned to. Every
+     * Outline change appends a version, so the spec reads as stale whenever
+     * this is lower than the current Outline version; approval reconciles
+     * it and moves it forward (ticket #4).
+     */
+    outlineVersion: integer("outline_version").notNull().default(1),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [uniqueIndex("course_specs_course_id_key").on(table.courseId)],
+);
+
+/**
+ * One durable generation run over an approved Outline version (started at
+ * approval, ticket #4; the Lesson work itself is ticket #5). The unique
+ * (course, version) pair is what makes a double approval unable to start a
+ * second run: the second insert simply loses.
+ */
+export const generationRuns = pgTable(
+  "generation_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    outlineVersion: integer("outline_version").notNull(),
+    /** "running" | "succeeded" | "failed" */
+    status: text("status").notNull().default("running"),
+    /** Vercel Workflow run id, when started through Workflow. */
+    workflowRunId: text("workflow_run_id"),
+    /** The step the run is currently in, e.g. "lessons". */
+    currentStep: text("current_step").notNull().default("queued"),
+    /** Why the run failed; null while it is running or succeeded. */
+    error: text("error"),
+    startedAt: timestamp("started_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("generation_runs_course_id_version_key").on(
+      table.courseId,
+      table.outlineVersion,
+    ),
+    index("generation_runs_course_id_idx").on(table.courseId),
+  ],
 );
 
 /**
@@ -211,3 +252,4 @@ export type Outline = typeof outlines.$inferSelect;
 export type SourceRow = typeof sources.$inferSelect;
 export type DesignRun = typeof designRuns.$inferSelect;
 export type CourseSpecRow = typeof courseSpecs.$inferSelect;
+export type GenerationRun = typeof generationRuns.$inferSelect;

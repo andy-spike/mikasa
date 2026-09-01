@@ -1,54 +1,45 @@
 /**
  * Adapters from DB rows to the shapes the existing interface reads. The
- * Outline editor keeps its own vocabulary (`LibraryCourse`); feeding it
- * real data must not mean redesigning it.
+ * Outline editor keeps its own vocabulary (`OutlineEditorCourse`); feeding
+ * it real data must not mean redesigning it.
  */
 import { DEPTH_CHOICES } from "./limits";
-import type { OutlineData } from "./types";
+import type { OutlineData, OutlineModule } from "./types";
 import type { Course } from "@/lib/db/schema";
-import type { LibraryCourse } from "@/lib/demo-library";
 
 /** The Depth's display title, as the form offered it. */
 export function depthLabel(depth: string): string {
   return DEPTH_CHOICES.find((d) => d.id === depth)?.title ?? depth;
 }
 
-function shortDate(date: Date): string {
-  return date
-    .toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-    .toUpperCase();
-}
+/** What the Outline editor reads: the Course header and the current shape. */
+export type OutlineEditorCourse = {
+  id: string;
+  topic: string;
+  goal: string;
+  /** "editing" at the checkpoint; "generating" once approval opened the run. */
+  phase: "editing" | "generating";
+  /** The Outline version this shape is, so edits can detect conflicts. */
+  version: number;
+  modules: OutlineModule[];
+};
 
 /**
- * A designed Course, as the Outline editor reads it. Lessons are `unset`
- * (no content exists yet), and there is no Tailor plan until that ticket
- * exists — the editor's plan UI simply shows nothing pending.
+ * A designed Course, as the Outline editor reads it. Lessons carry their
+ * stable ids; numbers are derived from position at render time.
  */
-export function outlineToLibraryCourse(
+export function outlineToEditorCourse(
   course: Course,
+  outlineVersion: number,
   outline: OutlineData,
-): LibraryCourse {
+  phase: "editing" | "generating" = "editing",
+): OutlineEditorCourse {
   return {
     id: course.id,
     topic: course.topic,
     goal: course.goal,
-    depth: depthLabel(course.depth),
-    background: course.background,
-    grounding: course.grounding,
-    phase: "outline",
-    createdOn: shortDate(course.createdAt),
-    openedOn: shortDate(course.updatedAt),
-    modules: outline.modules.map((m) => ({
-      numeral: m.numeral,
-      title: m.title,
-      lessons: m.lessons.map((l) => ({
-        id: l.id,
-        title: l.title,
-        summary: l.summary,
-        minutes: l.minutes,
-        status: "unset" as const,
-      })),
-    })),
-    plan: [],
+    phase,
+    version: outlineVersion,
+    modules: outline.modules,
   };
 }

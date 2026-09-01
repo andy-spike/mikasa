@@ -5,13 +5,14 @@ import { OutlineEditor } from "@/components/outline-editor";
 import { db } from "@/lib/db";
 import { findOwnedCourse } from "@/lib/db/courses";
 import { latestDesignRun, latestOutline } from "@/lib/db/design";
-import { outlineToLibraryCourse } from "@/lib/course/view";
+import { outlineToEditorCourse } from "@/lib/course/view";
 import { requireLearner } from "@/lib/session";
 
 /**
- * The Outline checkpoint. While design runs (or after it fails) this is the
- * progress screen; once the Course is awaiting approval, the same route is
- * the Outline editor the product has always had.
+ * The Outline checkpoint. While design runs (or after it fails) this is
+ * the progress screen; at the checkpoint it is the Outline editor; once
+ * approval opens generation it is the generating screen. Reading and
+ * review screens arrive with their own tickets.
  */
 export default async function OutlinePage({
   params,
@@ -42,9 +43,25 @@ export default async function OutlinePage({
      nothing to checkpoint yet. */
   if (!outline) notFound();
 
+  if (course.status === "generating") {
+    return (
+      <AppShell section={course.topic}>
+        <OutlineEditor
+          course={outlineToEditorCourse(course, outline.version, outline.data, "generating")}
+        />
+      </AppShell>
+    );
+  }
+
+  if (course.status !== "awaiting-outline-approval") {
+    // "reviewing" and "ready" get their own screens with the review and
+    // reading tickets; until then they have nothing to show here.
+    notFound();
+  }
+
   return (
     <AppShell section={course.topic}>
-      <OutlineEditor course={outlineToLibraryCourse(course, outline.data)} />
+      <OutlineEditor course={outlineToEditorCourse(course, outline.version, outline.data)} />
     </AppShell>
   );
 }

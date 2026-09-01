@@ -104,14 +104,6 @@ export async function saveDesignResult(
       );
     }
 
-    await tx
-      .insert(courseSpecs)
-      .values({ courseId, spec: outcome.specification })
-      .onConflictDoUpdate({
-        target: courseSpecs.courseId,
-        set: { spec: outcome.specification },
-      });
-
     const [outline] = await tx
       .insert(outlines)
       .values({
@@ -120,6 +112,18 @@ export async function saveDesignResult(
         data: outcome.outline,
       })
       .returning();
+
+    await tx
+      .insert(courseSpecs)
+      .values({
+        courseId,
+        spec: outcome.specification,
+        outlineVersion: outline.version,
+      })
+      .onConflictDoUpdate({
+        target: courseSpecs.courseId,
+        set: { spec: outcome.specification, outlineVersion: outline.version },
+      });
 
     await tx
       .update(courses)
