@@ -74,7 +74,12 @@ export async function loadGenerationContext(
   const [specRow] = await db
     .select()
     .from(courseSpecs)
-    .where(eq(courseSpecs.courseId, courseId))
+    .where(
+      and(
+        eq(courseSpecs.courseId, courseId),
+        eq(courseSpecs.outlineVersion, outlineVersion),
+      ),
+    )
     .limit(1);
   if (!specRow) return undefined;
 

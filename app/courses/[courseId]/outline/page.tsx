@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { CourseDesignProgress } from "@/components/course-design-progress";
 import { CourseFailed } from "@/components/course-failed";
@@ -26,6 +26,9 @@ export default async function OutlinePage({
   const { courseId } = await params;
   const course = await findOwnedCourse(db, user.id, courseId);
   if (!course) notFound();
+  if (course.status === "ready" || course.status === "reading") {
+    redirect(`/courses/${courseId}`);
+  }
 
   if (course.status === "failed") {
     /* A failure after design: the Outline exists and a generation run
@@ -98,11 +101,7 @@ export default async function OutlinePage({
     );
   }
 
-  if (course.status !== "awaiting-outline-approval") {
-    // "reviewing" and "ready" get their own screens with the review and
-    // reading tickets; until then they have nothing to show here.
-    notFound();
-  }
+  if (course.status !== "awaiting-outline-approval") notFound();
 
   return (
     <AppShell section={course.topic}>

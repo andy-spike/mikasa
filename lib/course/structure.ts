@@ -27,7 +27,7 @@ export class StructureError extends Error {
 }
 
 export type OutlineOp =
-  | { kind: "addModule"; title: string }
+  | { kind: "addModule"; title: string; moduleId?: string }
   | { kind: "renameModule"; moduleId: string; title: string }
   | { kind: "removeModule"; moduleId: string }
   | { kind: "moveModule"; moduleId: string; toIndex: number }
@@ -127,7 +127,7 @@ export function applyOutlineOp(
         throw new StructureError("An Outline cannot keep growing forever.");
       }
       modules.push({
-        id: newId(),
+        id: op.moduleId ?? newId(),
         ordinal: 0,
         numeral: "",
         title: checkTitle(op.title, "Module"),

@@ -70,6 +70,7 @@ async function stepOrder(context: GenerationContext): Promise<OutlineLesson[]> {
 async function stepReconcileSpec(
   planId: string,
   context: GenerationContext,
+  runId: string,
 ): Promise<GenerationContext> {
   "use step";
   const { db } = await import("@/lib/db");
@@ -77,11 +78,22 @@ async function stepReconcileSpec(
   const { reconcileSpecification, specNeedsReconciliation } = await import(
     "@/lib/course/reconcile"
   );
-  const { planContentAdjustments } = await import("@/lib/db/tailor");
+  const { planContentAdjustments, planHasStructuralChanges } = await import("@/lib/db/tailor");
   const { saveReconciledSpec } = await import("@/lib/db/outline");
 
   const adjustments = await planContentAdjustments(db, planId);
-  if (!specNeedsReconciliation(context.spec, context.outline.data, adjustments)) {
+  const { generationRuns } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const [run] = await db
+    .select({ currentStep: generationRuns.currentStep })
+    .from(generationRuns)
+    .where(eq(generationRuns.id, runId))
+    .limit(1);
+  if (run?.currentStep === "lessons") return context;
+  if (
+    !(await planHasStructuralChanges(db, planId)) &&
+    !specNeedsReconciliation(context.spec, context.outline.data, adjustments)
+  ) {
     return context;
   }
 
@@ -340,7 +352,7 @@ async function stepFailReview(
   "use step";
   const { failReview } = await import("@/lib/db/review");
   const { db } = await import("@/lib/db");
-  await failReview(db, courseId, runId, message);
+  await failReview(db, courseId, runId, message, { touchCourse: false });
 }
 
 /**
@@ -384,13 +396,23 @@ async function stepEmbedAffected(
   courseId: string,
   outlineVersion: number,
   embedLessonRefs: string[],
+  runId: string,
 ): Promise<void> {
   "use step";
   if (embedLessonRefs.length === 0) return;
   const { db } = await import("@/lib/db");
   const { embedLessonFragments } = await import("@/lib/course/fragments");
   const { embedTexts } = await import("@/lib/model");
-  await embedLessonFragments(db, embedTexts, courseId, outlineVersion, embedLessonRefs);
+  try {
+    await embedLessonFragments(db, embedTexts, courseId, outlineVersion, embedLessonRefs);
+  } catch (error) {
+    const { generationRuns } = await import("@/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    await db
+      .update(generationRuns)
+      .set({ currentStep: `fragments-failed: ${errorMessage(error)}`, updatedAt: new Date() })
+      .where(eq(generationRuns.id, runId));
+  }
 }
 
 /** The plan's terminal states, written from the workflow. */
@@ -466,7 +488,7 @@ export async function stageRevisionWorkflow(
        reads it: Lessons the plan added or split have no alignment yet,
        removed ones may still sit in the graph, and the plan's accepted
        prose/Exercise demands must ride into generation (#17). */
-    const prepared = await stepReconcileSpec(planId, context);
+    const prepared = await stepReconcileSpec(planId, context, runId);
     const order = await stepOrder(prepared);
     await stepMarkStep(runId, "lessons");
 
@@ -565,7 +587,7 @@ export async function stageRevisionWorkflow(
       return { ok: false as const, reason: "publish-failed" };
     }
 
-    await stepEmbedAffected(courseId, outlineVersion, embedLessonRefs);
+    await stepEmbedAffected(courseId, outlineVersion, embedLessonRefs, runId);
     await stepMarkPlan(planId, "published", published.revisionNumber);
     return { ok: true as const, revisionNumber: published.revisionNumber };
   } catch (error) {

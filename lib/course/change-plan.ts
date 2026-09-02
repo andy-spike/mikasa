@@ -29,7 +29,7 @@ export type ExerciseOp = {
 export type ChangePlanOp = OutlineOp | LessonProseOp | ExerciseOp;
 
 export const changePlanOpSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("addModule"), title: z.string().min(1).max(200) }),
+  z.object({ kind: z.literal("addModule"), title: z.string().min(1).max(200), moduleId: z.string().min(1).optional() }),
   z.object({ kind: z.literal("renameModule"), moduleId: z.string().min(1), title: z.string().min(1).max(200) }),
   z.object({ kind: z.literal("removeModule"), moduleId: z.string().min(1) }),
   z.object({ kind: z.literal("moveModule"), moduleId: z.string().min(1), toIndex: z.number().int().min(0) }),

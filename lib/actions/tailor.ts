@@ -7,14 +7,15 @@
  * the Course; application and staging are the only doors that do.
  */
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { start } from "workflow/api";
 import { db } from "@/lib/db";
 import { requireLearner } from "@/lib/session";
-import { courses } from "@/lib/db/schema";
+import { courses, generationRuns } from "@/lib/db/schema";
 import {
   applyPlanToOutline,
   findProposedPlan,
+  findStagedPlan,
   listPlansWithOperations,
   resumeStagedRevision,
   setOperationStatus,
@@ -65,6 +66,33 @@ export async function findProposedPlanAction(
   const { user } = await requireLearner();
   const plan = await findProposedPlan(db, user.id, courseId);
   return plan ? toPlanView(plan) : null;
+}
+
+export type StagedPlanView = { plan: PlanView; failed: boolean; error: string | null };
+
+/** The active staged Course revision, including a failure the Learner can retry. */
+export async function findStagedPlanAction(
+  courseId: string,
+): Promise<StagedPlanView | null> {
+  const { user } = await requireLearner();
+  const plan = await findStagedPlan(db, user.id, courseId);
+  if (!plan?.stagedOutlineVersion) return null;
+  const [run] = await db
+    .select({ status: generationRuns.status, error: generationRuns.error })
+    .from(generationRuns)
+    .where(
+      and(
+        eq(generationRuns.courseId, courseId),
+        eq(generationRuns.outlineVersion, plan.stagedOutlineVersion),
+      ),
+    )
+    .orderBy(desc(generationRuns.updatedAt))
+    .limit(1);
+  return {
+    plan: toPlanView(plan),
+    failed: run?.status === "failed",
+    error: run?.status === "failed" ? run.error : null,
+  };
 }
 
 export async function reviewTailorOperationAction(
@@ -221,6 +249,7 @@ export async function stagePlanRevisionAction(
       courseId,
       staged.runId,
       "The generation engine could not start this revision.",
+      { touchCourse: false },
     );
     return {
       ok: false,
@@ -265,6 +294,7 @@ export async function retryPlanRevisionAction(
       courseId,
       resume.runId,
       "The generation engine could not start this retry.",
+      { touchCourse: false },
     );
     return {
       ok: false,

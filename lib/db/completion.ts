@@ -27,6 +27,45 @@ export type MarkResult =
     }
   | { ok: false; reason: "not-found" | "not-published" | "unknown-lesson"; message: string };
 
+async function currentLessonRefs(db: Db, courseId: string): Promise<string[]> {
+  const revision = await currentRevision(db, courseId);
+  if (!revision) return [];
+  const [outline] = await db
+    .select()
+    .from(outlines)
+    .where(and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)))
+    .limit(1);
+  return outline?.data.modules.flatMap((m) => m.lessons.map((l) => l.id)) ?? [];
+}
+
+export type CourseCompletion = { done: number; total: number; complete: boolean };
+
+/** Counts only Lessons in the current published Course revision. */
+export async function currentCourseCompletion(db: Db, courseId: string): Promise<CourseCompletion> {
+  const lessonRefs = await currentLessonRefs(db, courseId);
+  const completed = await db
+    .select({ lessonRef: completions.lessonRef })
+    .from(completions)
+    .where(eq(completions.courseId, courseId));
+  const current = new Set(lessonRefs);
+  const done = completed.filter((row) => current.has(row.lessonRef)).length;
+  return { done, total: lessonRefs.length, complete: lessonRefs.length > 0 && done === lessonRefs.length };
+}
+
+/** Recomputes the Course Completion after its current revision changes. */
+export async function recomputeCourseCompletion(
+  db: Db,
+  courseId: string,
+  completedAt: Date = new Date(),
+): Promise<CourseCompletion> {
+  const completion = await currentCourseCompletion(db, courseId);
+  await db
+    .update(courses)
+    .set({ completedAt: completion.complete ? completedAt : null, updatedAt: new Date() })
+    .where(eq(courses.id, courseId));
+  return completion;
+}
+
 async function ownedPublishedLesson(
   db: Db,
   ownerId: string,
@@ -45,8 +84,8 @@ async function ownedPublishedLesson(
     };
   }
 
-  const revision = await currentRevision(db, courseId);
-  if (!revision) {
+  const lessonRefs = await currentLessonRefs(db, courseId);
+  if (lessonRefs.length === 0) {
     return {
       ok: false,
       result: {
@@ -57,15 +96,7 @@ async function ownedPublishedLesson(
     };
   }
 
-  const [outline] = await db
-    .select()
-    .from(outlines)
-    .where(
-      and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)),
-    )
-    .limit(1);
-  const planned = outline?.data.modules.flatMap((m) => m.lessons.map((l) => l.id)) ?? [];
-  if (!planned.includes(lessonRef)) {
+  if (!lessonRefs.includes(lessonRef)) {
     return {
       ok: false,
       result: {
@@ -75,7 +106,7 @@ async function ownedPublishedLesson(
       },
     };
   }
-  return { ok: true, total: planned.length };
+  return { ok: true, total: lessonRefs.length };
 }
 
 /** Marks one Exercise done; the Lesson is complete from that moment on. */
@@ -94,27 +125,21 @@ export async function markLessonDone(
       .values({ courseId, lessonRef })
       .onConflictDoNothing()
       .returning();
-    const doneAt = row?.doneAt ?? new Date();
-
-    const doneCount = (
-      await tx.select({ lessonRef: completions.lessonRef }).from(completions).where(eq(completions.courseId, courseId))
-    ).length;
-    const courseComplete = doneCount >= checked.total;
-
-    await tx
-      .update(courses)
-      .set({
-        completedAt: courseComplete ? (doneAt as Date) : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(courses.id, courseId));
+    const doneAt = row?.doneAt ?? (
+      await tx
+        .select({ doneAt: completions.doneAt })
+        .from(completions)
+        .where(and(eq(completions.courseId, courseId), eq(completions.lessonRef, lessonRef)))
+        .limit(1)
+    )[0]!.doneAt;
+    const completion = await recomputeCourseCompletion(tx, courseId, doneAt);
 
     return {
       ok: true as const,
       stamp: stampOf(doneAt),
-      doneCount,
-      total: checked.total,
-      courseComplete,
+      doneCount: completion.done,
+      total: completion.total,
+      courseComplete: completion.complete,
     };
   });
 }
@@ -134,21 +159,14 @@ export async function markLessonUndone(
       .delete(completions)
       .where(and(eq(completions.courseId, courseId), eq(completions.lessonRef, lessonRef)));
 
-    const doneCount = (
-      await tx.select({ lessonRef: completions.lessonRef }).from(completions).where(eq(completions.courseId, courseId))
-    ).length;
-
-    await tx
-      .update(courses)
-      .set({ completedAt: null, updatedAt: new Date() })
-      .where(eq(courses.id, courseId));
+    const completion = await recomputeCourseCompletion(tx, courseId);
 
     return {
       ok: true as const,
       stamp: "",
-      doneCount,
-      total: checked.total,
-      courseComplete: false,
+      doneCount: completion.done,
+      total: completion.total,
+      courseComplete: completion.complete,
     };
   });
 }
@@ -158,9 +176,7 @@ export async function listCompletions(
   db: Db,
   courseId: string,
 ): Promise<Map<string, Date>> {
-  const rows = await db
-    .select()
-    .from(completions)
-    .where(eq(completions.courseId, courseId));
-  return new Map(rows.map((r) => [r.lessonRef, r.doneAt]));
+  const lessonRefs = new Set(await currentLessonRefs(db, courseId));
+  const rows = await db.select().from(completions).where(eq(completions.courseId, courseId));
+  return new Map(rows.filter((r) => lessonRefs.has(r.lessonRef)).map((r) => [r.lessonRef, r.doneAt]));
 }

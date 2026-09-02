@@ -138,8 +138,8 @@ export async function saveDesignSpecification(
     .insert(courseSpecs)
     .values({ courseId, spec: specification, outlineVersion })
     .onConflictDoUpdate({
-      target: courseSpecs.courseId,
-      set: { spec: specification, outlineVersion },
+      target: [courseSpecs.courseId, courseSpecs.outlineVersion],
+      set: { spec: specification },
     });
 }
 
@@ -234,11 +234,17 @@ export async function latestOutline(
 export async function findCourseSpec(
   db: Db,
   courseId: string,
+  outlineVersion?: number,
 ): Promise<CourseSpecification | undefined> {
   const [row] = await db
     .select()
     .from(courseSpecs)
-    .where(eq(courseSpecs.courseId, courseId))
+    .where(
+      outlineVersion === undefined
+        ? eq(courseSpecs.courseId, courseId)
+        : and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, outlineVersion)),
+    )
+    .orderBy(desc(courseSpecs.outlineVersion))
     .limit(1);
   return row?.spec;
 }

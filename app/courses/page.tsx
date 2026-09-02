@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { LiveMark, UnsetMark } from "@/components/workspace/marks";
 import { Button } from "@/components/ui/button";
-import { listOwnedCourses } from "@/lib/db/courses";
+import { listOwnedCoursesWithCompletion } from "@/lib/db/courses";
 import { db } from "@/lib/db";
 import { requireLearner } from "@/lib/session";
 
@@ -35,7 +35,7 @@ function rowFor(course: {
 
 export default async function CoursesPage() {
   const { user } = await requireLearner();
-  const owned = await listOwnedCourses(db, user.id);
+  const owned = await listOwnedCoursesWithCompletion(db, user.id);
 
   return (
     <AppShell
@@ -90,10 +90,10 @@ export default async function CoursesPage() {
                       </span>
                     </span>
 
-                    {/* The done fraction needs the Lessons, which arrive with
-                        generation; a reading Course holds its place until then. */}
+                    {/* A published Course shows Completion; earlier Course work
+                        keeps its lifecycle text. */}
                     <span className="tnum shrink-0 text-[0.8125rem] text-fg-3">
-                      {label}
+                      {reading && c.completion ? `${c.completion.done}/${c.completion.total}` : label}
                     </span>
                   </Link>
                 </li>

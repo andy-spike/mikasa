@@ -23,6 +23,8 @@ import {
   type ReviewRun,
 } from "./schema";
 import type { Finding, FindingKind } from "../course/review";
+import { outlineApprovalProblems } from "@/lib/course/structure";
+import { recomputeCourseCompletion } from "./completion";
 
 /** Opens the review run for a generated candidate. */
 export async function openReviewRun(
@@ -156,6 +158,10 @@ export async function publishRevision(
       .where(and(eq(outlines.courseId, courseId), eq(outlines.version, outlineVersion)))
       .limit(1);
     if (!outline) return { ok: false as const, reason: "The Outline for this candidate is gone." };
+    const problems = outlineApprovalProblems(outline.data);
+    if (problems.length > 0) {
+      return { ok: false as const, reason: `Refusing to publish: ${problems.join(" ")}` };
+    }
 
     const planned = outline.data.modules.flatMap((m) => m.lessons.map((l) => l.id));
     const written = await tx
@@ -242,6 +248,7 @@ export async function publishRevision(
       .update(courses)
       .set({ status: "ready", updatedAt: new Date() })
       .where(eq(courses.id, courseId));
+    await recomputeCourseCompletion(tx, courseId);
 
     return { ok: true as const, revision };
   });
@@ -324,14 +331,33 @@ export async function latestCodeVerification(
   return row;
 }
 
-/** A failed review keeps the Course unpublished with a usable message. */export async function failReview(
+/** A failed review leaves the candidate retryable. */
+export async function failReview(
   db: Db,
   courseId: string,
   runId: string,
   message: string,
+  options?: { touchCourse?: boolean },
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await finishReviewRun(tx, runId, "failed", message);
+    const [review] = await tx
+      .select({ outlineVersion: reviewRuns.outlineVersion })
+      .from(reviewRuns)
+      .where(eq(reviewRuns.id, runId))
+      .limit(1);
+    if (review) {
+      await tx
+        .update(generationRuns)
+        .set({ status: "failed", error: message, updatedAt: new Date() })
+        .where(
+          and(
+            eq(generationRuns.courseId, courseId),
+            eq(generationRuns.outlineVersion, review.outlineVersion),
+          ),
+        );
+    }
+    if (options?.touchCourse === false) return;
     await tx
       .update(courses)
       .set({ status: "failed", updatedAt: new Date() })
@@ -389,12 +415,19 @@ export async function resetGenerationRun(
 
     await tx
       .update(generationRuns)
-      .set({ status: "running", error: null, currentStep: "resuming", updatedAt: new Date() })
+      .set({ status: "running", error: null, updatedAt: new Date() })
       .where(eq(generationRuns.id, runId));
-    await tx
-      .update(courses)
-      .set({ status: "generating", updatedAt: new Date() })
-      .where(eq(courses.id, courseId));
+    const [published] = await tx
+      .select({ id: revisions.id })
+      .from(revisions)
+      .where(eq(revisions.courseId, courseId))
+      .limit(1);
+    if (!published) {
+      await tx
+        .update(courses)
+        .set({ status: "generating", updatedAt: new Date() })
+        .where(eq(courses.id, courseId));
+    }
     return true;
   });
 }

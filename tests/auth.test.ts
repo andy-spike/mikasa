@@ -17,9 +17,6 @@ function testAuth(db: AuthDb): Auth {
     secret: "test-secret-not-used-anywhere-real",
     baseURL: ORIGIN,
     google: { clientId: "test-google-client-id", clientSecret: "test-google-client-secret" },
-    // The proxy only matters across local/preview/production; here the
-    // callback is answered locally.
-    oauthProxy: false,
     trustedOrigins: [ORIGIN],
   });
 }
@@ -41,6 +38,7 @@ async function startGoogleSignIn(auth: Auth, callbackURL = "/courses") {
   const authorize = new URL(body.url);
   expect(authorize.origin + authorize.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
   expect(authorize.searchParams.get("client_id")).toBe("test-google-client-id");
+  expect(authorize.searchParams.get("redirect_uri")).toBe(`${ORIGIN}/api/auth/callback/google`);
   const state = authorize.searchParams.get("state");
   expect(state).toBeTruthy();
   return { response, authorize, state: state as string };

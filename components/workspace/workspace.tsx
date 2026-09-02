@@ -12,10 +12,13 @@ import type { ReadingCourse, SourceLink } from "@/lib/course/reading";
 import type { CompletionActionResult } from "@/lib/actions/completion";
 import {
   listPublishedPlansAction,
+  findStagedPlanAction,
   reviewTailorOperationAction,
+  retryPlanRevisionAction,
   stagePlanRevisionAction,
   undoPlanRevisionAction,
   type PublishedPlanRow,
+  type StagedPlanView,
 } from "@/lib/actions/tailor";
 import type { PlanView, Turn } from "./panel";
 import { Outline, type ModuleView } from "./outline";
@@ -51,6 +54,8 @@ type Props = {
   tailorTurns?: Turn[];
   /** The Change plan under review, as the server has it. */
   tailorPlan?: PlanView | null;
+  /** The one staged Course revision, if the Tailor has one. */
+  stagedPlan?: StagedPlanView | null;
   /** The plan as the server has it now, after a turn may have proposed one. */
   onRefreshPlan: () => Promise<PlanView | null>;
 };
@@ -63,6 +68,7 @@ export function Workspace({
   tutorHistory,
   tailorTurns,
   tailorPlan,
+  stagedPlan,
   onRefreshPlan,
 }: Props) {
   const [doneAt, setDoneAt] = useState<Record<string, string>>(() => {
@@ -121,6 +127,7 @@ export function Workspace({
     flat.slice(openIndex + 1).find((l) => l.status !== "unset") ?? null;
 
   function showPanel(mode: PanelMode) {
+    if (window.matchMedia("(max-width: 1279px)").matches) setRailChoice(false);
     setLastMode(mode);
     setPanel(mode);
   }
@@ -243,6 +250,12 @@ export function Workspace({
   /* Staging a revision (#14): the accepted operations become a candidate
      the durable engine regenerates; the current Course stays readable. */
   const [staged, setStaged] = useState(false);
+  const [stagedRevision, setStagedRevision] = useState(stagedPlan);
+  const [restoredStagedRevision, setRestoredStagedRevision] = useState(stagedPlan);
+  if (stagedPlan !== restoredStagedRevision) {
+    setRestoredStagedRevision(stagedPlan);
+    setStagedRevision(stagedPlan);
+  }
   const [, startStaging] = useTransition();
 
   /* The published changes, with their undo availability (#15). */
@@ -296,9 +309,19 @@ export function Workspace({
     }
   }
 
-  const tailorStatus = staged
-    ? "A revision is being prepared from your accepted changes. The Course reads as it is until it publishes."
-    : null;
+  const tailorStatus = stagedRevision?.failed
+    ? `The staged revision failed. ${stagedRevision.error ?? "The revision did not finish."}`
+    : staged || stagedRevision
+      ? "A revision is being prepared from your accepted changes. The Course reads as it is until it publishes."
+      : null;
+
+  useEffect(() => {
+    if (!stagedRevision || stagedRevision.failed) return;
+    const timer = setInterval(() => {
+      findStagedPlanAction(course.id).then(setStagedRevision).catch(() => {});
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [course.id, stagedRevision]);
 
   const tailorTurnsStable = useMemo<Turn[]>(() => tailorTurns ?? [], [tailorTurns]);
 
@@ -558,6 +581,7 @@ export function Workspace({
                     if (result.ok) {
                       setPlan(null);
                       setStaged(true);
+                      setStagedRevision(await findStagedPlanAction(course.id));
                       setPublishedKey((k) => k + 1);
                     } else {
                       setPlan(await onRefreshPlan());
@@ -567,6 +591,18 @@ export function Workspace({
                 className="w-full"
               >
                 Stage as a new revision
+              </Button>
+            ) : stagedRevision?.failed ? (
+              <Button
+                onClick={() =>
+                  startStaging(async () => {
+                    const result = await retryPlanRevisionAction(course.id, stagedRevision.plan.id);
+                    if (result.ok) setStagedRevision(await findStagedPlanAction(course.id));
+                  })
+                }
+                className="w-full"
+              >
+                Retry the revision
               </Button>
             ) : null
           }

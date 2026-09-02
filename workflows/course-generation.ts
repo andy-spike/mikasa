@@ -326,12 +326,25 @@ async function stepPublish(
  * Course search answers from exactly what was just published. Runs after
  * the revision exists; re-running replaces the fragments wholesale.
  */
-async function stepEmbedFragments(courseId: string, outlineVersion: number): Promise<void> {
+async function stepEmbedFragments(
+  courseId: string,
+  outlineVersion: number,
+  runId: string,
+): Promise<void> {
   "use step";
   const { db } = await import("@/lib/db");
   const { embedCourseFragments } = await import("@/lib/course/fragments");
   const { embedTexts } = await import("@/lib/model");
-  await embedCourseFragments(db, embedTexts, courseId, outlineVersion);
+  const { generationRuns } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
+  try {
+    await embedCourseFragments(db, embedTexts, courseId, outlineVersion);
+  } catch (error) {
+    await db
+      .update(generationRuns)
+      .set({ currentStep: `fragments-failed: ${errorMessage(error)}`, updatedAt: new Date() })
+      .where(eq(generationRuns.id, runId));
+  }
 }
 
 async function stepFailReview(
@@ -514,7 +527,7 @@ export async function generateCourseWorkflow(
       await stepFailReview(courseId, reviewRunId, published.reason ?? "Publication failed.");
       return { ok: false as const, reason: "publish-failed" };
     }
-    await stepEmbedFragments(courseId, outlineVersion);
+    await stepEmbedFragments(courseId, outlineVersion, runId);
     return { ok: true as const, revisionNumber: published.revisionNumber };
   } catch (error) {
     await stepFail(courseId, runId, errorMessage(error));

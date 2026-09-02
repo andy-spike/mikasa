@@ -60,18 +60,18 @@ export const DEPTH_IDS = DEPTH_CHOICES.map((d) => d.id);
 /**
  * How much structure each Depth allows before the Learner reshapes it. The
  * Outline a Course is born with must land inside these bounds; design fails
- * and can be retried when a model draft misses them. Bounds are lessons
- * *total* across the Course, not per Module. A reach Course is a short
+ * and can be retried when a model draft misses them. Bounds are per Module.
+ * A reach Course is a short
  * line to one outcome; working adds the ground to keep using the skill;
  * mastery walks the edges, so it earns the most Modules and Lessons.
  */
 export const DEPTH_BOUNDS: Record<
   DepthId,
-  { minModules: number; maxModules: number; minLessons: number; maxLessons: number }
+  { minModules: number; maxModules: number; minLessonsPerModule: number; maxLessonsPerModule: number }
 > = {
-  reach: { minModules: 2, maxModules: 3, minLessons: 3, maxLessons: 6 },
-  working: { minModules: 3, maxModules: 5, minLessons: 6, maxLessons: 12 },
-  mastery: { minModules: 4, maxModules: 7, minLessons: 10, maxLessons: 18 },
+  reach: { minModules: 3, maxModules: 4, minLessonsPerModule: 2, maxLessonsPerModule: 3 },
+  working: { minModules: 5, maxModules: 7, minLessonsPerModule: 3, maxLessonsPerModule: 4 },
+  mastery: { minModules: 8, maxModules: 10, minLessonsPerModule: 4, maxLessonsPerModule: 5 },
 };
 
 export function depthBounds(depth: string) {

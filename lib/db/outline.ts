@@ -121,16 +121,22 @@ export function specIsStale(spec: CourseSpecRow, outlineVersion: number): boolea
 export async function findCourseSpecRow(
   db: Db,
   courseId: string,
+  outlineVersion?: number,
 ): Promise<CourseSpecRow | undefined> {
   const [row] = await db
     .select()
     .from(courseSpecs)
-    .where(eq(courseSpecs.courseId, courseId))
+    .where(
+      outlineVersion === undefined
+        ? eq(courseSpecs.courseId, courseId)
+        : and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, outlineVersion)),
+    )
+    .orderBy(desc(courseSpecs.outlineVersion))
     .limit(1);
   return row;
 }
 
-/** Overwrites the specification and records the Outline version it now fits. */
+/** Saves the specification for the Outline version it fits. */
 export async function saveReconciledSpec(
   db: Db,
   courseId: string,
@@ -138,9 +144,12 @@ export async function saveReconciledSpec(
   outlineVersion: number,
 ): Promise<void> {
   await db
-    .update(courseSpecs)
-    .set({ spec, outlineVersion })
-    .where(eq(courseSpecs.courseId, courseId));
+    .insert(courseSpecs)
+    .values({ courseId, spec, outlineVersion })
+    .onConflictDoUpdate({
+      target: [courseSpecs.courseId, courseSpecs.outlineVersion],
+      set: { spec },
+    });
 }
 
 export type ApprovalStart =
@@ -257,12 +266,14 @@ export async function failGenerationRun(
   courseId: string,
   runId: string,
   message: string,
+  options?: { touchCourse?: boolean },
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await tx
       .update(generationRuns)
       .set({ status: "failed", error: message, updatedAt: new Date() })
       .where(eq(generationRuns.id, runId));
+    if (options?.touchCourse === false) return;
     await tx
       .update(courses)
       .set({ status: "failed", updatedAt: new Date() })

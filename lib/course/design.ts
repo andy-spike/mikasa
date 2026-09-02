@@ -251,7 +251,7 @@ const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 function describeBounds(depth: string): string {
   const b = depthBounds(depth);
-  return `${b.minModules}–${b.maxModules} Modules and ${b.minLessons}–${b.maxLessons} Lessons in total`;
+  return `${b.minModules}–${b.maxModules} Modules with ${b.minLessonsPerModule}–${b.maxLessonsPerModule} Lessons each`;
 }
 
 function depthIntent(depth: string): string {
@@ -329,16 +329,17 @@ export function buildOutline(
 ): OutlineData {
   const bounds = depthBounds(depth);
   const moduleCount = draft.modules.length;
-  const lessonCount = draft.modules.reduce((n, m) => n + m.lessons.length, 0);
-
   if (
     moduleCount < bounds.minModules ||
     moduleCount > bounds.maxModules ||
-    lessonCount < bounds.minLessons ||
-    lessonCount > bounds.maxLessons
+    draft.modules.some(
+      (m) =>
+        m.lessons.length < bounds.minLessonsPerModule ||
+        m.lessons.length > bounds.maxLessonsPerModule,
+    )
   ) {
     throw new DesignError(
-      `The drafted outline (${moduleCount} Modules, ${lessonCount} Lessons) misses the ${depth} bounds of ${describeBounds(depth)}.`,
+      `The drafted Outline misses the ${depth} bounds of ${describeBounds(depth)}.`,
     );
   }
 

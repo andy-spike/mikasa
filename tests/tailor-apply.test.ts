@@ -6,7 +6,7 @@
  * Learner's accepted content demands reach that reconciliation.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 vi.mock("server-only", () => ({}));
 
@@ -262,7 +262,7 @@ describe("applyPlanToOutlineAction", () => {
     const [spec] = await db
       .select()
       .from(courseSpecs)
-      .where(eq(courseSpecs.courseId, courseId));
+      .where(and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, 1)));
     /* The Outline moved past the specification. */
     expect(spec.outlineVersion).toBe(1);
 
@@ -277,7 +277,7 @@ describe("applyPlanToOutlineAction", () => {
     const [reconciled] = await db
       .select()
       .from(courseSpecs)
-      .where(eq(courseSpecs.courseId, courseId));
+      .where(and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, 2)));
     expect(reconciled.outlineVersion).toBe(2);
     expect(workflowStarts.calls).toHaveLength(1);
   });

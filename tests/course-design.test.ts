@@ -62,8 +62,8 @@ function draftOf(modules: number, lessons: number): OutlineDraft {
   };
 }
 
-/** Two Modules of two Lessons: 4 total, inside the reach bounds. */
-const REACH_DRAFT = draftOf(2, 2);
+/** Three Modules of two Lessons: inside the reach bounds. */
+const REACH_DRAFT = draftOf(3, 2);
 
 const fetched = [
   page({
@@ -190,7 +190,7 @@ describe("draftOutline and buildOutline", () => {
     expect(prompt).toContain("the Vercel AI SDK");
     expect(prompt).toContain("build my own AI chat app");
     expect(prompt).toContain("English");
-    expect(prompt).toContain("2–3 Modules and 3–6 Lessons in total");
+    expect(prompt).toContain("3–4 Modules with 2–3 Lessons each");
     expect(prompt).toContain("https://sdk.vercel.example/docs");
   });
 
@@ -198,38 +198,41 @@ describe("draftOutline and buildOutline", () => {
     let n = 0;
     const outline = buildOutline(REACH_DRAFT, course.depth, () => `id-${++n}`);
 
-    expect(outline.modules).toHaveLength(2);
-    expect(outline.modules.flatMap((m) => m.lessons)).toHaveLength(4);
-    expect(outline.modules.map((m) => m.numeral)).toEqual(["I", "II"]);
-    expect(outline.modules.map((m) => m.ordinal)).toEqual([1, 2]);
+    expect(outline.modules).toHaveLength(3);
+    expect(outline.modules.flatMap((m) => m.lessons)).toHaveLength(6);
+    expect(outline.modules.map((m) => m.numeral)).toEqual(["I", "II", "III"]);
+    expect(outline.modules.map((m) => m.ordinal)).toEqual([1, 2, 3]);
     /* Lesson ordinals run across the whole Course, not per Module. */
     expect(outline.modules[0].lessons.map((l) => l.ordinal)).toEqual([1, 2]);
     expect(outline.modules[1].lessons.map((l) => l.ordinal)).toEqual([3, 4]);
+    expect(outline.modules[2].lessons.map((l) => l.ordinal)).toEqual([5, 6]);
     /* Ids are unique, stable strings: module first, then its lessons. */
     const ids = [
       outline.modules[0].id,
       ...outline.modules[0].lessons.map((l) => l.id),
       outline.modules[1].id,
       ...outline.modules[1].lessons.map((l) => l.id),
+      outline.modules[2].id,
+      ...outline.modules[2].lessons.map((l) => l.id),
     ];
-    expect(ids).toEqual(["id-1", "id-2", "id-3", "id-4", "id-5", "id-6"]);
-    expect(new Set(ids).size).toBe(6);
+    expect(ids).toEqual(["id-1", "id-2", "id-3", "id-4", "id-5", "id-6", "id-7", "id-8", "id-9"]);
+    expect(new Set(ids).size).toBe(9);
   });
 
   it.each([2, 3])("keeps a %s-lesson-per-module reach outline inside the bounds", (lessons) => {
-    const outline = buildOutline(draftOf(2, lessons), "reach");
+    const outline = buildOutline(draftOf(3, lessons), "reach");
     const total = outline.modules.reduce((n, m) => n + m.lessons.length, 0);
-    expect(total).toBe(2 * lessons);
+    expect(total).toBe(3 * lessons);
   });
 
   it("fails a draft outside the Depth bounds instead of trimming it", () => {
-    expect(() => buildOutline(draftOf(1, 2), "reach")).toThrow(DesignError);
-    expect(() => buildOutline(draftOf(5, 4), "reach")).toThrow(DesignError);
-    expect(() => buildOutline(draftOf(2, 10), "reach")).toThrow(DesignError);
+    expect(() => buildOutline(draftOf(2, 2), "reach")).toThrow(DesignError);
+    expect(() => buildOutline(draftOf(5, 2), "reach")).toThrow(DesignError);
+    expect(() => buildOutline(draftOf(3, 4), "reach")).toThrow(DesignError);
   });
 
   it("fails a module with no lessons", () => {
-    const draft = draftOf(2, 2);
+    const draft = draftOf(3, 2);
     draft.modules[1].lessons = [];
     expect(() => buildOutline(draft, "reach")).toThrow(DesignError);
   });
@@ -279,7 +282,7 @@ describe("designSpecification", () => {
     expect(spec.contract.terminalPerformances).toEqual(REACH_DRAFT.terminalPerformances);
     expect(spec.throughline).toEqual(REACH_DRAFT.throughline);
     expect(spec.learningGraph).toHaveLength(2);
-    expect(spec.alignment).toHaveLength(4);
+    expect(spec.alignment).toHaveLength(6);
     expect(spec.finalExercise.acceptanceChecks).toHaveLength(2);
   });
 
@@ -346,7 +349,7 @@ describe("design persistence", () => {
     ]);
     const sources = await collectSources(firecrawl.searcher, excerptModel.model, runCourse);
 
-    const outlineModel = scriptedModel([json(draftOf(2, 2))]);
+    const outlineModel = scriptedModel([json(draftOf(3, 2))]);
     const draft = await draftOutline(outlineModel.model, runCourse, sources);
     const outline = buildOutline(draft, runCourse.depth, () => `l${++counter}`);
     const lessonIds = outline.modules.flatMap((m) => m.lessons.map((l) => l.id));
@@ -385,7 +388,7 @@ describe("design persistence", () => {
 
     const outline = await latestOutline(db, courseRow.id);
     expect(outline?.version).toBe(1);
-    expect(outline?.data.modules).toHaveLength(2);
+    expect(outline?.data.modules).toHaveLength(3);
     /* Module ids and lesson ids come from the same stable string space. */
     expect(outline?.data.modules[0].id).toBe("l1");
     expect(outline?.data.modules[0].lessons[0].id).toBe("l2");

@@ -101,7 +101,7 @@ export function OutlineEditor({
 
   /* Durable work continues with the page closed, so while the Course is
      generating this screen polls — same courtesy as the design screen. */
-  const polling = course.phase === "generating";
+  const polling = course.phase !== "editing";
   useEffect(() => {
     if (!polling) return;
     const timer = setInterval(() => router.refresh(), 4000);

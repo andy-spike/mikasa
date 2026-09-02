@@ -123,8 +123,8 @@ export const courses = pgTable(
 /**
  * The private Course specification: the structured plan that links the Goal,
  * Outline, Lessons, Exercises and Sources. Never rendered to the Learner.
- * One row per Course; replaced whole when a revision is accepted (later
- * tickets), so the JSON carries a version of its own.
+ * One row per Outline version. A staged Course revision must never replace
+ * the specification the current published Course revision uses.
  */
 export const courseSpecs = pgTable(
   "course_specs",
@@ -143,7 +143,10 @@ export const courseSpecs = pgTable(
     outlineVersion: integer("outline_version").notNull().default(1),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (table) => [uniqueIndex("course_specs_course_id_key").on(table.courseId)],
+  (table) => [
+    uniqueIndex("course_specs_course_outline_key").on(table.courseId, table.outlineVersion),
+    index("course_specs_course_id_idx").on(table.courseId),
+  ],
 );
 
 /**

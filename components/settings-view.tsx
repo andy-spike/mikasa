@@ -1,19 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@/components/sign-out-button";
-import { field } from "@/lib/ui";
-import { depths } from "@/lib/demo-library";
 import { readTheme, serverTheme, setTheme, subscribeTheme, type ThemeChoice } from "@/lib/theme";
 
 /** A settings row: name, value, and whatever changes it. No boxes. */
@@ -40,11 +31,9 @@ function Row({
 }
 
 export function SettingsView({
-  name,
   email,
   courseCount,
 }: {
-  name: string;
   email: string;
   courseCount: number;
 }) {
@@ -53,8 +42,6 @@ export function SettingsView({
      The server snapshot is "system", which is also what the header switch
      assumes before it has looked. */
   const theme = useSyncExternalStore(subscribeTheme, readTheme, serverTheme);
-  const [depth, setDepth] = useState<string>("working");
-  const [grounding, setGrounding] = useState(true);
 
   return (
     <div className="mx-auto w-full max-w-[42rem] px-5 pt-10 pb-24 sm:px-8">
@@ -64,13 +51,6 @@ export function SettingsView({
 
         <section className="mt-10">
           <h2 className="label border-b border-hair pb-2 text-fg-3">Account</h2>
-          <Row name="Name">
-            <input
-              defaultValue={name}
-              aria-label="Name"
-              className={`${field} w-[16rem]`}
-            />
-          </Row>
           <Row name="Google" hint="The only way into Mikasa.">
             <span className="text-[0.8125rem] text-fg-2">{email}</span>
           </Row>
@@ -98,41 +78,6 @@ export function SettingsView({
         </section>
 
         <section className="mt-12">
-          <h2 className="label border-b border-hair pb-2 text-fg-3">
-            Defaults for a new Course
-          </h2>
-          <Row name="Depth">
-            <Select
-              value={depth}
-              onValueChange={(v) => setDepth(v as string)}
-              items={depths.map((d) => ({ value: d.id, label: d.title }))}
-            >
-              <SelectTrigger aria-label="Default Depth" className="w-[16rem]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {depths.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Row>
-          <Row name="Grounding" hint="Fixed per Course once it is created.">
-            <ToggleGroup
-              multiple={false}
-              value={[grounding ? "on" : "off"]}
-              onValueChange={(v) => setGrounding(v[0] !== "off")}
-              aria-label="Default Grounding"
-            >
-              <ToggleGroupItem value="on">On</ToggleGroupItem>
-              <ToggleGroupItem value="off">Off</ToggleGroupItem>
-            </ToggleGroup>
-          </Row>
-        </section>
-
-        <section className="mt-12">
           <h2 className="label border-b border-hair pb-2 text-fg-3">Your data</h2>
           <Row name="Courses">
             <span className="tnum text-[0.8125rem] text-fg-2">{courseCount}</span>
@@ -142,12 +87,6 @@ export function SettingsView({
           </Row>
           <Row name="Sign out">
             <SignOutButton variant="quiet" />
-          </Row>
-          <Row
-            name="Delete account"
-            hint="No undo on this one."
-          >
-            <Button variant="discard">Delete</Button>
           </Row>
         </section>
 

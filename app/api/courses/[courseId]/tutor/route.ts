@@ -71,7 +71,7 @@ export async function POST(
   const lesson = reading.modules.flatMap((m) => m.lessons).find((l) => l.id === lessonId);
   if (!lesson) return json(409, { error: "That Lesson is not part of the Course as it is published." });
 
-  const spec = await findCourseSpec(db, courseId);
+  const spec = await findCourseSpec(db, courseId, published.revision.outlineVersion);
 
   const result = streamText({
     model: tutorModel(),

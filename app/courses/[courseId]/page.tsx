@@ -7,7 +7,7 @@ import { listCompletions } from "@/lib/db/completion";
 import { loadTutorHistory } from "@/lib/db/tutor";
 import { loadTailorHistory } from "@/lib/db/tailor";
 import { markLessonDoneAction, markLessonUndoneAction } from "@/lib/actions/completion";
-import { findProposedPlanAction } from "@/lib/actions/tailor";
+import { findProposedPlanAction, findStagedPlanAction } from "@/lib/actions/tailor";
 import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
 import { requireLearner } from "@/lib/session";
 
@@ -62,6 +62,7 @@ export default async function CoursePage({ params }: PageProps<"/courses/[course
       tutorHistory={tutorHistory}
       tailorTurns={tailorTurns}
       tailorPlan={proposedPlan}
+      stagedPlan={await findStagedPlanAction(courseId)}
       onRefreshPlan={findProposedPlanAction.bind(null, courseId)}
     />
   );

@@ -78,9 +78,8 @@ const {
 const { parseLessonContent } = await import("@/lib/course/content");
 const { saveLessonContent } = await import("@/lib/db/lessons");
 const { publishRevision, currentRevision } = await import("@/lib/db/review");
-const { createChangePlan, stagePlanRevision, planContentAdjustments } = await import(
-  "@/lib/db/tailor"
-);
+const { createChangePlan, stagePlanRevision, planContentAdjustments, planHasStructuralChanges } =
+  await import("@/lib/db/tailor");
 const { specNeedsReconciliation } = await import("@/lib/course/reconcile");
 const { embedCourseFragments } = await import("@/lib/course/fragments");
 const {
@@ -306,7 +305,8 @@ async function stageAndPublish(
       and(eq(outlines.courseId, courseId), eq(outlines.version, staged.stagedOutlineVersion)),
     );
   const adjustments = await planContentAdjustments(db, planId);
-  const full = specNeedsReconciliation(specRow.spec, stagedOutline.data, adjustments)
+  const structural = await planHasStructuralChanges(db, planId);
+  const full = structural || specNeedsReconciliation(specRow.spec, stagedOutline.data, adjustments)
     ? [reconcileJson(stagedOutline.data), ...responses]
     : responses;
   revisionModelState.current = scriptedModel(full);
@@ -416,6 +416,8 @@ describe("publishing a revision", () => {
     /* The rewritten Exercise redefined "done" for its Lesson; the new
        Lesson has never been done; the rest kept their moment. */
     expect(await completionRows()).toEqual(before.filter(([ref]) => ref !== "l1"));
+    const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
+    expect(course.completedAt).toBeNull();
 
     const outline = await currentOutlineData(courseId);
     const added = outline.modules[0].lessons.find((l) => l.title === "Lesson four")!;
@@ -431,7 +433,7 @@ describe("publishing a revision", () => {
     const [specRow] = await db
       .select()
       .from(courseSpecs)
-      .where(eq(courseSpecs.courseId, courseId));
+      .where(and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, 2)));
     expect(specRow.outlineVersion).toBe(2);
     expect(specRow.spec.alignment.map((a) => a.lessonId)).toEqual(
       expect.arrayContaining(["l1", "l2", "l3", added.id]),
@@ -521,9 +523,15 @@ describe("publishing a revision", () => {
     const revisionNumber = await stageAndPublish(courseId, planId, []);
     expect(revisionNumber).toBe(2);
 
-    /* Nothing regenerated and the specification already joins to the
-       shape, so the revision spent no model call. */
-    expect(revisionModelState.current!.calls()).toBe(0);
+    /* Nothing regenerated; the remove is structural, so the staged
+       specification was reconciled to the smaller shape with one model
+       call, and the version-2 spec row exists beside the untouched base. */
+    expect(revisionModelState.current!.calls()).toBe(1);
+    const [specV2] = await db
+      .select()
+      .from(courseSpecs)
+      .where(and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, 2)));
+    expect(specV2.spec.alignment.map((a) => a.lessonId)).toEqual(["l1", "l3"]);
 
     /* The Completion survives, pointing at content the older revision
        still holds. */
@@ -531,6 +539,12 @@ describe("publishing a revision", () => {
     expect((await lessonRows(courseId, 2)).map((r) => r.lessonRef)).toEqual(["l1", "l3"]);
     const v1 = await lessonRows(courseId, 1);
     expect(v1.map((r) => r.lessonRef)).toEqual(["l1", "l2", "l3"]);
+
+    /* Removed Completion does not count toward the current Course. */
+    headerState.current = new Headers({ cookie: ownerCookie });
+    const marked = await markLessonDoneAction(courseId, "l1");
+    expect(marked).toMatchObject({ ok: true, doneCount: 1, total: 2, courseComplete: false });
+    const l1DoneAt = (await completionRows()).find(([ref]) => ref === "l1")![1];
 
     headerState.current = new Headers({ cookie: ownerCookie });
     const undone = await undoPlanRevisionAction(courseId, planId);
@@ -544,8 +558,31 @@ describe("publishing a revision", () => {
       v1.find((r) => r.lessonRef === "l2")!.body,
     );
     expect(v3.find((r) => r.lessonRef === "l2")!.title).toBe("Lesson two");
-    expect(await completionRows()).toEqual([["l2", doneAt]]);
+    /* l2's Completion is restored to its original moment; l1's, marked
+       after the removal on content the undo never touches, survives. */
+    expect(await completionRows()).toEqual([
+      ["l1", l1DoneAt],
+      ["l2", doneAt],
+    ]);
     expect((await planRow(planId)).status).toBe("undone");
+  });
+
+  it("undoes an added Module and its added Lesson", async () => {
+    const courseId = await seedPublishedCourse(OWNER);
+    const planId = await proposeAndAccept(courseId, [
+      { kind: "addModule", moduleId: "m3", title: "Module three" },
+      { kind: "addLesson", moduleId: "m3", title: "Lesson four", summary: "Fourth." },
+    ]);
+    await stageAndPublish(courseId, planId, [lessonJson("Lesson four")]);
+    expect((await currentOutlineData(courseId)).modules.at(-1)).toMatchObject({
+      id: "m3",
+      lessons: [{ title: "Lesson four" }],
+    });
+    expect((await planRow(planId)).touchedModules).toContain("m3");
+
+    headerState.current = new Headers({ cookie: ownerCookie });
+    expect(await undoPlanRevisionAction(courseId, planId)).toMatchObject({ ok: true });
+    expect((await currentOutlineData(courseId)).modules.map((m) => m.id)).not.toContain("m3");
   });
 });
 
@@ -620,6 +657,25 @@ describe("undoing a published change", () => {
       { kind: "renameModule", moduleId: "m1", title: "Module one, retitled" },
     ]);
     await stageAndPublish(courseId, planA, []);
+
+    /* A structural plan reconciles the specification even when the base
+       already joins to the shape: the staged version got its own row,
+       re-derived by the model (it carries the reconciled adjustments
+       key the base row never had), and the base row is untouched. */
+    const [specV2, specV1] = await Promise.all([
+      db
+        .select()
+        .from(courseSpecs)
+        .where(and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, 2))),
+      db
+        .select()
+        .from(courseSpecs)
+        .where(and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, 1))),
+    ]);
+    expect(specV2).toHaveLength(1);
+    expect(specV2[0].spec.adjustments).toEqual([]);
+    expect(specV2[0].spec.alignment.map((a) => a.lessonId)).toEqual(["l1", "l2", "l3"]);
+    expect(specV1[0].spec).toEqual(SPEC);
     const planB = await proposeAndAccept(courseId, [
       { kind: "addLesson", moduleId: "m1", title: "Lesson four", summary: "Fourth." },
     ]);

@@ -7,7 +7,6 @@
  */
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { oAuthProxy } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import * as schema from "./db/schema";
 
@@ -21,27 +20,13 @@ export type AuthConfig = {
   baseURL?: string;
   /** false removes the provider (tests); a value overrides the env pair. */
   google?: { clientId: string; clientSecret: string } | false;
-  /** false disables the proxy (tests); a value overrides the env pair. */
-  oauthProxy?: { productionURL?: string; secret?: string } | false;
   /** Overrides the trusted origins list. */
   trustedOrigins?: string[];
 };
 
-/**
- * Every origin allowed to start or finish a sign-in: local dev, the
- * production URL, and Vercel preview deployments (which get unpredictable
- * hostnames, hence the wildcard). Values come from env names only.
- */
-function defaultTrustedOrigins(): string[] {
-  return [
-    "http://localhost:3000",
-    process.env.BETTER_AUTH_URL,
-    process.env.BETTER_AUTH_PRODUCTION_URL,
-    "https://*.vercel.app",
-  ].filter((origin): origin is string => Boolean(origin));
-}
-
 export function createAuth(db: AuthDb, config: AuthConfig = {}) {
+  const baseURL = config.baseURL ?? process.env.BETTER_AUTH_URL;
+  const secret = config.secret ?? process.env.BETTER_AUTH_SECRET;
   const google =
     config.google === false
       ? undefined
@@ -51,22 +36,19 @@ export function createAuth(db: AuthDb, config: AuthConfig = {}) {
           clientSecret:
             config.google?.clientSecret ?? process.env.GOOGLE_CLIENT_SECRET ?? "",
         };
-
-  const oauthProxy =
-    config.oauthProxy === false
-      ? []
-      : [
-          oAuthProxy({
-            productionURL:
-              config.oauthProxy?.productionURL ??
-              process.env.BETTER_AUTH_PRODUCTION_URL,
-            secret: config.oauthProxy?.secret ?? process.env.OAUTH_PROXY_SECRET,
-          }),
-        ];
+  const missing = [
+    !baseURL && "BETTER_AUTH_URL",
+    !secret && "BETTER_AUTH_SECRET",
+    google && !google.clientId && "GOOGLE_CLIENT_ID",
+    google && !google.clientSecret && "GOOGLE_CLIENT_SECRET",
+  ].filter((name): name is string => Boolean(name));
+  if (missing.length) {
+    throw new Error(`Missing required auth configuration: ${missing.join(", ")}`);
+  }
 
   const options: BetterAuthOptions = {
-    baseURL: config.baseURL ?? process.env.BETTER_AUTH_URL,
-    secret: config.secret ?? process.env.BETTER_AUTH_SECRET,
+    baseURL,
+    secret,
     database: drizzleAdapter(db, {
       provider: "pg",
       schema,
@@ -75,8 +57,8 @@ export function createAuth(db: AuthDb, config: AuthConfig = {}) {
     // No `emailAndPassword`: Google is the only way in, and the first
     // sign-in creates the account (ADR 0003).
     socialProviders: google ? { google } : {},
-    trustedOrigins: config.trustedOrigins ?? defaultTrustedOrigins(),
-    plugins: [...oauthProxy, nextCookies()],
+    trustedOrigins: config.trustedOrigins ?? [baseURL!],
+    plugins: [nextCookies()],
   };
 
   return betterAuth(options);

@@ -6,7 +6,7 @@
  * Outline it is given.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 vi.mock("server-only", () => ({}));
 
@@ -308,7 +308,7 @@ describe("approveOutlineAction", () => {
     const [spec] = await db
       .select()
       .from(courseSpecs)
-      .where(eq(courseSpecs.courseId, courseId));
+      .where(and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, 2)));
     expect(spec.outlineVersion).toBe(2);
     expect(spec.spec.alignment.map((a) => a.lessonId)).toEqual(["l1", "l2", "l3", "l4"]);
 

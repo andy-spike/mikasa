@@ -9,11 +9,13 @@ import "server-only";
  * operations — writes nothing to the Course itself.
  */
 import { and, asc, desc, eq, inArray, max } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import type { Db } from "./index";
 import {
   changeOperations,
   changePlans,
   completions,
+  courseSpecs,
   courses,
   generationRuns,
   lessons,
@@ -35,6 +37,8 @@ import type { ChangePlanOp } from "@/lib/course/change-plan";
 import { applyOutlineChange } from "./outline";
 import type { LessonAdjustment, OutlineData } from "@/lib/course/types";
 import { currentRevision, resetGenerationRun } from "./review";
+import { recomputeCourseCompletion } from "./completion";
+import { outlineApprovalProblems } from "@/lib/course/structure";
 
 export type TailorTurnRow = {
   id: string;
@@ -218,8 +222,11 @@ export async function createChangePlan(
     return { ok: false, reason: "invalid", message: "This Course has no Outline yet." };
   }
 
+  const normalized = ops.map((op) =>
+    op.kind === "addModule" && !op.moduleId ? { ...op, moduleId: nanoid() } : op,
+  );
   try {
-    validatePlanOps(outline.data, ops);
+    validatePlanOps(outline.data, normalized);
   } catch (error) {
     if (error instanceof StructureError) {
       return { ok: false, reason: "invalid", message: error.message };
@@ -245,7 +252,7 @@ export async function createChangePlan(
       })
       .returning();
     await tx.insert(changeOperations).values(
-      ops.map((op, position) => ({
+        normalized.map((op, position) => ({
         planId: row.id,
         position,
         kind: op.kind,
@@ -609,6 +616,18 @@ export async function planContentAdjustments(
   return [...byLesson.values()];
 }
 
+/** Any accepted structural operation changes the Course shape or sequence. */
+export async function planHasStructuralChanges(db: Db, planId: string): Promise<boolean> {
+  const operations = await db
+    .select({ payload: changeOperations.payload, status: changeOperations.status })
+    .from(changeOperations)
+    .where(eq(changeOperations.planId, planId));
+  return operations.some(
+    (operation) =>
+      operation.status === "accepted" && isStructureOp(operation.payload as ChangePlanOp),
+  );
+}
+
 export type StageRevisionResult =
   | {
       ok: true;
@@ -750,6 +769,10 @@ export async function stagePlanRevision(
       }
       throw error;
     }
+    const problems = outlineApprovalProblems(nextData);
+    if (problems.length > 0) {
+      return { ok: false, reason: "invalid", message: problems.join(" ") };
+    }
 
     /* The affected sets, from the Outline the plan was drawn against and
        the staged one. New ids (added Lessons, split halves) and Lessons
@@ -761,6 +784,24 @@ export async function stagePlanRevision(
       courseId,
       version: stagedVersion,
       data: nextData,
+    });
+    const [baseSpec] = await tx
+      .select()
+      .from(courseSpecs)
+      .where(
+        and(
+          eq(courseSpecs.courseId, courseId),
+          eq(courseSpecs.outlineVersion, baseOutline.version),
+        ),
+      )
+      .limit(1);
+    if (!baseSpec) {
+      return { ok: false, reason: "invalid", message: "The published Course specification is gone." };
+    }
+    await tx.insert(courseSpecs).values({
+      courseId,
+      outlineVersion: stagedVersion,
+      spec: baseSpec.spec,
     });
 
     /* Copy the untouched Lessons into the staged version. The workflow's
@@ -813,6 +854,8 @@ export async function stagePlanRevision(
       for (const l of m.lessons)
         if (!baseOutline.data.modules.some((bm) => bm.lessons.some((bl) => bl.id === l.id)))
           touched.lessons.push(l.id);
+    for (const m of nextData.modules)
+      if (!baseOutline.data.modules.some((base) => base.id === m.id)) touched.modules.push(m.id);
 
     await tx
       .update(changePlans)
@@ -1047,6 +1090,7 @@ export async function markRevisionPublished(
           ),
         );
     }
+    await recomputeCourseCompletion(tx, plan.courseId);
   });
 }
 
@@ -1294,6 +1338,8 @@ export async function undoPlanRevision(
       .update(changePlans)
       .set({ status: "undone", updatedAt: new Date() })
       .where(eq(changePlans.id, planId));
+
+    await recomputeCourseCompletion(tx, courseId);
 
     return { ok: true, revisionNumber: nextNumber, restoredLessons };
   });

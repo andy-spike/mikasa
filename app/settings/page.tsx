@@ -10,7 +10,7 @@ export default async function SettingsPage() {
 
   return (
     <AppShell section="Settings">
-      <SettingsView name={user.name} email={user.email} courseCount={owned.length} />
+      <SettingsView email={user.email} courseCount={owned.length} />
     </AppShell>
   );
 }
