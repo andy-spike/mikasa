@@ -24,17 +24,25 @@ export type AuthConfig = {
   trustedOrigins?: string[];
 };
 
-export function createAuth(db: AuthDb, config: AuthConfig = {}) {
-  const baseURL = config.baseURL ?? process.env.BETTER_AUTH_URL;
-  const secret = config.secret ?? process.env.BETTER_AUTH_SECRET;
+/**
+ * The names-only auth configuration check (bug 15): throws naming every
+ * missing variable, never printing a value. The instrumentation hook
+ * calls it at server boot so a misconfigured deployment refuses to
+ * start, instead of failing on the first request that needs auth;
+ * `createAuth` calls it as a backstop with its overrides applied.
+ */
+export function assertAuthConfig(
+  overrides: Pick<AuthConfig, "baseURL" | "secret" | "google"> = {},
+  env: Record<string, string | undefined> = process.env,
+): void {
+  const baseURL = overrides.baseURL ?? env.BETTER_AUTH_URL;
+  const secret = overrides.secret ?? env.BETTER_AUTH_SECRET;
   const google =
-    config.google === false
+    overrides.google === false
       ? undefined
       : {
-          clientId:
-            config.google?.clientId ?? process.env.GOOGLE_CLIENT_ID ?? "",
-          clientSecret:
-            config.google?.clientSecret ?? process.env.GOOGLE_CLIENT_SECRET ?? "",
+          clientId: overrides.google?.clientId ?? env.GOOGLE_CLIENT_ID ?? "",
+          clientSecret: overrides.google?.clientSecret ?? env.GOOGLE_CLIENT_SECRET ?? "",
         };
   const missing = [
     !baseURL && "BETTER_AUTH_URL",
@@ -45,6 +53,19 @@ export function createAuth(db: AuthDb, config: AuthConfig = {}) {
   if (missing.length) {
     throw new Error(`Missing required auth configuration: ${missing.join(", ")}`);
   }
+}
+
+export function createAuth(db: AuthDb, config: AuthConfig = {}) {
+  assertAuthConfig(config);
+  const baseURL = config.baseURL ?? process.env.BETTER_AUTH_URL;
+  const secret = config.secret ?? process.env.BETTER_AUTH_SECRET;
+  const google =
+    config.google === false
+      ? undefined
+      : {
+          clientId: config.google?.clientId ?? process.env.GOOGLE_CLIENT_ID ?? "",
+          clientSecret: config.google?.clientSecret ?? process.env.GOOGLE_CLIENT_SECRET ?? "",
+        };
 
   const options: BetterAuthOptions = {
     baseURL,

@@ -20,7 +20,7 @@ Every worker implementing a Mikasa ticket follows these rules. They exist so tic
 - Vercel Workflow for durable Course work (design, generation, review, correction, approved post-ready changes). Tutor and Tailor conversations stream directly and never use Workflow.
 - Vercel Sandbox for coding Topic verification.
 
-Secrets live in `.env.local` and are already present (GOOGLE_CLIENT_ID/SECRET, BETTER_AUTH_*, DATABASE_URL, OPENROUTER_API_KEY, FIRECRAWL_API_KEY, OAUTH_PROXY_SECRET, NEON_PROJECT_ID). Never print, commit, or copy secret values. Read them only through `process.env`.
+Secrets live in `.env.local` and are already present (GOOGLE_CLIENT_ID/SECRET, BETTER_AUTH_*, DATABASE_URL, OPENROUTER_API_KEY, FIRECRAWL_API_KEY, NEON_PROJECT_ID). Never print, commit, or copy secret values. Read them only through `process.env`. A missing auth variable fails at startup: `instrumentation.ts` runs `assertAuthConfig` when the server boots.
 
 ## Code layout
 
