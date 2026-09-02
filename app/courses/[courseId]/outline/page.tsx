@@ -26,7 +26,7 @@ export default async function OutlinePage({
   const { courseId } = await params;
   const course = await findOwnedCourse(db, user.id, courseId);
   if (!course) notFound();
-  if (course.status === "ready" || course.status === "reading") {
+  if (course.status === "ready") {
     redirect(`/courses/${courseId}`);
   }
 

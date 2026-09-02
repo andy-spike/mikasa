@@ -7,7 +7,7 @@
  * Lesson's prose or Exercise.
  */
 import { z } from "zod";
-import { applyOutlineOps, renumberOutline, StructureError } from "./structure";
+import { applyOutlineOps, outlineApprovalProblems, renumberOutline, StructureError } from "./structure";
 import type { OutlineOp } from "./structure";
 import type { OutlineData, OutlineLesson, OutlineModule } from "./types";
 
@@ -68,9 +68,12 @@ export function isStructureOp(op: ChangePlanOp): op is OutlineOp {
 /**
  * Whether a plan would actually take: structure operations are applied to
  * a throwaway copy of the Outline in order (the manual editor's own
- * grammar, so the same refusals apply), and a content change needs its
- * Lesson to still exist once the structure operations before it have run.
- * Throws `StructureError` on the first operation that does not fit.
+ * grammar, so the same refusals apply), a content change needs its
+ * Lesson to still exist once the structure operations before it have
+ * run, and the resulting shape must still be approvable — a plan that
+ * adds a lessons-less Module is refused here, when the Tailor proposes
+ * it, not after the Learner accepts it (bug 5's front door). Throws
+ * `StructureError` on the first operation that does not fit.
  */
 export function validatePlanOps(data: OutlineData, ops: ChangePlanOp[]): void {
   let current = data;
@@ -95,6 +98,11 @@ export function validatePlanOps(data: OutlineData, ops: ChangePlanOp[]): void {
     }
   }
   flush();
+
+  const problems = outlineApprovalProblems(current);
+  if (problems.length > 0) {
+    throw new StructureError(problems.join(" "));
+  }
 }
 
 /** The verb the pane's label row reads. */

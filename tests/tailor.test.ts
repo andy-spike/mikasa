@@ -512,4 +512,19 @@ describe("validatePlanOps", () => {
       ]),
     ).toThrow();
   });
+
+  it("refuses a Module without Lessons when the plan is proposed", () => {
+    /* An empty Module would sail through staging only to block
+       publication (bug 5); the front door refuses it. */
+    expect(() =>
+      validatePlanOps(OUTLINE, [{ kind: "addModule", moduleId: "m2", title: "Module two" }]),
+    ).toThrow(/no Lessons/);
+
+    expect(() =>
+      validatePlanOps(OUTLINE, [
+        { kind: "addModule", moduleId: "m2", title: "Module two" },
+        { kind: "addLesson", moduleId: "m2", title: "Lesson three", summary: "Third." },
+      ]),
+    ).not.toThrow();
+  });
 });

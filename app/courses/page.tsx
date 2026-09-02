@@ -9,17 +9,20 @@ import { requireLearner } from "@/lib/session";
 
 /**
  * The one fact a library row adds: where the Course is in its life. A
- * ready Course is read in the workspace; everything before that happens on
+ * Course with a published revision reads in the workspace, whatever the
+ * status string says — the list is the one screen that must never hide a
+ * readable Course (bug 1's defensive guard); everything else happens on
  * the Outline — designing, failed, or waiting for approval.
  */
 function rowFor(course: {
   id: string;
   status: string;
+  published: boolean;
 }): { href: string; label: string; reading: boolean } {
-  if (course.status === "ready" || course.status === "reading") {
-    return { href: `/courses/${course.id}`, label: "—", reading: true };
+  if (course.published || course.status === "ready") {
+    return { href: `/courses/${course.id}`, label: "", reading: true };
   }
-  if (course.status === "awaiting-outline-approval" || course.status === "outline") {
+  if (course.status === "awaiting-outline-approval") {
     return { href: `/courses/${course.id}/outline`, label: "Outline", reading: false };
   }
   if (course.status === "designing") {
@@ -91,9 +94,12 @@ export default async function CoursesPage() {
                     </span>
 
                     {/* A published Course shows Completion; earlier Course work
-                        keeps its lifecycle text. */}
+                        keeps its lifecycle text. A published Course always
+                        has a revision, so the label never shows here. */}
                     <span className="tnum shrink-0 text-[0.8125rem] text-fg-3">
-                      {reading && c.completion ? `${c.completion.done}/${c.completion.total}` : label}
+                      {reading && c.completion
+                        ? `${c.completion.done} / ${c.completion.total}`
+                        : label}
                     </span>
                   </Link>
                 </li>
