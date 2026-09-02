@@ -806,19 +806,35 @@ export async function stagePlanRevision(
 
     /* Copy the untouched Lessons into the staged version. The workflow's
        resume machinery then sees them as written and regenerates only
-       the affected ones. */
+       the affected ones. A plan staged after a discarded staged revision
+       (bug 10) draws against a base version whose regenerated Lessons
+       were never written; their content comes from the published
+       revision instead. */
     const rows = await tx
       .select()
       .from(lessons)
       .where(and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, baseOutline.version)));
     const byRef = new Map(rows.map((r) => [r.lessonRef, r]));
+    const publishedRows =
+      revision && revision.outlineVersion !== baseOutline.version
+        ? await tx
+            .select()
+            .from(lessons)
+            .where(
+              and(
+                eq(lessons.courseId, courseId),
+                eq(lessons.outlineVersion, revision.outlineVersion),
+              ),
+            )
+        : [];
+    const publishedByRef = new Map(publishedRows.map((r) => [r.lessonRef, r]));
     const copies: (typeof lessons.$inferInsert)[] = [];
     const newTitles = new Map<string, string>();
     for (const m of nextData.modules)
       for (const l of m.lessons) newTitles.set(l.id, l.title);
     for (const [id, title] of newTitles) {
       if (affected.regenerate.includes(id)) continue;
-      const row = byRef.get(id);
+      const row = byRef.get(id) ?? publishedByRef.get(id);
       if (!row) {
         return {
           ok: false,
@@ -1016,6 +1032,89 @@ export async function resumeStagedRevision(
     regenerateLessonRefs: affected.regenerate,
     embedLessonRefs: affected.embed,
   };
+}
+
+export type DiscardStagedRevision =
+  | { ok: true }
+  | { ok: false; reason: "not-found" | "not-discardable"; message: string };
+
+/**
+ * Gives up on a staged revision (bug 10): a plan whose run failed — or
+ * crashed between publication and the plan mark — can be discarded, so
+ * the Tailor can propose a fresh one. Only the plan moves, to
+ * superseded, the terminal status for dead plans. The published Course,
+ * the staged Outline rows, and the run stay exactly as they are:
+ * versions are append-only, and an unread version harms nothing.
+ */
+export async function discardStagedRevision(
+  db: Db,
+  ownerId: string,
+  courseId: string,
+  planId: string,
+): Promise<DiscardStagedRevision> {
+  const [course] = await db
+    .select({ id: courses.id })
+    .from(courses)
+    .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
+    .limit(1);
+  if (!course) return { ok: false, reason: "not-found", message: "Course not found." };
+
+  const plan = await findPlan(db, ownerId, planId);
+  if (!plan) return { ok: false, reason: "not-found", message: "Plan not found." };
+  if (plan.status !== "staged" || !plan.stagedOutlineVersion) {
+    return {
+      ok: false,
+      reason: "not-discardable",
+      message: "This plan has no staged revision to discard.",
+    };
+  }
+
+  /* The run must have settled: failed, or succeeded without publishing
+     the staged version (the crash-between-publish-and-mark edge). While
+     work is still going, the Learner waits or retries — a discard could
+     kill a revision about to publish. */
+  const [run] = await db
+    .select({ status: generationRuns.status })
+    .from(generationRuns)
+    .where(
+      and(
+        eq(generationRuns.courseId, courseId),
+        eq(generationRuns.outlineVersion, plan.stagedOutlineVersion),
+      ),
+    )
+    .limit(1);
+  if (run && run.status !== "failed" && run.status !== "succeeded") {
+    return {
+      ok: false,
+      reason: "not-discardable",
+      message: "The revision is still being prepared. Wait for it to settle.",
+    };
+  }
+  if (run?.status === "succeeded") {
+    const [published] = await db
+      .select({ id: revisions.id })
+      .from(revisions)
+      .where(
+        and(
+          eq(revisions.courseId, courseId),
+          eq(revisions.outlineVersion, plan.stagedOutlineVersion),
+        ),
+      )
+      .limit(1);
+    if (published) {
+      return {
+        ok: false,
+        reason: "not-discardable",
+        message: "This revision has already published.",
+      };
+    }
+  }
+
+  await db
+    .update(changePlans)
+    .set({ status: "superseded", updatedAt: new Date() })
+    .where(eq(changePlans.id, planId));
+  return { ok: true };
 }
 
 /**
@@ -1258,13 +1357,29 @@ export async function undoPlanRevision(
 
     /* Content: everything the plan regenerated or removed comes back
        from the base revision; every other Lesson keeps the content the
-       current revision has. */
+       current revision has. The base REVISION's version is the faithful
+       source: a plan drawn after a discarded staged revision (bug 10)
+       has a base Outline version whose regenerated Lessons were never
+       written. */
     const restored = new Set([...(plan.regeneratedLessons ?? []), ...plan.touchedLessons]);
+    const [baseRevisionRow] = await tx
+      .select({ outlineVersion: revisions.outlineVersion })
+      .from(revisions)
+      .where(
+        and(
+          eq(revisions.courseId, courseId),
+          eq(revisions.revisionNumber, plan.baseRevisionNumber!),
+        ),
+      )
+      .limit(1);
     const baseRows = await tx
       .select()
       .from(lessons)
       .where(
-        and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, baseOutline.version)),
+        and(
+          eq(lessons.courseId, courseId),
+          eq(lessons.outlineVersion, baseRevisionRow?.outlineVersion ?? baseOutline.version),
+        ),
       );
     const currentRows = await tx
       .select()

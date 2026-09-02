@@ -14,6 +14,7 @@ import { requireLearner } from "@/lib/session";
 import { courses, generationRuns } from "@/lib/db/schema";
 import {
   applyPlanToOutline,
+  discardStagedRevision,
   findProposedPlan,
   findStagedPlan,
   listPlansWithOperations,
@@ -316,4 +317,25 @@ export async function retryPlanRevisionAction(
       message: "The generation engine could not start this retry. Try again.",
     };
   }
+}
+
+/**
+ * Gives up on a staged revision that keeps failing (bug 10): the plan is
+ * superseded and the Tailor can propose a fresh one. The published
+ * Course and the current revision are untouched.
+ */
+export type DiscardStagedRevisionResult =
+  | { ok: true }
+  | { ok: false; reason: "invalid" | "not-found" | "not-discardable"; message?: string };
+
+export async function discardStagedRevisionAction(
+  courseId: string,
+  planId: string,
+): Promise<DiscardStagedRevisionResult> {
+  const { user } = await requireLearner();
+  const parsed = planSchema.safeParse({ courseId, planId });
+  if (!parsed.success) {
+    return { ok: false, reason: "invalid", message: "That discard does not fit the plan." };
+  }
+  return discardStagedRevision(db, user.id, courseId, parsed.data.planId);
 }

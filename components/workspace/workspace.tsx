@@ -15,6 +15,7 @@ import {
   findStagedPlanAction,
   reviewTailorOperationAction,
   retryPlanRevisionAction,
+  discardStagedRevisionAction,
   stagePlanRevisionAction,
   undoPlanRevisionAction,
   type PublishedPlanRow,
@@ -326,6 +327,21 @@ export function Workspace({
         router.refresh();
       }
       setPublished(await listPublishedPlansAction(course.id));
+    });
+  }
+
+  /* A failed staged revision can be given up on (bug 10): the plan is
+     superseded, the staged view clears, and the Tailor can propose a
+     fresh plan. Nothing published changes. */
+  function discardStaged() {
+    if (!stagedRevision) return;
+    startStaging(async () => {
+      const result = await discardStagedRevisionAction(course.id, stagedRevision.plan.id);
+      if (result.ok) {
+        setStaged(false);
+        setStagedRevision(null);
+        router.refresh();
+      }
     });
   }
 
@@ -654,17 +670,26 @@ export function Workspace({
                 Stage as a new revision
               </Button>
             ) : stagedRevision?.failed ? (
-              <Button
-                onClick={() =>
-                  startStaging(async () => {
-                    const result = await retryPlanRevisionAction(course.id, stagedRevision.plan.id);
-                    if (result.ok) setStagedRevision(await findStagedPlanAction(course.id));
-                  })
-                }
-                className="w-full"
-              >
-                Retry the revision
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() =>
+                    startStaging(async () => {
+                      const result = await retryPlanRevisionAction(course.id, stagedRevision.plan.id);
+                      if (result.ok) setStagedRevision(await findStagedPlanAction(course.id));
+                    })
+                  }
+                  className="min-w-0 flex-1"
+                >
+                  Retry the revision
+                </Button>
+                <Button
+                  variant="quiet"
+                  onClick={discardStaged}
+                  className="shrink-0"
+                >
+                  Discard
+                </Button>
+              </div>
             ) : null
           }
           resizer={
