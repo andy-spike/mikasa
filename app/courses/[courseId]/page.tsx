@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { findOwnedCourse } from "@/lib/db/courses";
 import { findOwnedPublishedCourse } from "@/lib/db/review";
 import { listCompletions } from "@/lib/db/completion";
+import { searchIsIncomplete } from "@/lib/db/fragments";
 import { loadTutorHistory } from "@/lib/db/tutor";
 import { loadTailorHistory } from "@/lib/db/tailor";
 import { markLessonDoneAction, markLessonUndoneAction } from "@/lib/actions/completion";
@@ -53,6 +54,11 @@ export default async function CoursePage({ params }: PageProps<"/courses/[course
   }));
   const proposedPlan = await findProposedPlanAction(courseId);
 
+  /* The Tutor's search index can lag the published Course (bug 9): an
+     embedding failure, or an undo whose re-embed has not finished. The
+     pane then offers the rebuild. */
+  const searchStale = await searchIsIncomplete(db, courseId);
+
   return (
     <Workspace
       course={reading}
@@ -63,6 +69,7 @@ export default async function CoursePage({ params }: PageProps<"/courses/[course
       tailorTurns={tailorTurns}
       tailorPlan={proposedPlan}
       stagedPlan={await findStagedPlanAction(courseId)}
+      searchStale={searchStale}
       onRefreshPlan={findProposedPlanAction.bind(null, courseId)}
     />
   );

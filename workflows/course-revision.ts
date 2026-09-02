@@ -390,7 +390,9 @@ async function stepPublish(
 /**
  * Re-embeds exactly the affected Lessons (ticket #14): regenerated and
  * retitled Lessons get fresh fragments, removed Lessons' fragments are
- * deleted, and every other Lesson's fragments stay as they are.
+ * deleted, and every other Lesson's fragments stay as they are. An
+ * embedding failure is recorded on the run alone (bug 9): the revision
+ * stays published and the repair workflow can finish the job later.
  */
 async function stepEmbedAffected(
   courseId: string,
@@ -399,18 +401,21 @@ async function stepEmbedAffected(
   runId: string,
 ): Promise<void> {
   "use step";
-  if (embedLessonRefs.length === 0) return;
   const { db } = await import("@/lib/db");
   const { embedLessonFragments } = await import("@/lib/course/fragments");
   const { embedTexts } = await import("@/lib/model");
+  const { generationRuns } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
   try {
     await embedLessonFragments(db, embedTexts, courseId, outlineVersion, embedLessonRefs);
-  } catch (error) {
-    const { generationRuns } = await import("@/lib/db/schema");
-    const { eq } = await import("drizzle-orm");
     await db
       .update(generationRuns)
-      .set({ currentStep: `fragments-failed: ${errorMessage(error)}`, updatedAt: new Date() })
+      .set({ fragmentsStatus: "done", fragmentsError: null, updatedAt: new Date() })
+      .where(eq(generationRuns.id, runId));
+  } catch (error) {
+    await db
+      .update(generationRuns)
+      .set({ fragmentsStatus: "failed", fragmentsError: errorMessage(error), updatedAt: new Date() })
       .where(eq(generationRuns.id, runId));
   }
 }

@@ -17,7 +17,8 @@ import {
 import {
   failGenerationRun,
   latestGenerationRun,} from "@/lib/db/outline";
-import { resetGenerationRun } from "@/lib/db/review";
+import { resetGenerationRun, currentRevision } from "@/lib/db/review";
+import { searchIsIncomplete } from "@/lib/db/fragments";
 import { findOwnedCourse } from "@/lib/db/courses";
 import { requireLearner } from "@/lib/session";
 import {
@@ -27,6 +28,7 @@ import {
 } from "@/lib/course/limits";
 import { designCourseWorkflow } from "@/workflows/course-design";
 import { generateCourseWorkflow } from "@/workflows/course-generation";
+import { repairFragmentsWorkflow } from "@/workflows/repair-fragments";
 
 export type CreateCourseResult =
   | { ok: true; courseId: string }
@@ -149,4 +151,40 @@ export async function retryCourseAction(courseId: string): Promise<RetryResult> 
     );
     return { ok: false, errors: { form: "The design engine could not start this retry. Try again." } };
   }
+}
+
+/**
+ * Rebuilds the current revision's Tutor search index (bug 9). The
+ * published Course is never touched: the durable repair re-embeds the
+ * revision's fragments and records the outcome on the run.
+ */
+export type RebuildFragmentsResult = { ok: boolean; message?: string };
+
+export async function rebuildFragmentsAction(courseId: string): Promise<RebuildFragmentsResult> {
+  const { user } = await requireLearner();
+  const course = await findOwnedCourse(db, user.id, courseId);
+  if (!course) return { ok: false, message: "Course not found." };
+
+  const revision = await currentRevision(db, courseId);
+  if (!revision) {
+    return { ok: false, message: "This Course has no published revision yet." };
+  }
+
+  try {
+    await start(repairFragmentsWorkflow, [courseId, revision.outlineVersion]);
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "The rebuild could not start. Try again." };
+  }
+}
+
+/**
+ * Whether the current revision's Tutor search is out of date (bug 9).
+ * The Workspace's rebuild strip polls this while a repair is running.
+ */
+export async function searchIsIncompleteAction(courseId: string): Promise<boolean> {
+  const { user } = await requireLearner();
+  const course = await findOwnedCourse(db, user.id, courseId);
+  if (!course) return false;
+  return searchIsIncomplete(db, courseId);
 }

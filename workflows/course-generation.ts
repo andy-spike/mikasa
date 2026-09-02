@@ -324,7 +324,9 @@ async function stepPublish(
 /**
  * Embeds the published Lessons' fragments (ticket #11), so the Tutor's
  * Course search answers from exactly what was just published. Runs after
- * the revision exists; re-running replaces the fragments wholesale.
+ * the revision exists; re-running replaces the fragments wholesale. An
+ * embedding failure is recorded on the run alone (bug 9): the Course
+ * stays ready and the repair workflow can finish the job later.
  */
 async function stepEmbedFragments(
   courseId: string,
@@ -339,10 +341,14 @@ async function stepEmbedFragments(
   const { eq } = await import("drizzle-orm");
   try {
     await embedCourseFragments(db, embedTexts, courseId, outlineVersion);
+    await db
+      .update(generationRuns)
+      .set({ fragmentsStatus: "done", fragmentsError: null, updatedAt: new Date() })
+      .where(eq(generationRuns.id, runId));
   } catch (error) {
     await db
       .update(generationRuns)
-      .set({ currentStep: `fragments-failed: ${errorMessage(error)}`, updatedAt: new Date() })
+      .set({ fragmentsStatus: "failed", fragmentsError: errorMessage(error), updatedAt: new Date() })
       .where(eq(generationRuns.id, runId));
   }
 }

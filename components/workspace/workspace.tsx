@@ -20,6 +20,10 @@ import {
   type PublishedPlanRow,
   type StagedPlanView,
 } from "@/lib/actions/tailor";
+import {
+  rebuildFragmentsAction,
+  searchIsIncompleteAction,
+} from "@/lib/actions/courses";
 import type { PlanView, Turn } from "./panel";
 import { Outline, type ModuleView } from "./outline";
 import { LessonPane } from "./lesson";
@@ -56,6 +60,8 @@ type Props = {
   tailorPlan?: PlanView | null;
   /** The one staged Course revision, if the Tailor has one. */
   stagedPlan?: StagedPlanView | null;
+  /** Whether the Tutor's search index lags the published Course (bug 9). */
+  searchStale?: boolean;
   /** The plan as the server has it now, after a turn may have proposed one. */
   onRefreshPlan: () => Promise<PlanView | null>;
 };
@@ -69,6 +75,7 @@ export function Workspace({
   tailorTurns,
   tailorPlan,
   stagedPlan,
+  searchStale,
   onRefreshPlan,
 }: Props) {
   const [doneAt, setDoneAt] = useState<Record<string, string>>(() => {
@@ -257,6 +264,43 @@ export function Workspace({
     setStagedRevision(stagedPlan);
   }
   const [, startStaging] = useTransition();
+
+  /* The Tutor's search index (bug 9): the server's staleness verdict,
+     locally amended while a rebuild runs. The strip clears itself when
+     the repair's re-embed lands. */
+  const [searchStaleNow, setSearchStaleNow] = useState(searchStale ?? false);
+  const [restoredStale, setRestoredStale] = useState(searchStale);
+  if (searchStale !== restoredStale) {
+    setRestoredStale(searchStale);
+    setSearchStaleNow(searchStale ?? false);
+  }
+  const [rebuilding, setRebuilding] = useState(false);
+
+  function rebuildSearch() {
+    startStaging(async () => {
+      const result = await rebuildFragmentsAction(course.id);
+      if (result.ok) {
+        setRebuilding(true);
+        router.refresh();
+      }
+    });
+  }
+
+  useEffect(() => {
+    if (!rebuilding) return;
+    const timer = setInterval(async () => {
+      try {
+        if (!(await searchIsIncompleteAction(course.id))) {
+          setRebuilding(false);
+          setSearchStaleNow(false);
+          router.refresh();
+        }
+      } catch {
+        /* A failed poll changes nothing; the next one re-checks. */
+      }
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [rebuilding, course.id, router]);
 
   /* The published changes, with their undo availability (#15). */
   const [published, setPublished] = useState<PublishedPlanRow[]>([]);
@@ -539,6 +583,23 @@ export function Workspace({
           onDiscard={(id) => reviewOperation(id, "discarded")}
           onRestore={(id) => reviewOperation(id, "proposed")}
           tailorStatus={tailorStatus ?? undefined}
+          tutorNotice={
+            searchStaleNow ? (
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-hair px-3.5 py-2">
+                <p className="text-[0.75rem] leading-[1.5] text-fg-3">
+                  Course search is out of date.
+                </p>
+                <Button
+                  variant="quiet"
+                  onClick={rebuildSearch}
+                  disabled={rebuilding}
+                  className="shrink-0"
+                >
+                  Rebuild
+                </Button>
+              </div>
+            ) : null
+          }
           publishedSlot={
             published.length > 0 ? (
               <div className="mt-5">

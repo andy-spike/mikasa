@@ -10,7 +10,8 @@ import "server-only";
  */
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "./index";
-import { lessonFragments } from "./schema";
+import { generationRuns, lessonFragments, outlines } from "./schema";
+import { currentRevision } from "./review";
 
 /** One searchable fragment, before it is embedded. */
 export type FragmentInput = {
@@ -132,4 +133,44 @@ export async function listFragments(
     .from(lessonFragments)
     .where(eq(lessonFragments.courseId, courseId))
     .orderBy(asc(lessonFragments.ordinal));
+}
+
+/**
+ * Whether the current revision's Tutor search is out of date (bug 9):
+ * the revision's run recorded an embedding failure, or a Lesson of the
+ * current revision has no fragments at all (an undo's version, or an
+ * interrupted repair). The reading page uses this to offer the rebuild.
+ */
+export async function searchIsIncomplete(db: Db, courseId: string): Promise<boolean> {
+  const revision = await currentRevision(db, courseId);
+  if (!revision) return false;
+
+  const [run] = await db
+    .select({ fragmentsStatus: generationRuns.fragmentsStatus })
+    .from(generationRuns)
+    .where(
+      and(
+        eq(generationRuns.courseId, courseId),
+        eq(generationRuns.outlineVersion, revision.outlineVersion),
+      ),
+    )
+    .limit(1);
+  if (run?.fragmentsStatus === "failed") return true;
+
+  const [outline] = await db
+    .select({ data: outlines.data })
+    .from(outlines)
+    .where(
+      and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)),
+    )
+    .limit(1);
+  if (!outline) return false;
+  const refs = outline.data.modules.flatMap((m) => m.lessons.map((l) => l.id));
+  if (refs.length === 0) return false;
+  const rows = await db
+    .selectDistinct({ lessonRef: lessonFragments.lessonRef })
+    .from(lessonFragments)
+    .where(eq(lessonFragments.courseId, courseId));
+  const have = new Set(rows.map((r) => r.lessonRef));
+  return refs.some((ref) => !have.has(ref));
 }

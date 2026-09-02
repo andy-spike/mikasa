@@ -1095,7 +1095,15 @@ export async function markRevisionPublished(
 }
 
 export type UndoResult =
-  | { ok: true; revisionNumber: number; restoredLessons: string[] }
+  | {
+      ok: true;
+      revisionNumber: number;
+      /** The Outline version the undo wrote (the new current revision's). */
+      outlineVersion: number;
+      restoredLessons: string[];
+      /** Lessons the undo removed from the Course, whose fragments must go. */
+      removedLessons: string[];
+    }
   | {
       ok: false;
       reason:
@@ -1273,6 +1281,15 @@ export async function undoPlanRevision(
     const undoVersion = currentOutline.version + 1;
     await tx.insert(outlines).values({ courseId, version: undoVersion, data: inverted });
 
+    /* Lessons the undo removes (an added Lesson leaving): their fragments
+       must be deleted, not just left behind. */
+    const undoRefs = new Set(
+      inverted.modules.flatMap((m) => m.lessons.map((l) => l.id)),
+    );
+    const removedLessons = [...currentByRef.values()]
+      .map((r) => r.lessonRef)
+      .filter((ref) => !undoRefs.has(ref));
+
     const restoredLessons: string[] = [];
     const rows: (typeof lessons.$inferInsert)[] = [];
     for (const m of inverted.modules) {
@@ -1341,6 +1358,12 @@ export async function undoPlanRevision(
 
     await recomputeCourseCompletion(tx, courseId);
 
-    return { ok: true, revisionNumber: nextNumber, restoredLessons };
+    return {
+      ok: true,
+      revisionNumber: nextNumber,
+      outlineVersion: undoVersion,
+      restoredLessons,
+      removedLessons,
+    };
   });
 }

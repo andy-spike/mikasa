@@ -281,6 +281,30 @@ export async function failGenerationRun(
   });
 }
 
+/**
+ * Records the Tutor search index's state for a run's revision (bug 9).
+ * The published Course and the run's own status are never touched: an
+ * embedding failure is repairable, not fatal. A version without a run
+ * (an undo's) has nowhere to record it, and that is fine — the missing
+ * rows themselves are what the reading page's check looks for.
+ */
+export async function recordFragmentsStatus(
+  db: Db,
+  courseId: string,
+  outlineVersion: number,
+  status: "done" | "failed",
+  error?: string,
+): Promise<void> {
+  await db
+    .update(generationRuns)
+    .set({
+      fragmentsStatus: status,
+      fragmentsError: status === "failed" ? (error ?? "The embedding failed.") : null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(generationRuns.courseId, courseId), eq(generationRuns.outlineVersion, outlineVersion)));
+}
+
 export type ApprovalContext = {
   course: Course;
   outline: Outline;

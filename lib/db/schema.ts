@@ -169,6 +169,14 @@ export const generationRuns = pgTable(
     workflowRunId: text("workflow_run_id"),
     /** The step the run is currently in, e.g. "lessons". */
     currentStep: text("current_step").notNull().default("queued"),
+    /**
+     * The Tutor search index's state for this run's revision:
+     * "pending" | "done" | "failed". A failure never invalidates the
+     * published Course; it is recorded here and repaired separately.
+     */
+    fragmentsStatus: text("fragments_status").notNull().default("pending"),
+    /** Why the fragment embedding failed; null while pending or done. */
+    fragmentsError: text("fragments_error"),
     /** Why the run failed; null while it is running or succeeded. */
     error: text("error"),
     startedAt: timestamp("started_at").notNull().defaultNow(),

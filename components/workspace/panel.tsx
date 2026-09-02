@@ -42,6 +42,8 @@ type Props = {
   tailorApply?: ReactNode;
   /** One line of pane-level status, e.g. that a revision is staging. */
   tailorStatus?: string;
+  /** A fixed strip above the Tutor's thread (bug 9): the stale-search notice. */
+  tutorNotice?: ReactNode;
   /** The published changes and their undo affordances (#15). */
   publishedSlot?: ReactNode;
   onMode: (mode: PanelMode) => void;
@@ -62,6 +64,7 @@ export function Panel({
   onRestore,
   tailorApply,
   tailorStatus,
+  tutorNotice,
   publishedSlot,
   onMode,
   onClose,
@@ -102,15 +105,18 @@ export function Panel({
 
       <SidebarContent className="gap-0 overflow-hidden">
         {mode === "tutor" ? (
-          <Conversation
-            turns={tutorTurns ?? []}
-            onAsk={onAsk}
-            placeholder="Ask about this Lesson"
-            composerLabel="Ask the Tutor about this Lesson"
-            sendLabel="Ask the Tutor"
-            pendingText="Working on an answer…"
-            failedText="The Tutor could not answer just now — ask again."
-          />
+          <>
+            {tutorNotice}
+            <Conversation
+              turns={tutorTurns ?? []}
+              onAsk={onAsk}
+              placeholder="Ask about this Lesson"
+              composerLabel="Ask the Tutor about this Lesson"
+              sendLabel="Ask the Tutor"
+              pendingText="Working on an answer…"
+              failedText="The Tutor could not answer just now — ask again."
+            />
+          </>
         ) : (
           <TailorConversation
             turns={tailorTurns ?? []}

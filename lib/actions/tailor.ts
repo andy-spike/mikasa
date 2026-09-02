@@ -26,6 +26,7 @@ import type { ChangePlanRow } from "@/lib/db/tailor";
 import type { PlanView } from "@/components/workspace/panel";
 import { opDetail, opEntry, opVerb } from "@/lib/course/change-plan";
 import { stageRevisionWorkflow } from "@/workflows/course-revision";
+import { repairFragmentsWorkflow } from "@/workflows/repair-fragments";
 import { failGenerationRun } from "@/lib/db/outline";
 
 const statusSchema = z.object({
@@ -160,9 +161,22 @@ export async function undoPlanRevisionAction(
     return { ok: false, reason: "invalid", message: "That undo does not fit the plan." };
   }
   const result = await undoPlanRevision(db, user.id, courseId, parsed.data.planId);
-  return result.ok
-    ? { ok: true, revisionNumber: result.revisionNumber }
-    : result;
+  if (!result.ok) return result;
+
+  /* The Tutor's search index follows the undo (bug 9): restored Lessons
+     re-embed from their restored content, removed Lessons' fragments are
+     deleted. A dispatch failure changes nothing the undo changed — the
+     reading page's stale-search notice still catches the gap. */
+  try {
+    await start(repairFragmentsWorkflow, [
+      courseId,
+      result.outlineVersion,
+      [...result.restoredLessons, ...result.removedLessons],
+    ]);
+  } catch {
+    /* The undo itself landed; only the re-embed is missing. */
+  }
+  return { ok: true, revisionNumber: result.revisionNumber };
 }
 
 export type PublishedPlanRow = {
