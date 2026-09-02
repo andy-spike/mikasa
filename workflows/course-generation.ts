@@ -494,6 +494,7 @@ export async function generateCourseWorkflow(
       reviewRunId = resume.reviewRunId;
       review = { runId: reviewRunId, round: 0, findings: [] };
     } else {
+      await stepMarkStep(runId, "review");
       reviewRunId = await stepOpenReviewRun(courseId, outlineVersion);
       review = await stepReviewRound(courseId, outlineVersion, reviewRunId, 0);
     }
@@ -528,9 +529,13 @@ export async function generateCourseWorkflow(
        passed run and a retry resumes at publication, not through it. */
     await stepFinishReviewRun(reviewRunId);
 
+    await stepMarkStep(runId, "publish");
     const published = await stepPublish(courseId, outlineVersion, reviewRunId);
     if (!published.ok) {
-      await stepFailReview(courseId, reviewRunId, published.reason ?? "Publication failed.");
+      /* The review stays succeeded: a retry resumes at publication
+         instead of reviewing from round 0 (bug 2). The Course fails with
+         the run, so it stays retryable from the Courses screen. */
+      await stepFail(courseId, runId, published.reason ?? "Publication failed.");
       return { ok: false as const, reason: "publish-failed" };
     }
     await stepEmbedFragments(courseId, outlineVersion, runId);

@@ -70,7 +70,13 @@ export async function findProposedPlanAction(
   return plan ? toPlanView(plan) : null;
 }
 
-export type StagedPlanView = { plan: PlanView; failed: boolean; error: string | null };
+export type StagedPlanView = {
+  plan: PlanView;
+  failed: boolean;
+  error: string | null;
+  /** The stage the failed run was in, in Learner words ("review"). */
+  stage: string | null;
+};
 
 /** The active staged Course revision, including a failure the Learner can retry. */
 export async function findStagedPlanAction(
@@ -80,7 +86,11 @@ export async function findStagedPlanAction(
   const plan = await findStagedPlan(db, user.id, courseId);
   if (!plan?.stagedOutlineVersion) return null;
   const [run] = await db
-    .select({ status: generationRuns.status, error: generationRuns.error })
+    .select({
+      status: generationRuns.status,
+      error: generationRuns.error,
+      currentStep: generationRuns.currentStep,
+    })
     .from(generationRuns)
     .where(
       and(
@@ -94,6 +104,7 @@ export async function findStagedPlanAction(
     plan: toPlanView(plan),
     failed: run?.status === "failed",
     error: run?.status === "failed" ? run.error : null,
+    stage: run?.status === "failed" ? run.currentStep : null,
   };
 }
 

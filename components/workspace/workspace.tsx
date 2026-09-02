@@ -369,8 +369,22 @@ export function Workspace({
     }
   }
 
+  /* The failed stage, in Learner words: the line names where the
+     revision died, so a retry's promise ("keeps the finished work") is
+     legible (bug 2). */
+  const stageWords = (stage: string | null): string | null => {
+    if (!stage || stage === "queued") return null;
+    if (stage === "lessons") return "writing the Lessons";
+    if (stage.startsWith("corrections")) return "correcting the Lessons";
+    if (stage === "review") return "reviewing";
+    if (stage === "publish") return "publishing";
+    return null;
+  };
+
   const tailorStatus = stagedRevision?.failed
-    ? `The staged revision failed. ${stagedRevision.error ?? "The revision did not finish."}`
+    ? `The staged revision failed while ${
+        stageWords(stagedRevision.stage) ?? "it was being prepared"
+      }: ${stagedRevision.error ?? "The revision did not finish."}`
     : staged || stagedRevision
       ? "A revision is being prepared from your accepted changes. The Course reads as it is until it publishes."
       : null;

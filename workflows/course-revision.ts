@@ -89,7 +89,13 @@ async function stepReconcileSpec(
     .from(generationRuns)
     .where(eq(generationRuns.id, runId))
     .limit(1);
-  if (run?.currentStep === "lessons") return context;
+  /* Any step past the queue means a previous attempt got through here:
+     the specification it reconciled is the one the written Lessons were
+     generated against, and re-running it would rewrite the spec under
+     them. "queued" is the staged run's only pre-lesson value, and a
+     failure during reconciliation itself leaves it, so a retry
+     re-runs exactly the unfinished step. */
+  if (run && run.currentStep !== "queued") return context;
   if (
     !(await planHasStructuralChanges(db, planId)) &&
     !specNeedsReconciliation(context.spec, context.outline.data, adjustments)
@@ -462,6 +468,59 @@ async function stepFinishReviewRun(runId: string): Promise<void> {
 }
 
 /**
+ * Where a retry re-enters (ticket #7's rules, on a staged candidate).
+ * A revision for the staged version means the publication landed and
+ * only the bookkeeping is left; a succeeded review with no open
+ * findings goes straight back to publication; otherwise review.
+ */
+async function stepReviewResumePoint(
+  courseId: string,
+  outlineVersion: number,
+): Promise<
+  | { action: "done"; revisionNumber: number }
+  | { action: "publish"; reviewRunId: string }
+  | { action: "review" }
+> {
+  "use step";
+  const { db } = await import("@/lib/db");
+  const { revisions, reviewRuns, reviewFindings } = await import("@/lib/db/schema");
+  const { and, desc, eq } = await import("drizzle-orm");
+
+  /* The staged version already published (a crash between publication
+     and the plan mark): the candidate's work is complete. */
+  const [revision] = await db
+    .select({ revisionNumber: revisions.revisionNumber })
+    .from(revisions)
+    .where(
+      and(eq(revisions.courseId, courseId), eq(revisions.outlineVersion, outlineVersion)),
+    )
+    .limit(1);
+  if (revision) return { action: "done", revisionNumber: revision.revisionNumber };
+
+  const [review] = await db
+    .select()
+    .from(reviewRuns)
+    .where(
+      and(eq(reviewRuns.courseId, courseId), eq(reviewRuns.outlineVersion, outlineVersion)),
+    )
+    .orderBy(desc(reviewRuns.startedAt))
+    .limit(1);
+  if (review && review.status === "succeeded") {
+    const open = await db
+      .select({ id: reviewFindings.id })
+      .from(reviewFindings)
+      .where(
+        and(eq(reviewFindings.reviewRunId, review.id), eq(reviewFindings.status, "open")),
+      )
+      .limit(1);
+    if (open.length === 0) {
+      return { action: "publish", reviewRunId: review.id };
+    }
+  }
+  return { action: "review" };
+}
+
+/**
  * One durable pass over a staged revision: regenerate the affected
  * Lessons (the copied ones are already written for this version), review
  * the whole candidate's structure and the affected content, correct at
@@ -530,15 +589,33 @@ export async function stageRevisionWorkflow(
       };
     }
 
-    const reviewRunId = await stepOpenReviewRun(courseId, outlineVersion);
+    /* Review and publication, resuming at the exact failed stage: a
+       review that already passed goes straight back to publication, and
+       a publication that already landed finishes the bookkeeping. */
+    const resume = await stepReviewResumePoint(courseId, outlineVersion);
+    if (resume.action === "done") {
+      await stepEmbedAffected(courseId, outlineVersion, embedLessonRefs, runId);
+      await stepMarkPlan(planId, "published", resume.revisionNumber);
+      return { ok: true as const, revisionNumber: resume.revisionNumber };
+    }
+
     let round = 0;
-    let review = await stepReviewRound(
-      courseId,
-      outlineVersion,
-      reviewRunId,
-      round,
-      regenerateLessonRefs,
-    );
+    let reviewRunId: string;
+    let review: ReviewPayload;
+    if (resume.action === "publish") {
+      reviewRunId = resume.reviewRunId;
+      review = { runId: reviewRunId, round: 0, findings: [] };
+    } else {
+      await stepMarkStep(runId, "review");
+      reviewRunId = await stepOpenReviewRun(courseId, outlineVersion);
+      review = await stepReviewRound(
+        courseId,
+        outlineVersion,
+        reviewRunId,
+        0,
+        regenerateLessonRefs,
+      );
+    }
 
     while (review.findings.length > 0 && round < MAX_CORRECTION_ROUNDS) {
       round += 1;
@@ -574,21 +651,29 @@ export async function stageRevisionWorkflow(
     await stepFinishReviewRun(reviewRunId);
 
     /* The stale guard: a candidate drawn against revision N must never
-       replace revision N+1. */
+       replace revision N+1. The review that passed stays passed — the
+       failure belongs to the generation run, whose retry re-publishes. */
     const stillCurrent = await stepCheckStillCurrent(courseId, baseRevisionNumber);
     if (!stillCurrent.ok) {
-      await stepFailReview(
+      await stepFailRun(
         courseId,
-        reviewRunId,
+        runId,
         `The Course moved to revision ${stillCurrent.current} while this revision was being prepared. The staged changes were discarded.`,
       );
       await stepMarkPlan(planId, "failed");
       return { ok: false as const, reason: "stale-revision" };
     }
 
+    await stepMarkStep(runId, "publish");
     const published = await stepPublish(courseId, outlineVersion, reviewRunId);
     if (!published.ok) {
-      await stepFailReview(courseId, reviewRunId, published.reason ?? "Publication failed.");
+      /* The review stays succeeded: a retry resumes at publication
+         instead of reviewing from round 0 (bug 2). */
+      await stepFailRun(
+        courseId,
+        runId,
+        `Publication failed: ${published.reason ?? "The revision could not be published."}`,
+      );
       return { ok: false as const, reason: "publish-failed" };
     }
 
