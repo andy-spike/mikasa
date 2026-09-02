@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import { PanelLeftOpen, PanelRight, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -102,6 +102,12 @@ export function Workspace({
   const router = useRouter();
   const narrow = useIsMobile();
   const railOpen = railChoice ?? !narrow;
+  /* The keyboard and viewport listeners outlive a render, so they read
+     the rails through refs instead of closing over stale state. */
+  const railOpenRef = useRef(railOpen);
+  railOpenRef.current = railOpen;
+  const panelRef = useRef(panel);
+  panelRef.current = panel;
 
   const modules: ModuleView[] = useMemo(() => {
     let n = 0;
@@ -134,11 +140,36 @@ export function Workspace({
   const next =
     flat.slice(openIndex + 1).find((l) => l.status !== "unset") ?? null;
 
+  /* Below 1280 the shell shows two regions at most: opening the panel
+     collapses the rail, and expanding the rail closes the panel. The
+     most recent action wins. Crossing the breakpoint with both open
+     collapses the rail — the panel was the deliberate action. */
+  const below1279 = () => window.matchMedia("(max-width: 1279px)").matches;
+
   function showPanel(mode: PanelMode) {
-    if (window.matchMedia("(max-width: 1279px)").matches) setRailChoice(false);
+    if (below1279()) setRailChoice(false);
     setLastMode(mode);
     setPanel(mode);
   }
+
+  function setRailOpen(open: boolean) {
+    setRailChoice(open);
+    if (open && below1279() && panelRef.current !== null) setPanel(null);
+  }
+
+  /* Crossing the breakpoint enforces the same invariant: shrunk below
+     1280 with both open, the rail gives way (the panel was the
+     deliberate action). Growing changes nothing. */
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 1279px)");
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches && railOpenRef.current && panelRef.current !== null) {
+        setRailChoice(false);
+      }
+    };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   function openLesson(id: string) {
     setOpenId(id);
@@ -409,7 +440,9 @@ export function Workspace({
         setPaletteOpen((v) => !v);
       } else if (key === "b") {
         e.preventDefault();
-        setRailChoice((r) => !(r ?? !window.matchMedia("(max-width: 767px)").matches));
+        const next = !railOpenRef.current;
+        setRailChoice(next);
+        if (next && window.matchMedia("(max-width: 1279px)").matches) setPanel(null);
       }
     };
     document.addEventListener("keydown", onKey);
@@ -452,7 +485,7 @@ export function Workspace({
         id: "cmd-rail",
         label: railOpen ? "Collapse the Outline" : "Expand the Outline",
         group: "Actions",
-        run: () => setRailChoice(!railOpen),
+        run: () => setRailOpen(!railOpen),
       },
       {
         id: "cmd-outline",
@@ -477,7 +510,7 @@ export function Workspace({
   return (
     <SidebarProvider
       open={railOpen}
-      onOpenChange={setRailChoice}
+      onOpenChange={setRailOpen}
       className="h-full min-h-0 overflow-hidden bg-canvas"
       style={
         {
@@ -497,7 +530,7 @@ export function Workspace({
         stampFor={(id) => doneAt[id]}
         onOpen={openLesson}
         onCollapse={() => setRailChoice(false)}
-        onExpand={() => setRailChoice(true)}
+        onExpand={() => setRailOpen(true)}
         total={flat.length}
         doneCount={doneCount}
         resizer={
@@ -535,7 +568,7 @@ export function Workspace({
           <div className="relative flex w-full shrink-0 items-center gap-2 px-5 py-3 sm:px-8 lg:px-10">
             <Button
               variant="icon"
-              onClick={() => setRailChoice(true)}
+              onClick={() => setRailOpen(true)}
               className={cn("md:hidden", railOpen ? "hidden" : "flex")}
               aria-label="Expand the Outline"
             >
