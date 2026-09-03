@@ -162,6 +162,9 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
+  /* The shell's one easing: exponential ease-out, never a bounce. */
+  --ease-expo: cubic-bezier(0.2, 0, 0, 1);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

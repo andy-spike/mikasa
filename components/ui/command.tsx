@@ -165,7 +165,7 @@ function CommandShortcut({
     <span
       data-slot="command-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground group-data-selected/command-item:text-foreground",
+        "ml-auto text-[0.6875rem] tracking-[0.06em] text-muted-foreground group-data-selected/command-item:text-foreground",
         className
       )}
       {...props}
