@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { LiveMark, UnsetMark } from "@/components/workspace/marks";
+import { DoneCheck, LiveMark, UnsetMark } from "@/components/workspace/marks";
 import { Button } from "@/components/ui/button";
 import { listOwnedCoursesWithCompletion } from "@/lib/db/courses";
 import { db } from "@/lib/db";
@@ -73,6 +73,10 @@ export default async function CoursesPage() {
           <ul className="mt-8 border-t border-hair">
             {owned.map((c) => {
               const { href, label, reading } = rowFor(c);
+              /* The accent marks where you are up to: a readable Course
+                 with every Exercise done carries the neutral check. */
+              const complete =
+                reading && c.completion && c.completion.done >= c.completion.total;
               return (
                 <li key={c.id} className="border-b border-hair">
                   <Link
@@ -81,7 +85,17 @@ export default async function CoursesPage() {
                   >
                     <span className="flex h-5 w-3 items-center justify-center">
                       {/* The accent still means one thing: where you are up to. */}
-                      {reading ? <LiveMark /> : <UnsetMark />}
+                      {reading ? (
+                        complete ? (
+                          <span className="text-fg-3">
+                            <DoneCheck />
+                          </span>
+                        ) : (
+                          <LiveMark />
+                        )
+                      ) : (
+                        <UnsetMark />
+                      )}
                     </span>
 
                     <span className="min-w-0">
