@@ -593,16 +593,21 @@ export function Workspace({
             up ground all the way, instead of overflowing under the
             fixed-positioned rails. */}
         <SidebarInset
-          className="mk-panel-reserve min-h-0 min-w-0 bg-canvas transition-[padding-right,padding-left] duration-200 ease-linear"
+          className={cn(
+            /* From 2xl up the closed panel keeps its width in reserve as a
+               right pad; open, the offcanvas gap already holds that space,
+               so the sentence never moves either way. */
+            !panel && "mk-panel-reserve",
+            "min-h-0 min-w-0 bg-canvas transition-[padding-right,padding-left] duration-200 ease-linear",
+          )}
           style={
             {
               /* Collapsed, the rail keeps a 2.75rem stub: the region takes
                  the rest of the rail back as a left pad, so the sentence
                  holds still. A sheet has no stub, so this stays a desktop
-                 rule. The panel reserve rides the CSS class above, from 2xl
-                 up, whether the panel is open or shut. */
+                 rule. */
               ...(!railOpen && !narrow ? { paddingLeft: `${railWidth - 2.75}rem` } : null),
-              "--mk-panel-reserve": `${panelWidth}rem`,
+              ...(!panel ? { "--mk-panel-reserve": `${panelWidth}rem` } : null),
             } as CSSProperties
           }
         >
