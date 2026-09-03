@@ -37,6 +37,10 @@ export function Conversation({
   sendLabel,
   pendingText,
   failedText,
+  /* False on the Outline screen: the thread grows with the page instead of
+     owning a scrollport beside it. True in the workspace panel, which owns
+     its own overflow. */
+  scrollport = true,
 }: {
   turns: Turn[];
   onAsk?: (text: string, onDelta: (chunk: string) => void) => Promise<boolean>;
@@ -47,6 +51,7 @@ export function Conversation({
   sendLabel: string;
   pendingText: string;
   failedText?: string;
+  scrollport?: boolean;
 }) {
   const [thread, setThread] = useState<Turn[]>(turns);
   const [failed, setFailed] = useState(false);
@@ -66,8 +71,11 @@ export function Conversation({
   }
 
   useEffect(() => {
+    /* In a scrollport the thread follows itself; on the page, yanking the
+       whole Outline on every streamed chunk would fight the reader. */
+    if (!scrollport) return;
     foot.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [thread.length, tail, pending, streaming]);
+  }, [thread.length, tail, pending, streaming, scrollport]);
 
   const connected = Boolean(onAsk);
 
@@ -112,8 +120,8 @@ export function Conversation({
   }
 
   return (
-    <>
-      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-3.5 py-4">
+    <div className={scrollport ? "contents" : "flex flex-col"}>
+      <div className={scrollport ? "scroll-thin min-h-0 flex-1 overflow-y-auto px-3.5 py-4" : "px-3.5 py-4"}>
         <div className="space-y-4">
           {thread.map((turn, i) =>
             turn.from === "learner" ? (
@@ -184,7 +192,7 @@ export function Conversation({
           </Button>
         </div>
       </form>
-    </>
+    </div>
   );
 }
 
@@ -204,6 +212,7 @@ export function TailorConversation({
   onRestore,
   applySlot,
   publishedSlot,
+  scrollport = true,
 }: {
   turns: Turn[];
   onAsk?: (text: string, onDelta: (chunk: string) => void) => Promise<boolean>;
@@ -214,6 +223,7 @@ export function TailorConversation({
   applySlot?: ReactNode;
   /** The revision's published changes and their undo affordances (#15). */
   publishedSlot?: ReactNode;
+  scrollport?: boolean;
 }) {
   const open = plan?.operations ?? [];
   const acceptedCount = open.filter((o) => o.status === "accepted").length;
@@ -227,6 +237,7 @@ export function TailorConversation({
       composerLabel="Tell the Tailor what to change"
       sendLabel="Tell the Tailor"
       pendingText="Working on a plan…"
+      scrollport={scrollport}
       below={
         <>
           {open.length > 0 ? (

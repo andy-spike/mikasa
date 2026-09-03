@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";import {
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
   ArrowDown,
   ArrowUp,
   Combine,
@@ -22,6 +23,7 @@ import { Button } from "./ui/button";
 import { field } from "@/lib/ui";
 import { Skeleton } from "./ui/skeleton";
 import { Textarea } from "./ui/textarea";
+import { useStickyFollow } from "@/hooks/use-sticky-follow";
 import {
   Dialog,
   DialogContent,
@@ -66,6 +68,9 @@ export function OutlineEditor({
   onRefreshPlan,
 }: Props) {
   const router = useRouter();
+  /* The Tailor column follows the page scroll once it outgrows the viewport. */
+  const tailorRef = useRef<HTMLElement | null>(null);
+  useStickyFollow(tailorRef);
   const [modules, setModules] = useState<Module[]>(course.modules);
   const [version, setVersion] = useState(course.version);
   const [edits, setEdits] = useState(0);
@@ -498,12 +503,15 @@ export function OutlineEditor({
             it to be grounded in until the Outline is approved. The plan's
             accepted operations apply through the editor's own change door
             (#13); nothing moves until then. */}
-        <aside className="w-full shrink-0 border-t border-hair pt-8 pb-20 lg:sticky lg:top-0 lg:w-[20rem] lg:self-start lg:border-t-0 lg:border-l lg:pt-10 lg:pb-10 lg:pl-8">
+        <aside
+          ref={tailorRef}
+          className="w-full shrink-0 border-t border-hair pt-8 pb-20 lg:sticky lg:top-0 lg:w-[20rem] lg:self-start lg:border-t-0 lg:border-l lg:pt-10 lg:pb-10 lg:pl-8"
+        >
           <h2 className="label text-fg-3">Tailor</h2>
           <p className="mt-2 text-[0.8125rem] leading-[1.6] text-fg-3">
             Nothing is written until you apply it.
           </p>
-          <div className="mt-5 flex h-[min(36rem,70vh)] min-h-0 flex-col">
+          <div className="mt-5">
             <TailorConversation
               turns={tailorTurns ?? []}
               onAsk={askTailor}
@@ -511,6 +519,7 @@ export function OutlineEditor({
               onAccept={(id) => reviewOperation(id, "accepted")}
               onDiscard={(id) => reviewOperation(id, "discarded")}
               onRestore={(id) => reviewOperation(id, "proposed")}
+              scrollport={false}
               applySlot={
                 <Button onClick={applyPlan} disabled={pending} className="w-full">
                   Apply the accepted changes
