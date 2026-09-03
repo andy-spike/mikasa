@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import { PanelLeftOpen, PanelRight, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -43,6 +43,10 @@ const RAIL_MIN = 16;
 const RAIL_MAX = 28;
 const PANEL_MIN = 18;
 const PANEL_MAX = 30;
+
+/* useLayoutEffect runs before paint on the client and warns on the server;
+   read the width where it lives instead. */
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 type Props = {
   /** The published Course, in reading order (lib/course/reading). */
@@ -94,6 +98,15 @@ export function Workspace({
      column's reserves read the same numbers. */
   const [railWidth, setRailWidth] = useState(20);
   const [panelWidth, setPanelWidth] = useState(21);
+  /* A drag wins over the spec default below. */
+  const railCustom = useRef(false);
+  /* The rail opens at 20rem, 23rem from xl up. Before paint on the client,
+     so an xl load never flashes the narrow rail. */
+  useIsoLayoutEffect(() => {
+    if (!railCustom.current && window.matchMedia("(min-width: 1280px)").matches) {
+      setRailWidth(23);
+    }
+  }, []);
   const [paletteOpen, setPaletteOpen] = useState(false);
   /* transient: the handoff plays on the mark, never on a revisit */
   const [justDone, setJustDone] = useState<string | null>(null);
@@ -336,14 +349,19 @@ export function Workspace({
 
   /* The published changes, with their undo availability (#15). */
   const [published, setPublished] = useState<PublishedPlanRow[]>([]);
+  const [publishedFailed, setPublishedFailed] = useState(false);
   const [publishedKey, setPublishedKey] = useState(0);
   useEffect(() => {
     let live = true;
     listPublishedPlansAction(course.id)
       .then((rows) => {
-        if (live) setPublished(rows);
+        if (!live) return;
+        setPublished(rows);
+        setPublishedFailed(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (live) setPublishedFailed(true);
+      });
     return () => {
       live = false;
     };
@@ -357,7 +375,11 @@ export function Workspace({
         setPublishedKey((k) => k + 1);
         router.refresh();
       }
-      setPublished(await listPublishedPlansAction(course.id));
+      try {
+        setPublished(await listPublishedPlansAction(course.id));
+      } catch {
+        setPublishedFailed(true);
+      }
     });
   }
 
@@ -412,18 +434,25 @@ export function Workspace({
     return null;
   };
 
+  const [stagedPollFailed, setStagedPollFailed] = useState(false);
   const tailorStatus = stagedRevision?.failed
     ? `The staged revision failed while ${
         stageWords(stagedRevision.stage) ?? "it was being prepared"
       }: ${stagedRevision.error ?? "The revision did not finish."}`
     : staged || stagedRevision
-      ? "A revision is being prepared from your accepted changes. The Course reads as it is until it publishes."
+      ? "A revision is being prepared from your accepted changes. The Course reads as it is until it publishes." +
+        (stagedPollFailed ? " Its status could not refresh just now — still trying." : "")
       : null;
 
   useEffect(() => {
     if (!stagedRevision || stagedRevision.failed) return;
     const timer = setInterval(() => {
-      findStagedPlanAction(course.id).then(setStagedRevision).catch(() => {});
+      findStagedPlanAction(course.id)
+        .then((s) => {
+          setStagedRevision(s);
+          setStagedPollFailed(false);
+        })
+        .catch(() => setStagedPollFailed(true));
     }, 4000);
     return () => clearInterval(timer);
   }, [course.id, stagedRevision]);
@@ -539,7 +568,10 @@ export function Workspace({
             width={railWidth}
             min={RAIL_MIN}
             max={RAIL_MAX}
-            onResize={setRailWidth}
+            onResize={(w) => {
+              railCustom.current = true;
+              setRailWidth(w);
+            }}
           />
         }
       />
@@ -560,8 +592,20 @@ export function Workspace({
             narrows when a rail actually crowds it. min-w-0 lets it give
             up ground all the way, instead of overflowing under the
             fixed-positioned rails. */}
-        <SidebarInset className="min-h-0 min-w-0 bg-canvas">
-          {/* the only chrome: what opens the palette, the panel, and the ground */}
+        <SidebarInset
+          className="mk-panel-reserve min-h-0 min-w-0 bg-canvas transition-[padding-right,padding-left] duration-200 ease-linear"
+          style={
+            {
+              /* Collapsed, the rail keeps a 2.75rem stub: the region takes
+                 the rest of the rail back as a left pad, so the sentence
+                 holds still. A sheet has no stub, so this stays a desktop
+                 rule. The panel reserve rides the CSS class above, from 2xl
+                 up, whether the panel is open or shut. */
+              ...(!railOpen && !narrow ? { paddingLeft: `${railWidth - 2.75}rem` } : null),
+              "--mk-panel-reserve": `${panelWidth}rem`,
+            } as CSSProperties
+          }
+        >
           {/* the only chrome: what opens the palette, the panel, and the ground.
               It spans the region, not the reading column: the search sits
               centred over the sentence, the actions pin to the right edge. */}
@@ -664,7 +708,21 @@ export function Workspace({
             ) : null
           }
           publishedSlot={
-            published.length > 0 ? (
+            publishedFailed && published.length === 0 ? (
+              <div className="mt-5">
+                <p className="label text-fg-3">Published changes</p>
+                <p className="mt-3 text-[0.8125rem] leading-[1.5] text-fg-2">
+                  Published changes could not load.
+                </p>
+                <Button
+                  variant="quiet"
+                  onClick={() => setPublishedKey((k) => k + 1)}
+                  className="mt-1 -ml-1"
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : published.length > 0 ? (
               <div className="mt-5">
                 <p className="label text-fg-3">Published changes</p>
                 <ul className="mt-3 space-y-3.5">
@@ -693,6 +751,15 @@ export function Workspace({
                     </li>
                   ))}
                 </ul>
+                {publishedFailed ? (
+                  <Button
+                    variant="quiet"
+                    onClick={() => setPublishedKey((k) => k + 1)}
+                    className="mt-2 -ml-1"
+                  >
+                    Retry
+                  </Button>
+                ) : null}
               </div>
             ) : null
           }

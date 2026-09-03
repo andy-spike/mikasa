@@ -15,14 +15,20 @@ import { authClient } from "@/lib/auth-client";
  */
 export default function Landing() {
   const [signingIn, setSigningIn] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   /* Better Auth answers with the Google consent screen; the callback comes
      back through /api/auth/callback/google and lands on /courses. */
   function signIn() {
     if (signingIn) return;
     setSigningIn(true);
+    setFailed(false);
     authClient.signIn
       .social({ provider: "google", callbackURL: "/courses" })
+      .then(
+        () => {},
+        () => setFailed(true),
+      )
       .finally(() => setSigningIn(false));
   }
 
@@ -46,6 +52,11 @@ export default function Landing() {
             <GoogleMark />
             Continue with Google
           </Button>
+          {failed ? (
+            <p role="alert" className="mt-3 text-[0.8125rem] leading-[1.5] text-fg-2">
+              Sign in did not complete. Try again.
+            </p>
+          ) : null}
         </div>
       </main>
 

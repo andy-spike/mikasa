@@ -307,6 +307,14 @@
   .lift {
     box-shadow: var(--lift);
   }
+
+  /* Constant region: from 2xl up the closed panel keeps its width in
+     reserve as a right pad, so opening it never moves the sentence. */
+  @media (min-width: 1536px) {
+    .mk-panel-reserve {
+      padding-right: var(--mk-panel-reserve, 21rem);
+    }
+  }
 }
 
 /* ── The authored moment ───────────────────────────────────────────────────

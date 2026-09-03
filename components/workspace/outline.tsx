@@ -79,7 +79,7 @@ export function Outline({
         <Button variant="icon-raised" onClick={onExpand} aria-label="Expand the Outline" className="p-2">
           <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
         </Button>
-        <span className="tnum mt-1 text-[0.6875rem] text-fg-dim">
+        <span className="tnum mt-1 text-[0.75rem] text-fg-dim">
           {doneCount}/{total}
         </span>
       </div>
