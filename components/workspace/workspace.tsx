@@ -1,7 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type CSSProperties,
+} from "react";
 import { PanelLeftOpen, PanelRight, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -21,10 +29,7 @@ import {
   type PublishedPlanRow,
   type StagedPlanView,
 } from "@/lib/actions/tailor";
-import {
-  rebuildFragmentsAction,
-  searchIsIncompleteAction,
-} from "@/lib/actions/courses";
+import { rebuildFragmentsAction, searchIsIncompleteAction } from "@/lib/actions/courses";
 import type { PlanView, Turn } from "./panel";
 import { Outline, type ModuleView } from "./outline";
 import { LessonPane } from "./lesson";
@@ -150,8 +155,7 @@ export function Workspace({
      open is carried by a raised ground in the rail, never by colour. */
   const live = set.find((l) => !doneAt[l.id]) ?? null;
   const openIndex = flat.findIndex((l) => l.id === open.id);
-  const next =
-    flat.slice(openIndex + 1).find((l) => l.status !== "unset") ?? null;
+  const next = flat.slice(openIndex + 1).find((l) => l.status !== "unset") ?? null;
 
   /* Below 1280 the shell shows two regions at most: opening the panel
      collapses the rail, and expanding the rail closes the panel. The
@@ -261,10 +265,7 @@ export function Workspace({
   /* The Tailor's turn (#12): one conversation for the whole Course, the
      server owns its history. When a turn completes, the server may have
      proposed a plan, so the review refreshes from it. */
-  async function askTailor(
-    text: string,
-    onDelta: (chunk: string) => void,
-  ): Promise<boolean> {
+  async function askTailor(text: string, onDelta: (chunk: string) => void): Promise<boolean> {
     try {
       const response = await fetch(`/api/courses/${course.id}/tailor`, {
         method: "POST",
@@ -409,9 +410,7 @@ export function Workspace({
         p
           ? {
               ...p,
-              operations: p.operations.map((o) =>
-                o.id === operationId ? { ...o, status } : o,
-              ),
+              operations: p.operations.map((o) => (o.id === operationId ? { ...o, status } : o)),
             }
           : p,
       );
@@ -521,7 +520,8 @@ export function Workspace({
         label: "Shape the Outline",
         group: "Actions",
         run: () => router.push(`/courses/${course.id}/outline`),
-      },    );
+      },
+    );
     for (const l of flat) {
       if (l.status === "unset") continue;
       list.push({
@@ -533,7 +533,7 @@ export function Workspace({
       });
     }
     return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [flat, open.id, open.exercise, doneAt, railOpen, router]);
 
   return (
@@ -651,9 +651,7 @@ export function Workspace({
                   variant="icon"
                   onClick={() => showPanel(lastMode)}
                   aria-expanded={false}
-                  aria-label={
-                    lastMode === "tutor" ? "Open the Tutor" : "Open the Tailor"
-                  }
+                  aria-label={lastMode === "tutor" ? "Open the Tutor" : "Open the Tailor"}
                   title={lastMode === "tutor" ? "Open the Tutor" : "Open the Tailor"}
                   className="p-2"
                 >
@@ -735,8 +733,7 @@ export function Workspace({
                     <li key={row.plan.id} className="text-[0.8125rem] leading-[1.5]">
                       <div className="flex items-baseline justify-between gap-3">
                         <span className="text-fg-2">
-                          Revision {row.publishedRevisionNumber} ·{" "}
-                          {row.plan.operations.length}{" "}
+                          Revision {row.publishedRevisionNumber} · {row.plan.operations.length}{" "}
                           {row.plan.operations.length === 1 ? "change" : "changes"}
                         </span>
                         {row.canUndo ? (
@@ -748,9 +745,7 @@ export function Workspace({
                             Undo
                           </Button>
                         ) : (
-                          <span className="text-[0.75rem] text-fg-3">
-                            {row.blockedReason}
-                          </span>
+                          <span className="text-[0.75rem] text-fg-3">{row.blockedReason}</span>
                         )}
                       </div>
                     </li>
@@ -796,7 +791,10 @@ export function Workspace({
                 <Button
                   onClick={() =>
                     startStaging(async () => {
-                      const result = await retryPlanRevisionAction(course.id, stagedRevision.plan.id);
+                      const result = await retryPlanRevisionAction(
+                        course.id,
+                        stagedRevision.plan.id,
+                      );
                       if (result.ok) setStagedRevision(await findStagedPlanAction(course.id));
                     })
                   }
@@ -804,11 +802,7 @@ export function Workspace({
                 >
                   Retry the revision
                 </Button>
-                <Button
-                  variant="quiet"
-                  onClick={discardStaged}
-                  className="shrink-0"
-                >
+                <Button variant="quiet" onClick={discardStaged} className="shrink-0">
                   Discard
                 </Button>
               </div>
