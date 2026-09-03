@@ -788,7 +788,10 @@ export function Workspace({
               >
                 Stage as a new revision
               </Button>
-            ) : stagedRevision?.failed ? (
+            ) : null
+          }
+          stagedFailedSlot={
+            stagedRevision?.failed ? (
               <div className="flex items-center gap-2">
                 <Button
                   onClick={() =>

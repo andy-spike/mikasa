@@ -40,6 +40,8 @@ type Props = {
   onRestore: (operationId: string) => void;
   /** Staging a revision (#14): the reading page's apply action. */
   tailorApply?: ReactNode;
+  /** A failed staged revision's retry and discard, outside any plan. */
+  stagedFailedSlot?: ReactNode;
   /** One line of pane-level status, e.g. that a revision is staging. */
   tailorStatus?: string;
   /** A fixed strip above the Tutor's thread (bug 9): the stale-search notice. */
@@ -63,6 +65,7 @@ export function Panel({
   onDiscard,
   onRestore,
   tailorApply,
+  stagedFailedSlot,
   tailorStatus,
   tutorNotice,
   publishedSlot,
@@ -126,6 +129,7 @@ export function Panel({
             onDiscard={onDiscard}
             onRestore={onRestore}
             applySlot={tailorApply}
+            stagedFailedSlot={stagedFailedSlot}
             publishedSlot={publishedSlot}
           />
         )}

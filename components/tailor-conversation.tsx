@@ -213,6 +213,7 @@ export function TailorConversation({
   applySlot,
   publishedSlot,
   scrollport = true,
+  stagedFailedSlot,
 }: {
   turns: Turn[];
   onAsk?: (text: string, onDelta: (chunk: string) => void) => Promise<boolean>;
@@ -224,6 +225,9 @@ export function TailorConversation({
   /** The revision's published changes and their undo affordances (#15). */
   publishedSlot?: ReactNode;
   scrollport?: boolean;
+  /** A failed staged revision's retry and discard, which live outside any
+      proposed plan: there may be no plan under review at all. */
+  stagedFailedSlot?: ReactNode;
 }) {
   const open = plan?.operations ?? [];
   const acceptedCount = open.filter((o) => o.status === "accepted").length;
@@ -303,6 +307,7 @@ export function TailorConversation({
               {applySlot && acceptedCount > 0 ? <div className="mt-4">{applySlot}</div> : null}
             </div>
           ) : null}
+          {stagedFailedSlot ? <div className="mt-4">{stagedFailedSlot}</div> : null}
           {publishedSlot}
         </>
       }
