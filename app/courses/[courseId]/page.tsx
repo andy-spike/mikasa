@@ -63,8 +63,8 @@ export default async function CoursePage({ params }: PageProps<"/courses/[course
     <Workspace
       course={reading}
       sources={sources}
-      onMark={(lessonId) => markLessonDoneAction(courseId, lessonId)}
-      onUnmark={(lessonId) => markLessonUndoneAction(courseId, lessonId)}
+      onMark={markLessonDoneAction.bind(null, courseId)}
+      onUnmark={markLessonUndoneAction.bind(null, courseId)}
       tutorHistory={tutorHistory}
       tailorTurns={tailorTurns}
       tailorPlan={proposedPlan}
