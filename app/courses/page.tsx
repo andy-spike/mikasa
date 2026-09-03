@@ -31,8 +31,11 @@ function rowFor(course: {
   if (course.status === "failed") {
     return { href: `/courses/${course.id}/outline`, label: "Failed", reading: false };
   }
-  // "generating" and "reviewing": generation is later work; the Outline is
-  // still the screen that exists.
+  // Generating and reviewing are distinct documented states with their
+  // own screens; the list names each one honestly.
+  if (course.status === "reviewing") {
+    return { href: `/courses/${course.id}/outline`, label: "Reviewing", reading: false };
+  }
   return { href: `/courses/${course.id}/outline`, label: "Generating", reading: false };
 }
 

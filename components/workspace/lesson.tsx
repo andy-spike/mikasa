@@ -96,7 +96,7 @@ export function LessonPane({
                 </span>
               </span>
               <ArrowRight
-                className="ml-auto h-4 w-4 shrink-0 text-fg-3 transition-transform duration-200 group-hover:translate-x-1"
+                className="ml-auto h-4 w-4 shrink-0 text-fg-3 transition-transform duration-120 ease-expo group-hover:translate-x-1"
                 strokeWidth={1.75}
               />
             </Button>
