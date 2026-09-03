@@ -202,9 +202,7 @@ export function LessonBlock({
                     key={j}
                     className={
                       "py-[0.4rem] pr-6 last:pr-0 " +
-                      (j === row.length - 1
-                        ? "font-medium text-fg"
-                        : "text-fg-2")
+                      (j === row.length - 1 ? "font-medium text-fg" : "text-fg-2")
                     }
                   >
                     {cell}

@@ -19,9 +19,7 @@ import { requireLearner } from "@/lib/session";
  * that failed after its Outline existed shows its failure here, with the
  * dispatching retry (ticket #7).
  */
-export default async function OutlinePage({
-  params,
-}: PageProps<"/courses/[courseId]/outline">) {
+export default async function OutlinePage({ params }: PageProps<"/courses/[courseId]/outline">) {
   const { user } = await requireLearner();
   const { courseId } = await params;
   const course = await findOwnedCourse(db, user.id, courseId);

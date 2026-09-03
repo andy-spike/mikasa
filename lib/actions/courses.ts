@@ -9,23 +9,13 @@ import { eq } from "drizzle-orm";
 import { start } from "workflow/api";
 import { db } from "@/lib/db";
 import { courses, designRuns } from "@/lib/db/schema";
-import {
-  failDesignRun,
-  latestDesignRun,
-  startDesignRun,
-} from "@/lib/db/design";
-import {
-  failGenerationRun,
-  latestGenerationRun,} from "@/lib/db/outline";
+import { failDesignRun, latestDesignRun, startDesignRun } from "@/lib/db/design";
+import { failGenerationRun, latestGenerationRun } from "@/lib/db/outline";
 import { resetGenerationRun, currentRevision } from "@/lib/db/review";
 import { searchIsIncomplete } from "@/lib/db/fragments";
 import { findOwnedCourse } from "@/lib/db/courses";
 import { requireLearner } from "@/lib/session";
-import {
-  validateCourseInput,
-  type CourseInput,
-  type CourseInputErrors,
-} from "@/lib/course/limits";
+import { validateCourseInput, type CourseInput, type CourseInputErrors } from "@/lib/course/limits";
 import { designCourseWorkflow } from "@/workflows/course-design";
 import { generateCourseWorkflow } from "@/workflows/course-generation";
 import { repairFragmentsWorkflow } from "@/workflows/repair-fragments";
@@ -49,12 +39,7 @@ async function startDesign(courseId: string): Promise<CourseInputErrors | null> 
       .where(eq(designRuns.id, run.id));
     return null;
   } catch {
-    await failDesignRun(
-      db,
-      courseId,
-      run.id,
-      "The design engine could not start this run.",
-    );
+    await failDesignRun(db, courseId, run.id, "The design engine could not start this run.");
     return { form: "Mikasa could not start the design. Try again." };
   }
 }
@@ -87,9 +72,7 @@ export async function createCourseAction(
  * resumes past its persisted steps; generation keeps written Lessons and
  * a passed review; nothing valid is regenerated.
  */
-export type RetryResult =
-  | { ok: true; courseId: string }
-  | { ok: false; errors: CourseInputErrors };
+export type RetryResult = { ok: true; courseId: string } | { ok: false; errors: CourseInputErrors };
 
 export async function retryCourseAction(courseId: string): Promise<RetryResult> {
   const { user } = await requireLearner();
@@ -119,7 +102,10 @@ export async function retryCourseAction(courseId: string): Promise<RetryResult> 
         generation.id,
         "The generation engine could not start this retry.",
       );
-      return { ok: false, errors: { form: "The generation engine could not start this retry. Try again." } };
+      return {
+        ok: false,
+        errors: { form: "The generation engine could not start this retry. Try again." },
+      };
     }
   }
 
@@ -129,10 +115,11 @@ export async function retryCourseAction(courseId: string): Promise<RetryResult> 
   /* A design that failed before anything persisted starts over; one that
      failed later resumes past its persisted steps. */
   const RESUMABLE = new Set(["outline", "specification", "persist"]);
-  const resumeFrom: "sources" | "outline" | "specification" | "persist" =
-    RESUMABLE.has(design.currentStep)
-      ? (design.currentStep as "outline" | "specification" | "persist")
-      : "sources";
+  const resumeFrom: "sources" | "outline" | "specification" | "persist" = RESUMABLE.has(
+    design.currentStep,
+  )
+    ? (design.currentStep as "outline" | "specification" | "persist")
+    : "sources";
 
   const newRun = await startDesignRun(db, courseId);
   try {
@@ -143,13 +130,11 @@ export async function retryCourseAction(courseId: string): Promise<RetryResult> 
       .where(eq(designRuns.id, newRun.id));
     return { ok: true, courseId };
   } catch {
-    await failDesignRun(
-      db,
-      courseId,
-      newRun.id,
-      "The design engine could not start this retry.",
-    );
-    return { ok: false, errors: { form: "The design engine could not start this retry. Try again." } };
+    await failDesignRun(db, courseId, newRun.id, "The design engine could not start this retry.");
+    return {
+      ok: false,
+      errors: { form: "The design engine could not start this retry. Try again." },
+    };
   }
 }
 

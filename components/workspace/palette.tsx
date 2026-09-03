@@ -72,38 +72,36 @@ export function CommandPalette({
         /* cmdk scores fuzzily by default, which turns "gaps" into seven
            loose matches. This palette is navigation, not search: a query
            either appears in the entry or the entry is not a result. */
-        filter={(value, search) =>
-          value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
-        }
+        filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}
       >
         <CommandInput placeholder="Go to a Lesson, or run an action" />
 
         <CommandList className="max-h-[46vh]">
-        <CommandEmpty>Nothing matches that.</CommandEmpty>
+          <CommandEmpty>Nothing matches that.</CommandEmpty>
 
-        {groups.map((group) => (
-          <CommandGroup key={group.name} heading={group.name}>
-            {group.items.map((c) => (
-              <CommandItem
-                key={c.id}
-                /* What the filter reads, so a Module name still finds its
+          {groups.map((group) => (
+            <CommandGroup key={group.name} heading={group.name}>
+              {group.items.map((c) => (
+                <CommandItem
+                  key={c.id}
+                  /* What the filter reads, so a Module name still finds its
                    Lessons the way it did before. */
-                value={`${c.label} ${c.hint ?? ""} ${c.group}`}
-                onSelect={() => {
-                  onClose();
-                  c.run();
-                }}
-              >
-                <span className="truncate">{c.label}</span>
-                {c.hint ? (
-                  <span className="ml-auto shrink-0 truncate text-[0.75rem] text-fg-dim">
-                    {c.hint}
-                  </span>
-                ) : null}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        ))}
+                  value={`${c.label} ${c.hint ?? ""} ${c.group}`}
+                  onSelect={() => {
+                    onClose();
+                    c.run();
+                  }}
+                >
+                  <span className="truncate">{c.label}</span>
+                  {c.hint ? (
+                    <span className="ml-auto shrink-0 truncate text-[0.75rem] text-fg-dim">
+                      {c.hint}
+                    </span>
+                  ) : null}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ))}
         </CommandList>
 
         <div className="flex items-center gap-4 border-t border-hair px-4 py-2.5">

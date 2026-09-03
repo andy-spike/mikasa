@@ -49,7 +49,11 @@ export async function currentCourseCompletion(db: Db, courseId: string): Promise
     .where(eq(completions.courseId, courseId));
   const current = new Set(lessonRefs);
   const done = completed.filter((row) => current.has(row.lessonRef)).length;
-  return { done, total: lessonRefs.length, complete: lessonRefs.length > 0 && done === lessonRefs.length };
+  return {
+    done,
+    total: lessonRefs.length,
+    complete: lessonRefs.length > 0 && done === lessonRefs.length,
+  };
 }
 
 /** Recomputes the Course Completion after its current revision changes. */
@@ -125,13 +129,15 @@ export async function markLessonDone(
       .values({ courseId, lessonRef })
       .onConflictDoNothing()
       .returning();
-    const doneAt = row?.doneAt ?? (
-      await tx
-        .select({ doneAt: completions.doneAt })
-        .from(completions)
-        .where(and(eq(completions.courseId, courseId), eq(completions.lessonRef, lessonRef)))
-        .limit(1)
-    )[0]!.doneAt;
+    const doneAt =
+      row?.doneAt ??
+      (
+        await tx
+          .select({ doneAt: completions.doneAt })
+          .from(completions)
+          .where(and(eq(completions.courseId, courseId), eq(completions.lessonRef, lessonRef)))
+          .limit(1)
+      )[0]!.doneAt;
     const completion = await recomputeCourseCompletion(tx, courseId, doneAt);
 
     return {
@@ -172,11 +178,10 @@ export async function markLessonUndone(
 }
 
 /** Every completion of the Course, keyed by its Outline Lesson id. */
-export async function listCompletions(
-  db: Db,
-  courseId: string,
-): Promise<Map<string, Date>> {
+export async function listCompletions(db: Db, courseId: string): Promise<Map<string, Date>> {
   const lessonRefs = new Set(await currentLessonRefs(db, courseId));
   const rows = await db.select().from(completions).where(eq(completions.courseId, courseId));
-  return new Map(rows.filter((r) => lessonRefs.has(r.lessonRef)).map((r) => [r.lessonRef, r.doneAt]));
+  return new Map(
+    rows.filter((r) => lessonRefs.has(r.lessonRef)).map((r) => [r.lessonRef, r.doneAt]),
+  );
 }

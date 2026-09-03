@@ -124,13 +124,22 @@ describe("validateCourseInput", () => {
 describe("DEPTH_BOUNDS", () => {
   it("matches the Product's Module and Lesson-per-Module bounds", () => {
     expect(DEPTH_BOUNDS.reach).toEqual({
-      minModules: 3, maxModules: 4, minLessonsPerModule: 2, maxLessonsPerModule: 3,
+      minModules: 3,
+      maxModules: 4,
+      minLessonsPerModule: 2,
+      maxLessonsPerModule: 3,
     });
     expect(DEPTH_BOUNDS.working).toEqual({
-      minModules: 5, maxModules: 7, minLessonsPerModule: 3, maxLessonsPerModule: 4,
+      minModules: 5,
+      maxModules: 7,
+      minLessonsPerModule: 3,
+      maxLessonsPerModule: 4,
     });
     expect(DEPTH_BOUNDS.mastery).toEqual({
-      minModules: 8, maxModules: 10, minLessonsPerModule: 4, maxLessonsPerModule: 5,
+      minModules: 8,
+      maxModules: 10,
+      minLessonsPerModule: 4,
+      maxLessonsPerModule: 5,
     });
   });
 });

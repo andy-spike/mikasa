@@ -23,7 +23,12 @@ async function seed() {
   const db = await makeTestDb();
   await db.insert(users).values([learnerA, learnerB]);
   await db.insert(courses).values([
-    { ownerId: learnerA.id, topic: "the Vercel AI SDK", goal: "build my own AI chat app", depth: "working" },
+    {
+      ownerId: learnerA.id,
+      topic: "the Vercel AI SDK",
+      goal: "build my own AI chat app",
+      depth: "working",
+    },
     { ownerId: learnerA.id, topic: "Rust ownership", goal: "ship a CLI", depth: "reach" },
     { ownerId: learnerB.id, topic: "Kubernetes", goal: "run one service", depth: "mastery" },
   ]);

@@ -136,9 +136,7 @@ async function seedFailedCourse(stage: "design" | "generation"): Promise<string>
       throughline: { premise: "p", runningExample: "r", vocabulary: [] },
     },
   });
-  await db
-    .insert(courseSpecs)
-    .values({ courseId: course.id, spec: SPEC, outlineVersion: 1 });
+  await db.insert(courseSpecs).values({ courseId: course.id, spec: SPEC, outlineVersion: 1 });
 
   if (stage === "design") {
     await db.insert(designRuns).values({
@@ -192,16 +190,11 @@ describe("retrying a failed design", () => {
         excerpt: "e",
       },
     ]);
-    const [failedRun] = await db
-      .select()
-      .from(designRuns)
-      .where(eq(designRuns.courseId, courseId));
+    const [failedRun] = await db.select().from(designRuns).where(eq(designRuns.courseId, courseId));
 
     const result = await retryCourseAction(courseId);
     expect(result.ok).toBe(true);
-    expect(workflowStarts.calls).toEqual([
-      [courseId, expect.any(String), "specification"],
-    ]);
+    expect(workflowStarts.calls).toEqual([[courseId, expect.any(String), "specification"]]);
 
     /* Sources survived the failure untouched. */
     const rows = await db.select().from(sources).where(eq(sources.courseId, courseId));
@@ -252,14 +245,9 @@ describe("retrying a failed generation", () => {
        written-Lesson check sees l1 as done once it is written. */
     const result = await retryCourseAction(courseId);
     expect(result.ok).toBe(true);
-    expect(workflowStarts.calls).toEqual([
-      [courseId, run.id, run.outlineVersion],
-    ]);
+    expect(workflowStarts.calls).toEqual([[courseId, run.id, run.outlineVersion]]);
 
-    const [reopened] = await db
-      .select()
-      .from(generationRuns)
-      .where(eq(generationRuns.id, run.id));
+    const [reopened] = await db.select().from(generationRuns).where(eq(generationRuns.id, run.id));
     expect(reopened.status).toBe("running");
 
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
@@ -297,11 +285,7 @@ describe("retrying a failed generation", () => {
       }),
     );
     await resetGenerationRun(db, courseId, run.id);
-    const again = await (await import("@/lib/db/lessons")).loadGenerationContext(
-      db,
-      courseId,
-      1,
-    );
+    const again = await (await import("@/lib/db/lessons")).loadGenerationContext(db, courseId, 1);
     expect(again?.written).toEqual(["l1"]);
   });
 
@@ -348,11 +332,7 @@ async function contentFor(lessonId: string) {
 
 type TestDb = Parameters<typeof saveLessonContent>[0];
 
-async function finishGenerationToSucceeded(
-  database: TestDb,
-  courseId: string,
-  runId: string,
-) {
+async function finishGenerationToSucceeded(database: TestDb, courseId: string, runId: string) {
   const { finishGeneration } = await import("@/lib/db/lessons");
   const result = await finishGeneration(database, courseId, 1, runId);
   expect(result.ok).toBe(true);

@@ -47,11 +47,7 @@ export async function listOwnedCoursesWithCompletion(
 }
 
 /** One Course by id, or undefined unless it belongs to this Learner. */
-export function findOwnedCourse(
-  db: Db,
-  ownerId: string,
-  id: string,
-): Promise<Course | undefined> {
+export function findOwnedCourse(db: Db, ownerId: string, id: string): Promise<Course | undefined> {
   return db
     .select()
     .from(courses)

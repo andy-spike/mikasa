@@ -18,16 +18,8 @@ import type { LanguageModel } from "ai";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { designProviderOptions } from "@/lib/model";
-import {
-  parseLessonContent,
-  type ContentBlock,
-  type LessonContent,
-} from "./content";
-import type {
-  CourseSpecification,
-  OutlineData,
-  OutlineLesson,
-} from "./types";
+import { parseLessonContent, type ContentBlock, type LessonContent } from "./content";
+import type { CourseSpecification, OutlineData, OutlineLesson } from "./types";
 
 /** A Source as a Lesson prompt sees it: the shared set plus any found for the Lesson. */
 export type PromptSource = {
@@ -54,10 +46,7 @@ export class GenerationError extends Error {
  * and fails the run loudly rather than generating a Course that builds on
  * nothing.
  */
-export function generationOrder(
-  spec: CourseSpecification,
-  outline: OutlineData,
-): OutlineLesson[] {
+export function generationOrder(spec: CourseSpecification, outline: OutlineData): OutlineLesson[] {
   const lessons = outline.modules.flatMap((m) => m.lessons);
   const position = new Map(lessons.map((l, i) => [l.id, i]));
 
@@ -72,9 +61,7 @@ export function generationOrder(
   }
 
   /** prerequisite edges: lesson -> lessons it depends on */
-  const dependsOn = new Map<string, Set<string>>(
-    lessons.map((l) => [l.id, new Set<string>()]),
-  );
+  const dependsOn = new Map<string, Set<string>>(lessons.map((l) => [l.id, new Set<string>()]));
   for (const node of spec.learningGraph) {
     const dependentLesson = node.lessonId;
     for (const required of node.requires) {
@@ -91,9 +78,7 @@ export function generationOrder(
   }
 
   /* Kahn's algorithm; the "queue" is the Outline order, so ties stay put. */
-  const remaining = new Map(
-    [...dependsOn.entries()].map(([id, deps]) => [id, new Set(deps)]),
-  );
+  const remaining = new Map([...dependsOn.entries()].map(([id, deps]) => [id, new Set(deps)]));
   const ordered: OutlineLesson[] = [];
   let progress = true;
   while (ordered.length < lessons.length && progress) {
@@ -205,9 +190,7 @@ export async function generateLesson(
     sources: PromptSource[];
   },
 ): Promise<LessonContent> {
-  const alignment = input.spec.alignment.find(
-    (a) => a.lessonId === input.lesson.id,
-  );
+  const alignment = input.spec.alignment.find((a) => a.lessonId === input.lesson.id);
   if (!alignment) {
     throw new GenerationError(
       `The specification has no alignment for Lesson "${input.lesson.title}".`,
@@ -219,9 +202,7 @@ export async function generateLesson(
   const assumedSkills = alignment.prerequisiteNodes
     .map((id) => input.spec.learningGraph.find((n) => n.id === id)?.skill)
     .filter((s): s is string => Boolean(s));
-  const adjustment = input.spec.adjustments?.find(
-    (a) => a.lessonId === input.lesson.id,
-  );
+  const adjustment = input.spec.adjustments?.find((a) => a.lessonId === input.lesson.id);
 
   const { output } = await generateText({
     model,
@@ -248,17 +229,11 @@ export async function generateLesson(
       "",
       `THIS Lesson: ${input.lesson.title} — ${input.lesson.summary}`,
       `It teaches the performance: ${alignment.performance}`,
-      introducedSkills.length
-        ? `It introduces the skills: ${introducedSkills.join("; ")}`
-        : "",
-      assumedSkills.length
-        ? `It assumes the learner already has: ${assumedSkills.join("; ")}`
-        : "",
+      introducedSkills.length ? `It introduces the skills: ${introducedSkills.join("; ")}` : "",
+      assumedSkills.length ? `It assumes the learner already has: ${assumedSkills.join("; ")}` : "",
       `Module milestone it advances: ${alignment.moduleMilestone}`,
       `Its Exercise must: ${alignment.exerciseContribution}`,
-      adjustment?.prose
-        ? `The learner asked, for this Lesson's prose: ${adjustment.prose}`
-        : "",
+      adjustment?.prose ? `The learner asked, for this Lesson's prose: ${adjustment.prose}` : "",
       adjustment?.exercise
         ? `The learner set this Lesson's Exercise: "${adjustment.exercise.task}", done when: ${adjustment.exercise.check}. Make it the Exercise.`
         : "",
@@ -296,7 +271,7 @@ export async function generateLesson(
   };
 }
 
-type BlockWithRefs = (ContentBlock & { sourceRefs?: string[] });
+type BlockWithRefs = ContentBlock & { sourceRefs?: string[] };
 
 function stripUnknownRefs(known: Set<string>) {
   return (block: unknown): BlockWithRefs => {
@@ -323,10 +298,7 @@ function languageName(language: string): string {
  * The candidate is complete only when every planned Lesson exists. The
  * Course advances to review on whole coverage — never on partial output.
  */
-export function candidateIsComplete(
-  outline: OutlineData,
-  writtenLessonIds: Set<string>,
-): boolean {
+export function candidateIsComplete(outline: OutlineData, writtenLessonIds: Set<string>): boolean {
   const planned = outline.modules.flatMap((m) => m.lessons.map((l) => l.id));
   return planned.every((id) => writtenLessonIds.has(id));
 }

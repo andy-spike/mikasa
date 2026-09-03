@@ -3,19 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import {
-  ArrowDown,
-  ArrowUp,
-  Combine,
-  Plus,
-  Scissors,
-  X,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Combine, Plus, Scissors, X } from "lucide-react";
 import { applyOutlineOpAction, approveOutlineAction } from "@/lib/actions/outline";
-import {
-  applyPlanToOutlineAction,
-  reviewTailorOperationAction,
-} from "@/lib/actions/tailor";
+import { applyPlanToOutlineAction, reviewTailorOperationAction } from "@/lib/actions/tailor";
 import type { OutlineEditorCourse } from "@/lib/course/view";
 import type { OutlineOp } from "@/lib/course/structure";
 import { TailorConversation, type PlanView, type Turn } from "./tailor-conversation";
@@ -60,13 +50,7 @@ type Props = {
   onRefreshPlan?: () => Promise<PlanView | null>;
 };
 
-export function OutlineEditor({
-  course,
-  runStep,
-  tailorTurns,
-  tailorPlan,
-  onRefreshPlan,
-}: Props) {
+export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefreshPlan }: Props) {
   const router = useRouter();
   /* The Tailor column follows the page scroll once it outgrows the viewport. */
   const tailorRef = useRef<HTMLElement | null>(null);
@@ -144,10 +128,7 @@ export function OutlineEditor({
   /* The Tailor's turn (#12): the client posts only the message; the
      server owns the conversation. When a turn completes, the server may
      have proposed a plan, so the review refreshes from it. */
-  async function askTailor(
-    text: string,
-    onDelta: (chunk: string) => void,
-  ): Promise<boolean> {
+  async function askTailor(text: string, onDelta: (chunk: string) => void): Promise<boolean> {
     try {
       const response = await fetch(`/api/courses/${course.id}/tailor`, {
         method: "POST",
@@ -182,9 +163,7 @@ export function OutlineEditor({
         p
           ? {
               ...p,
-              operations: p.operations.map((o) =>
-                o.id === operationId ? { ...o, status } : o,
-              ),
+              operations: p.operations.map((o) => (o.id === operationId ? { ...o, status } : o)),
             }
           : p,
       );
@@ -255,7 +234,11 @@ export function OutlineEditor({
         </p>
         <div className="mt-9 space-y-2.5">
           {[10, 6, 8, 5, 9].map((w, i) => (
-            <Skeleton key={i} className="h-4 rounded-sm bg-panel" style={{ width: `${w * 8 + 12}%` }} />
+            <Skeleton
+              key={i}
+              className="h-4 rounded-sm bg-panel"
+              style={{ width: `${w * 8 + 12}%` }}
+            />
           ))}
         </div>
       </div>
@@ -599,10 +582,7 @@ function SplitDialog({
           <Button variant="quiet" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            onClick={() => onSplit(title.trim(), summary.trim())}
-            disabled={!ready}
-          >
+          <Button onClick={() => onSplit(title.trim(), summary.trim())} disabled={!ready}>
             Split
           </Button>
         </DialogFooter>

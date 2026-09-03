@@ -49,15 +49,17 @@ export async function findTutorConversation(
 
   const revision = await currentRevision(db, courseId);
   if (!revision) {
-    return { ok: false, reason: "not-published", message: "This Course has not been published yet." };
+    return {
+      ok: false,
+      reason: "not-published",
+      message: "This Course has not been published yet.",
+    };
   }
 
   const [outline] = await db
     .select()
     .from(outlines)
-    .where(
-      and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)),
-    )
+    .where(and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)))
     .limit(1);
   const planned = outline?.data.modules.flatMap((m) => m.lessons.map((l) => l.id)) ?? [];
   if (!planned.includes(lessonRef)) {
@@ -72,20 +74,14 @@ export async function findTutorConversation(
     .select()
     .from(tutorConversations)
     .where(
-      and(
-        eq(tutorConversations.courseId, courseId),
-        eq(tutorConversations.lessonRef, lessonRef),
-      ),
+      and(eq(tutorConversations.courseId, courseId), eq(tutorConversations.lessonRef, lessonRef)),
     )
     .limit(1);
   return { ok: true, conversationId: existing?.id };
 }
 
 /** The conversation's completed turns, in order. */
-export async function listTutorMessages(
-  db: Db,
-  conversationId: string,
-): Promise<TutorTurnRow[]> {
+export async function listTutorMessages(db: Db, conversationId: string): Promise<TutorTurnRow[]> {
   const rows = await db
     .select()
     .from(tutorMessages)
@@ -113,12 +109,7 @@ export async function loadTutorHistory(
     .select({ id: tutorConversations.id, lessonRef: tutorConversations.lessonRef })
     .from(tutorConversations)
     .innerJoin(courses, eq(courses.id, tutorConversations.courseId))
-    .where(
-      and(
-        eq(tutorConversations.courseId, courseId),
-        eq(courses.ownerId, ownerId),
-      ),
-    );
+    .where(and(eq(tutorConversations.courseId, courseId), eq(courses.ownerId, ownerId)));
   if (conversations.length === 0) return new Map();
 
   const ids = conversations.map((c) => c.id);
@@ -168,10 +159,7 @@ export async function appendTutorTurn(
     try {
       return await db.transaction(async (tx) => {
         /* The conversation is born with its first completed turn. */
-        await tx
-          .insert(tutorConversations)
-          .values({ courseId, lessonRef })
-          .onConflictDoNothing();
+        await tx.insert(tutorConversations).values({ courseId, lessonRef }).onConflictDoNothing();
         const [conversation] = await tx
           .select()
           .from(tutorConversations)
@@ -194,7 +182,12 @@ export async function appendTutorTurn(
         const inserted = await tx
           .insert(tutorMessages)
           .values([
-            { conversationId: conversation.id, seq: base + 1, role: "learner", content: turn.learner },
+            {
+              conversationId: conversation.id,
+              seq: base + 1,
+              role: "learner",
+              content: turn.learner,
+            },
             { conversationId: conversation.id, seq: base + 2, role: "tutor", content: turn.tutor },
           ])
           .returning();

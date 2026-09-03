@@ -63,17 +63,14 @@ vi.mock("@/lib/db/review", async (importOriginal) => {
 
 /* The generation model, scripted per attempt; the embedder is a fake. */
 const modelState = vi.hoisted(() => ({
-  current: undefined as ReturnType<
-    typeof import("./helpers/fake-model").scriptedModel
-  > | undefined,
+  current: undefined as ReturnType<typeof import("./helpers/fake-model").scriptedModel> | undefined,
 }));
 vi.mock("@/lib/model", async () => {
   const actual = await vi.importActual<typeof import("@/lib/model")>("@/lib/model");
   return {
     ...actual,
     generationModel: () => modelState.current!.model,
-    embedTexts: async (texts: string[]) =>
-      texts.map(() => new Array<number>(768).fill(0.01)),
+    embedTexts: async (texts: string[]) => texts.map(() => new Array<number>(768).fill(0.01)),
   };
 });
 
@@ -81,21 +78,12 @@ const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
 const { json, scriptedModel } = await import("./helpers/fake-model");
 const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
-const {
-  changePlans,
-  courseSpecs,
-  courses,
-  generationRuns,
-  lessons,
-  outlines,
-  reviewRuns,
-  users,
-} = await import("@/lib/db/schema");
+const { changePlans, courseSpecs, courses, generationRuns, lessons, outlines, reviewRuns, users } =
+  await import("@/lib/db/schema");
 const { saveLessonContent } = await import("@/lib/db/lessons");
 const { publishRevision, currentRevision } = await import("@/lib/db/review");
-const { createChangePlan, stagePlanRevision, resumeStagedRevision } = await import(
-  "@/lib/db/tailor"
-);
+const { createChangePlan, stagePlanRevision, resumeStagedRevision } =
+  await import("@/lib/db/tailor");
 const { reviewTailorOperationAction } = await import("@/lib/actions/tailor");
 const { retryCourseAction } = await import("@/lib/actions/courses");
 const { generateCourseWorkflow } = await import("@/workflows/course-generation");
@@ -121,9 +109,7 @@ const OUTLINE = {
       ordinal: 2,
       numeral: "II",
       title: "Module two",
-      lessons: [
-        { id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 },
-      ],
+      lessons: [{ id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 }],
     },
   ],
 };
@@ -142,9 +128,27 @@ const SPEC = {
   throughline: { premise: "Water first", runningExample: "The sky wash", vocabulary: [] },
   learningGraph: [],
   alignment: [
-    { lessonId: "l1", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
-    { lessonId: "l2", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
-    { lessonId: "l3", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
+    {
+      lessonId: "l1",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
+    {
+      lessonId: "l2",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
+    {
+      lessonId: "l3",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
   ],
   finalExercise: { task: "Paint it", acceptanceChecks: ["It holds"] },
   evidence: [],
@@ -220,7 +224,9 @@ async function userIdOf(email: string): Promise<string> {
 }
 
 /** A Course at its generation checkpoint: Outline approved, nothing written. */
-async function seedGeneratingCourse(ownerEmail: string): Promise<{ courseId: string; runId: string }> {
+async function seedGeneratingCourse(
+  ownerEmail: string,
+): Promise<{ courseId: string; runId: string }> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
     .insert(courses)
@@ -275,8 +281,7 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
 async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<string> {
   const created = await createChangePlan(db, await userIdOf(OWNER), courseId, ops);
   expect(created.ok).toBe(true);
-  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } })
-    .plan;
+  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } }).plan;
   headerState.current = new Headers({ cookie: ownerCookie });
   for (const operation of plan.operations) {
     await reviewTailorOperationAction(plan.id, operation.id, "accepted");
@@ -302,10 +307,7 @@ async function runRow(courseId: string, outlineVersion: number) {
     .select()
     .from(generationRuns)
     .where(
-      and(
-        eq(generationRuns.courseId, courseId),
-        eq(generationRuns.outlineVersion, outlineVersion),
-      ),
+      and(eq(generationRuns.courseId, courseId), eq(generationRuns.outlineVersion, outlineVersion)),
     );
   return run;
 }
@@ -323,10 +325,7 @@ describe("a generation whose review fails", () => {
     const first = await generateCourseWorkflow(courseId, runId, 1);
     expect(first).toMatchObject({ ok: false, reason: "generation-failed" });
 
-    const [failedRun] = await db
-      .select()
-      .from(generationRuns)
-      .where(eq(generationRuns.id, runId));
+    const [failedRun] = await db.select().from(generationRuns).where(eq(generationRuns.id, runId));
     expect(failedRun.status).toBe("failed");
     const [failedCourse] = await db.select().from(courses).where(eq(courses.id, courseId));
     expect(failedCourse.status).toBe("failed");
@@ -335,10 +334,7 @@ describe("a generation whose review fails", () => {
     reviewState.throwFactual = false;
     headerState.current = new Headers({ cookie: ownerCookie });
     expect(await retryCourseAction(courseId)).toMatchObject({ ok: true });
-    const [reopened] = await db
-      .select()
-      .from(generationRuns)
-      .where(eq(generationRuns.id, runId));
+    const [reopened] = await db.select().from(generationRuns).where(eq(generationRuns.id, runId));
     expect(reopened.status).toBe("running");
 
     /* Any lesson prompt reaching the model would rewrite a Lesson with
@@ -356,10 +352,7 @@ describe("a generation whose review fails", () => {
     expect(bodies.map((r) => r.lessonRef).sort()).toEqual(["l1", "l2", "l3"]);
     expect(JSON.stringify(bodies.map((r) => r.body))).not.toContain("REGENERATED");
 
-    const reviews = await db
-      .select()
-      .from(reviewRuns)
-      .where(eq(reviewRuns.courseId, courseId));
+    const reviews = await db.select().from(reviewRuns).where(eq(reviewRuns.courseId, courseId));
     expect(reviews).toHaveLength(2);
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
     expect(course.status).toBe("ready");
@@ -377,10 +370,7 @@ describe("a staged revision whose review fails", () => {
 
     /* First attempt: reconcile, write l1, then the review explodes. */
     reviewState.throwFactual = true;
-    modelState.current = scriptedModel([
-      reconcileJson(OUTLINE),
-      lessonJson("Lesson one"),
-    ]);
+    modelState.current = scriptedModel([reconcileJson(OUTLINE), lessonJson("Lesson one")]);
     const first = await stageRevisionWorkflow(
       courseId,
       planId,
@@ -458,10 +448,7 @@ describe("a staged revision whose publication fails", () => {
     const staged = await stageForReal(courseId, planId);
 
     reviewState.throwFactual = false;
-    modelState.current = scriptedModel([
-      reconcileJson(OUTLINE),
-      lessonJson("Lesson one"),
-    ]);
+    modelState.current = scriptedModel([reconcileJson(OUTLINE), lessonJson("Lesson one")]);
     publishRefusal.current = { ok: false, reason: "The store refused." };
 
     const first = await stageRevisionWorkflow(

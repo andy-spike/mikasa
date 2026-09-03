@@ -48,9 +48,7 @@ function lessonText(lesson: ReadingLesson): string {
       else if (block.kind === "sql") lines.push(`\`\`\`sql\n${block.code}\n\`\`\``);
       else if (block.kind === "note") lines.push(`${block.title}: ${block.text}`);
       else if (block.kind === "table")
-        lines.push(
-          [block.head.join(" | "), ...block.rows.map((r) => r.join(" | "))].join("\n"),
-        );
+        lines.push([block.head.join(" | "), ...block.rows.map((r) => r.join(" | "))].join("\n"));
     }
   }
   lines.push(`Exercise: ${lesson.exercise?.task ?? "(none)"}`);
@@ -61,17 +59,12 @@ function lessonText(lesson: ReadingLesson): string {
 /** The Tutor's standing instructions plus the Course context it reads. */
 export function tutorSystemPrompt(context: TutorContext): string {
   const outlineLines = context.outline
-    .map(
-      (m) =>
-        `${m.numeral}. ${m.title}: ${m.lessons.map((l) => l.title).join(" · ")}`,
-    )
+    .map((m) => `${m.numeral}. ${m.title}: ${m.lessons.map((l) => l.title).join(" · ")}`)
     .join("\n");
 
   const sources =
     context.sources.length > 0
-      ? context.sources
-          .map((s) => `- ${s.title}${s.url ? ` (${s.url})` : ""}`)
-          .join("\n")
+      ? context.sources.map((s) => `- ${s.title}${s.url ? ` (${s.url})` : ""}`).join("\n")
       : "(none — answer from the Course alone)";
 
   return [
@@ -125,10 +118,7 @@ export function tutorSystemPrompt(context: TutorContext): string {
  * ModelMessages and the new Learner message last. The Tutor's standing
  * instructions ride separately, through `instructions`.
  */
-export function tutorPrompt(
-  history: TutorTurnRow[],
-  message: string,
-): ModelMessage[] {
+export function tutorPrompt(history: TutorTurnRow[], message: string): ModelMessage[] {
   const recent = history.slice(-HISTORY_WINDOW);
   return [
     ...recent.map((turn): ModelMessage =>

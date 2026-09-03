@@ -241,9 +241,10 @@ The Course is a working shell, not a reading room. It refuses the course player'
 
 Depth comes from light, and light has two settings. Graphite runs four steps up from `#0f1012`; paper runs four steps down from `#ffffff`. The ground flips, the system does not: in both, the sidebars sit one step off the reading ground, the open row sits two, and what floats sits at the top of the stack. A stored choice decides which ground a learner gets, and with no stored choice the operating system does; the class is set on `<html>` before first paint, so the shell is never briefly the wrong colour. A graphite canvas with three luminance steps up carries every layer in the product; hairlines divide but never enclose, and nothing on screen is a card. Type does the structural work that borders would do elsewhere: one sans for every word, one mono for every number that is data, and a single small tracked label style for the few things that need naming rather than reading.
 
-Colour is rationed to one job. `#4fd1a5` on graphite, `#0a7f5f` on paper, marks the Lesson you are up to and nothing else. Which Lesson is *open* is carried by a raised ground, so position and progress never compete for the same signal. Everything the learner has already finished is neutral, and everything still ahead of them carries no mark at all. A Course is generated in one pass, so a generated Course has no missing Lesson; the dashed rule belongs to a Course still sitting at its Outline, where nothing has been written yet. This world explicitly replaced a serif, paper-and-brass direction that was rejected outright; that vocabulary is anti-reference, not heritage.
+Colour is rationed to one job. `#4fd1a5` on graphite, `#0a7f5f` on paper, marks the Lesson you are up to and nothing else. Which Lesson is _open_ is carried by a raised ground, so position and progress never compete for the same signal. Everything the learner has already finished is neutral, and everything still ahead of them carries no mark at all. A Course is generated in one pass, so a generated Course has no missing Lesson; the dashed rule belongs to a Course still sitting at its Outline, where nothing has been written yet. This world explicitly replaced a serif, paper-and-brass direction that was rejected outright; that vocabulary is anti-reference, not heritage.
 
 **Key Characteristics:**
+
 - Two grounds, one system: graphite and paper, four surface steps each, zero cards, one shadow.
 - One accent with exactly one meaning, spent on roughly one row per screen.
 - Fewest facts per row: three in the Outline rail, three in the Courses list, everything else a click away.
@@ -257,6 +258,7 @@ Colour is rationed to one job. `#4fd1a5` on graphite, `#0a7f5f` on paper, marks 
 A single near-neutral family (hue ~258, chroma under 0.02) carries every surface, hairline and text step, with one green as the only colour on the screen.
 
 ### Two grounds
+
 Every semantic token has two values and one meaning. `{colors.*}` in this document names the graphite value; `colorsLight` in the frontmatter carries its paper twin. The pairing is by role, never by lightness — `--panel` is the sidebars' ground in both, which reads darker than the reading column on paper and lighter than it on graphite.
 
 The two grounds land on the same contrast floors, deliberately: the quiet text steps clear 5.08 and 4.63 against the topmost surface on paper, 5.09 and 4.61 on graphite, and the one graphics-only mark clears 3.18 and 3.15. Audited in the browser against the computed ground, both themes carry **zero** text below its floor.
@@ -264,21 +266,26 @@ The two grounds land on the same contrast floors, deliberately: the quiet text s
 A colour is defined in `:root` and, if it moves, redefined in `.dark`. Nothing is ever defined only in one ground.
 
 ### Primary
+
 - **Live Mint** (`{colors.live}`): The accent. It marks the Lesson you are up to — the first Lesson that is set and not done — as a small solid triangle in the Outline rail. It also paints the focus ring, the text caret, and the selection wash, because those are the browser surfaces the workspace still owns. It is never spent on done, on code, on hover, on a button, or on a second meaning. 9.97:1 on graphite canvas; the paper twin `#0a7f5f` is darkened to 4.98:1 on white and 3.95:1 on the topmost surface, so the same mark clears the graphics floor on both grounds.
 
 ### Neutral — surfaces
+
 - **Graphite Canvas** (`{colors.canvas}`): The ground everything sits on. The reading column, the shell, the palette scrim's backdrop.
 - **Panel** (`{colors.panel}`): One step up. The Outline rail, the Tutor/Tailor panel, code blocks, the palette trigger, the Done chip.
 - **Raised** (`{colors.raised}`): Two steps up. The open Lesson row, the active palette option, the active mode-switch segment, inline code, the learner's own turns in the Tutor thread, the primary button at rest.
 - **Over** (`{colors.over}`): Three steps up. The compact Approve button and, on graphite, the command palette body.
-- **Float** (`{colors.float}`): What leaves the document. On graphite it is `--over`; on paper it is white, because a modal that steps *down* from its own page reads as a hole rather than a layer. The command palette is its only consumer.
+- **Float** (`{colors.float}`): What leaves the document. On graphite it is `--over`; on paper it is white, because a modal that steps _down_ from its own page reads as a hole rather than a layer. The command palette is its only consumer.
 
 ### Neutral — hairlines
+
 - **Hairline** (`{colors.hair}`): The default divider and the global border colour. Rail against reading column, panel against shell, table row against table row.
 - **Rule** (`{colors.rule}`): The stronger divider, used where a hairline would be read as incidental: the note block's left rule, the table's header rule, and the Approve button's hover ground.
 
 ### Neutral — text
+
 Every text step is legal body text on all four surfaces; the ramp is a hierarchy of emphasis, not a hierarchy of legality.
+
 - **Full Ink** (`{colors.fg}`): Lesson titles, open Lesson rows, strong inline emphasis, code keywords, the last column of a result table. 12.18–15.65:1.
 - **Second Ink** (`{colors.fg-2}`): Body prose, unopened Lesson titles, Tutor answers. The colour most words in the product are set in. 7.58–9.75:1.
 - **Third Ink** (`{colors.fg-3}`): Supporting text — Goal, module counts, captions, quiet buttons, placeholders, code comments. 5.09–6.54:1.
@@ -286,18 +293,23 @@ Every text step is legal body text on all four surfaces; the ramp is a hierarchy
 - **Mark** (`{colors.mark}`): 3.15–4.05:1. **Graphics only, never text.** Its one consumer is the dashed rule that stands in for a Lesson in a Course that has not been generated yet — the Outline screen and the Courses list, never inside a Course the learner is reading.
 
 ### Neutral — browser surfaces
+
 - **Selection** (`{colors.select}`), **Scrollbar Thumb** (`{colors.thumb}` / `{colors.thumb-hover}`), **Scroll Shade** (`{colors.scroll-shade}`), **Scrim** (`{colors.scrim}`): The parts the workspace does not draw but still owns. Thin scrollbars, an accent selection, the shade that fades a horizontal scroller's edge while content sits past it, and the ground the command palette sits on. `color-scheme` moves with the theme, so the form controls and scrollbars the browser draws itself follow.
 
 ### Tertiary
+
 - **Bad Red** (`{colors.bad}`): One consumer only — the hover state of the Tailor's Discard control, where the word already says the same thing. There is no red fill, no red badge, no error surface in this build.
 
 ### Third-party marks
+
 One graphic in the product is exempt from everything above: Google's G on the sign-in button, drawn in `components/google-mark.tsx`. Its four hexes are hardcoded and are answered in neither ground, because it is an identity mark under someone else's brand terms rather than an interface icon — recolouring it to `--fg` would be the wrong kind of consistency. It is the single place a literal colour is legal at a call site, and the single place colour on screen does not mean "the Lesson you are up to". Nothing else earns this; a second exception is a design problem, not a precedent.
 
 ### Declared but unspent
+
 `--live-dim`, `--live-wash` and `--warn` are declared in the token layer and have **zero consumers** in the components. They are recorded here as available, not as in use; a new surface that needs a second green or an amber should either spend them deliberately or drop them. `--radius` was declared and unread, and has been deleted; the ramp is `--radius-sm/md/lg`, all three at `0`.
 
 ### Named Rules
+
 **The One Accent Rule.** `#4fd1a5` means exactly one thing: the Lesson you are up to. Roughly one row per screen carries it. If a second element wants the accent, the answer is a luminance step, not a hue. The one colour on screen that is not the accent is Google's G on the sign-in button, which belongs to Google.
 
 **The Light, Not Line Rule.** Surfaces separate by luminance. A hairline divides two regions; it never wraps one to make an object. If a thing needs a border on all four sides to read, it is drawn wrong.
@@ -314,6 +326,7 @@ One graphic in the product is exempt from everything above: Google's G on the si
 **Character:** Two families, no third. Geist is neutral enough to disappear at 13px in a dense rail and confident enough to carry a 36px Lesson title; the alternate `cv11` and `ss01` forms keep the lowercase l and the numerals unambiguous next to code. Geist Mono is not decoration — it appears wherever a glyph is data the learner might compare.
 
 ### Hierarchy
+
 - **Display Large** (600, 3rem, 1.08, -0.03em) and **Display Large Small** (600, 2.5rem, same leading and tracking, below 640px): The Persuade surfaces only — the landing's opening statement and its closing one. It exists because a 2.25rem line reads as a section heading at the top of a page that has nothing above it, and the answer to that is a size step, not a second weight or a colour. Two consumers, both on `app/page.tsx`. It is recorded as a pair for the same reason Display is — the system holds one size per named step, and a step that moves at a breakpoint names both ends.
 - **Display** (600, 2.25rem, 1.16, -0.026em): The Lesson title at ≥640px, capped at 22 characters per line and balanced.
 - **Display Small** (600, 1.875rem, 1.16, -0.026em): The same title below 640px. One of the system's two responsive steps; Display Large is the other, and both live at the top of the ramp where a line has room to be wrong.
@@ -327,6 +340,7 @@ One graphic in the product is exempt from everything above: Google's G on the si
 - **Mono** (400, 0.8125rem, 1.72): Code blocks, result tables, inline code at 0.86em of its host, keycaps at 0.6875rem.
 
 ### Named Rules
+
 **The Two Family Rule.** Geist sets every word and Geist Mono every number that is data. No third face, and no serif anywhere in this product — the serif world was tried and rejected.
 
 **The Tabular Data Rule.** Any number a learner might compare down a column — completion counts, Lesson numbers, dates, minute estimates, table cells, keycaps — carries `.tnum` (`font-variant-numeric: tabular-nums lining`). Prose numbers do not.
@@ -354,6 +368,7 @@ The column holds still by keeping the region around it a constant size, from bot
 **Breakpoints:** 768 (`md`), 1024 (`lg`), 1280 (`xl`), 1536 (`2xl`), plus the 767px query behind the sheet behaviour and a 1279px check that trades the rail for the panel.
 
 ### Named Rules
+
 **The One Right Edge Rule.** Every painted edge in the Lesson column — paragraph, code block, table, note, Exercise rule, footer rule — lands on the same right edge at 36rem. Code and tables scroll inside that edge; nothing reaches past it.
 
 **The Fixed Sentence Rule.** Opening or closing chrome must not move the reading column. Zero drift is the acceptance test, not "close enough".
@@ -369,9 +384,11 @@ The system is tonal, not shadowed. Depth is four steps of luminance — canvas, 
 Exactly one shadow ships, on the only thing that genuinely floats.
 
 ### Shadow Vocabulary
+
 - **Lift** (`--lift`): The layers that actually leave the document — the command palette and the Select popup. Offset and blur, never a halo. Two values: `0 18px 44px -12px rgba(0,0,0,0.72), 0 3px 10px -3px rgba(0,0,0,0.55)` on graphite, and a shorter, lighter pair on paper — a shadow tuned for a dark ground reads as soot on a white one.
 
 ### Named Rules
+
 **The Flat Shell Rule.** One shadow exists in this system and it belongs to whatever genuinely leaves the document — the command palette, the Select popup. Everything else earns its depth from light.
 
 ## Shapes
@@ -385,11 +402,13 @@ Marks are drawn, not iconified in a font: a 12px solid triangle for live, a 12px
 The focus ring is a 2px solid mint outline at 2px offset, square like the thing it surrounds.
 
 ### Named Rules
+
 **The Square Corner Rule.** There is no radius anywhere in this product. An element that needs to read as separate takes a luminance step or a hairline — the two tools the system already has.
 
 ## Components
 
 ### Vendored primitives (shadcn / base-ui)
+
 Anything with real interaction behaviour comes from the registry and is adapted through the token layer rather than rebuilt: `Sidebar`, `Button`, `Command`, `Dialog`, `Select`, `RadioGroup`, `ToggleGroup`, `Textarea`, `Input`, `Sheet`, `Tooltip`. Nothing in the product hand-rolls a control any more. The primitive owns roving focus, arrow keys, typeahead, ARIA, portalling and dismissal; this file owns how it looks. Every adaptation is recorded in the component file at the line it changes, in these four shapes:
 
 - **`Toggle` / `ToggleGroup`** — the shipped variants are uppercase at `tracking-widest` with a focus ring, which spends the one label style on a control and adds a ring this world does not have. Restyled to the segmented switch: a canvas-inset track, the chosen segment on a raised ground, at 0.8125rem/500.
@@ -402,9 +421,11 @@ Anything with real interaction behaviour comes from the registry and is adapted 
 Hand-rolled controls were deleted as each primitive landed. `switchTrack`/`switchSeg` went when `ToggleGroup` replaced them and the five `btn*` constants went when `Button` did, leaving `lib/ui.ts` holding one idiom: the inset `field` that a few inputs still wear directly. The palette's own dialog, filter, active-option tracking and key handling went with `Command` — what remains in `palette.tsx` is the surface, the grouping and the footer.
 
 ### Sidebar (vendored, shadcn)
+
 Both rails are the shadcn `Sidebar` — provider, gap, container, header, content, group, menu, and the mobile sheet — restyled through the token layer rather than rebuilt. `--sidebar` and its four companions are aliases onto `--panel`, `--fg`, `--hair`, `--raised` and `--live`, so the component follows the theme without knowing about it. `SidebarMenuButton` already carries `data-active` and hover as a ground step, which is exactly the Two Signals rule, so the Outline row spends it rather than re-implementing it.
 
 Four adaptations are recorded in the file, at the lines they change:
+
 - **One open state per rail.** The shipped provider keeps a second `openMobile` for the sheet. Two providers are on screen at once here, so the caller owns the only truth and the sheet reads it too.
 - **No cookie.** Two rails would write one cookie name. Nothing about the shell is persisted in this build.
 - **No `⌘B` inside the provider.** Two providers would both answer it. The workspace binds it once, for the Outline, beside `⌘K`.
@@ -413,16 +434,20 @@ Four adaptations are recorded in the file, at the lines they change:
 `--sidebar-width` is set inline by the provider, where a breakpoint cannot reach it, so it reads `--mk-rail` and the class moves that instead.
 
 ### Theme Switch
+
 One control in the chrome, holding no React state: the class on `<html>` is the state, which icon shows is a CSS question, and the choice is written to `localStorage` under `mk-theme`. It renders identically on the server and the client, so it needs no mounted flag and produces no hydration seam.
 
 ### Outline Rail (signature)
+
 The Outline is a live, editable object beside the Lesson, not a table of contents, and the rail is built to look like one. Module headings are labels with a `done/total` count; Lesson rows are a fixed four-column grid.
+
 - **Three states, three marks:** live is the accent triangle; done is a neutral check; unset is a dashed rule at `--mark` with its title at third ink. Inside a generated Course only the first two occur — a Lesson the learner has not reached yet is unmarked, not unfinished. Module headings carry their name and no count.
 - **Open:** raised ground, title at full ink and medium weight, `aria-current="true"`. Never the accent.
 - **Hover:** raised at 60% opacity. Rows transition background and colour over 120ms.
 - **Unset rows are `<div aria-disabled="true">`, not buttons.** No hover, no cursor change, no click target, no palette entry.
 
 ### Buttons
+
 - **Shape:** square, like everything else. All seven live on `Button`; `variant` decides both the look and the padding.
 - **Primary** (`Mark the Exercise done`): raised ground, full ink, 0.8125rem/500, 1rem × 0.625rem padding. Hover steps to over. It is the most important action on the page and it is still greyscale.
 - **Hero** (`Start a Course`, `Continue with Google`): over ground, full ink, 0.875rem/500, 1.25rem × 0.75rem padding, hover to rule. One luminance step above Primary, because an Operate screen has several actions competing and a Persuade surface has one. The step is the system answering "this needs more weight" the way it always does — with light, never with a hue.
@@ -431,7 +456,9 @@ The Outline is a live, editable object beside the Lesson, not a table of content
 - **Icon** (rail toggle, panel close, palette trigger): third ink on no ground, hover to a panel or raised step and full ink.
 
 ### Command Palette (signature)
+
 Navigation, not a shortcut: every set Lesson and every action is reachable without the pointer. ⌘K/Ctrl-K toggles it globally.
+
 - **Surface:** float ground, square, 34rem wide, `lift` shadow, on the scrim, 12vh from the top.
 - **Composition:** search input over a hairline, grouped results (Actions, then Lessons) with label-style group headers, a hairline-topped keycap footer. A hint beside an option identifies it — the Module a Lesson sits in — and never explains it, so the action rows carry a label alone.
 - **Behaviour is the primitive's:** cmdk inside a base-ui Dialog owns filtering, the active option, arrow keys, Enter, Escape, the focus trap, the inert background and returning focus. Opened by `⌘K` from anywhere there is no trigger to return to, so focus lands on the body.
@@ -439,21 +466,26 @@ Navigation, not a shortcut: every set Lesson and every action is reachable witho
 - **Empty state:** says that nothing in this Course matches, rather than leaving the absence unexplained. Every Lesson in a generated Course is in the palette, because every Lesson exists.
 
 ### Panel (Tutor / Tailor)
+
 One panel, two modes, an explicit segmented switch at the top on a canvas-inset ground with the active segment raised. It owns its own close, so the shell shows no second control naming the same thing. A one-line subtitle states the contract: the Tutor changes nothing, the Tailor writes nothing until approved.
+
 - **Tutor thread:** the learner's turns sit one luminance step up in a right-shouldered rounded block; the Tutor's answers are unadorned prose at second ink. Pending state is a live-region line, not a spinner.
 - **Composer:** canvas-inset field that steps up to raised on focus-within; Enter sends, Shift-Enter breaks.
 - **Tailor plan:** hairline-divided rows on the panel's own ground — verb label, target, change, reason, then Approve/Discard or Applied/Undo. Deliberately not a card list.
 
 ### Prose Blocks
+
 - **Paragraph:** second ink, 1rem/1.72, capped at the measure.
 - **Code:** panel ground, square, a label-style language strip over a hairline, and a horizontally scrolling body with edge fades (Lea Verou's local/scroll gradient pair) that appear only while there is content past the edge. Highlighting is weight for keywords and a dim step for comments; **no accent in code**.
 - **Note:** a left rule at `--rule` with a label heading. Not a callout, not a box.
 - **Table:** mono, tabular, label-style headers over a rule, hairline row dividers, last column at full ink. Scrolls inside the measure with the same edge fades.
 
 ### Motion
+
 Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bounce — at 120ms for row and colour changes, 160ms for the default, 240ms for entrances. The authored moment is marking an Exercise done: one handoff in two halves, the check stroking itself onto the row just finished (340ms dash) while the accent lifts into place on the next Lesson (300ms). It fires on a real mark, never on first paint or a revisit. Under `prefers-reduced-motion`, both end states remain and all movement is dropped.
 
 ### Named Rules
+
 **The Stays In Place Rule.** A Course whose Lessons have not been generated draws every one of them, ruled and inert. They are never hidden, never faded out, and never disabled buttons — they hold their positions so the shape of the Course is legible before a word of it exists. The state is a property of the Course, not of a Lesson within it: generation is one pass, so a Course is either written or it is not.
 
 **The Two Signals Rule.** Where you are up to is colour; what you have open is light. The two never swap and never combine on one row.
@@ -461,6 +493,7 @@ Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bo
 ## Do's and Don'ts
 
 ### Do:
+
 - **Do** separate surfaces with luminance — `{colors.canvas}` → `{colors.panel}` → `{colors.raised}` → `{colors.over}` — and use hairlines only to divide.
 - **Do** spend `{colors.live}` on exactly one thing: the Lesson the learner is up to.
 - **Do** carry the open state with a raised ground and `aria-current`, never with colour.
@@ -476,6 +509,7 @@ Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bo
 - **Do** mark a layer parked off the canvas `inert`, so it leaves the tab order with the pixels.
 
 ### Don't:
+
 - **Don't** build cards. No bordered, radiused, shadowed boxes as page structure — the Tailor's change list included.
 - **Don't** introduce a second accent, a coloured status pill, a progress ring, a percentage, a streak, or an XP counter.
 - **Don't** spend the accent on done, on hover, on a button, on code syntax, or on anything but the live Lesson.

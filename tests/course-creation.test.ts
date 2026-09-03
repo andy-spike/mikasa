@@ -208,26 +208,16 @@ describe("retryCourseAction", () => {
     const courseId = created.courseId;
 
     /* The first run failed on the engine side. */
-    await db
-      .update(courses)
-      .set({ status: "failed" })
-      .where(eq(courses.id, courseId));
+    await db.update(courses).set({ status: "failed" }).where(eq(courses.id, courseId));
 
     const before = workflowStarts.calls.length;
     const result = await retryCourseAction(courseId);
     expect(result.ok).toBe(true);
 
-    const [course] = await db
-      .select()
-      .from(courses)
-      .where(eq(courses.id, courseId))
-      .limit(1);
+    const [course] = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
     expect(course.status).toBe("designing");
 
-    const runs = await db
-      .select()
-      .from(designRuns)
-      .where(eq(designRuns.courseId, courseId));
+    const runs = await db.select().from(designRuns).where(eq(designRuns.courseId, courseId));
     expect(runs).toHaveLength(2);
     expect(workflowStarts.calls.length).toBe(before + 1);
     expect(workflowStarts.calls.at(-1)?.courseId).toBe(courseId);

@@ -19,29 +19,14 @@ import { makeTestDb } from "./helpers/test-db";
 import type { LessonContent } from "@/lib/course/content";
 import type { SandboxProvider } from "@/lib/course/sandbox-verify";
 
-const {
-  needsCodeVerification,
-  planVerification,
-  runVerification,
-  verificationFindings,
-} = await import("@/lib/course/sandbox-verify");
+const { needsCodeVerification, planVerification, runVerification, verificationFindings } =
+  await import("@/lib/course/sandbox-verify");
 const { parseLessonContent } = await import("@/lib/course/content");
 const { saveLessonContent } = await import("@/lib/db/lessons");
-const {
-  findCodeVerification,
-  latestCodeVerification,
-  publishRevision,
-  saveCodeVerification,
-} = await import("@/lib/db/review");
-const {
-  codeVerifications,
-  courses,
-  courseSpecs,
-  generationRuns,
-  outlines,
-  reviewRuns,
-  users,
-} = await import("@/lib/db/schema");
+const { findCodeVerification, latestCodeVerification, publishRevision, saveCodeVerification } =
+  await import("@/lib/db/review");
+const { codeVerifications, courses, courseSpecs, generationRuns, outlines, reviewRuns, users } =
+  await import("@/lib/db/schema");
 
 let db: Awaited<ReturnType<typeof makeTestDb>>;
 
@@ -91,28 +76,25 @@ function proseLesson(lessonId = "l1"): LessonContent {
 describe("needsCodeVerification", () => {
   it("says yes when the candidate carries code", () => {
     expect(
-      needsCodeVerification(
-        { topic: "the Vercel AI SDK", goal: "build my own AI chat app" },
-        [codingLesson()],
-      ),
+      needsCodeVerification({ topic: "the Vercel AI SDK", goal: "build my own AI chat app" }, [
+        codingLesson(),
+      ]),
     ).toBe(true);
   });
 
   it("says yes when the contract promises coding work, even without code yet", () => {
     expect(
-      needsCodeVerification(
-        { topic: "React from scratch", goal: "build my own dashboard" },
-        [proseLesson()],
-      ),
+      needsCodeVerification({ topic: "React from scratch", goal: "build my own dashboard" }, [
+        proseLesson(),
+      ]),
     ).toBe(true);
   });
 
   it("says no for a prose Course, so no Sandbox work is ever created", () => {
     expect(
-      needsCodeVerification(
-        { topic: "the history of typography", goal: "read faces critically" },
-        [proseLesson()],
-      ),
+      needsCodeVerification({ topic: "the history of typography", goal: "read faces critically" }, [
+        proseLesson(),
+      ]),
     ).toBe(false);
   });
 });
@@ -121,7 +103,13 @@ describe("planVerification", () => {
   it("returns the files and commands the model planned", async () => {
     const model = scriptedModel([
       json({
-        files: [{ path: "src/join.js", content: "export function join(a,b){return a+b}", lessonRef: "l1" }],
+        files: [
+          {
+            path: "src/join.js",
+            content: "export function join(a,b){return a+b}",
+            lessonRef: "l1",
+          },
+        ],
         commands: [{ run: "node src/join.js", lessonRef: "l1", proves: "join works" }],
       }),
     ]);
@@ -288,7 +276,12 @@ describe("verification in review and publication", () => {
     });
     const [run] = await db
       .insert(generationRuns)
-      .values({ courseId: course.id, outlineVersion: 1, status: "succeeded", currentStep: "complete" })
+      .values({
+        courseId: course.id,
+        outlineVersion: 1,
+        status: "succeeded",
+        currentStep: "complete",
+      })
       .returning();
     await saveLessonContent(db, course.id, 1, run.id, codingLesson());
     return course.id;

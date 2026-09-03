@@ -16,7 +16,8 @@ export const depths = [
   {
     id: "working",
     title: "Solid working knowledge",
-    detail: "The Goal, plus the surrounding ground you need to keep using this without a reference open.",
+    detail:
+      "The Goal, plus the surrounding ground you need to keep using this without a reference open.",
   },
   {
     id: "mastery",

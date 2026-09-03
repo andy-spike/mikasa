@@ -40,9 +40,7 @@ export function useStickyFollow(ref: RefObject<HTMLElement | null>) {
       el.style.top = "";
       gap = Math.max(
         0,
-        el.getBoundingClientRect().top -
-          scroller.getBoundingClientRect().top +
-          scroller.scrollTop,
+        el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop,
       );
       el.style.top = previous;
     };

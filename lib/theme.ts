@@ -43,8 +43,7 @@ export function setTheme(next: ThemeChoice) {
     /* ignored */
   }
   const dark =
-    next === "dark" ||
-    (next === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+    next === "dark" || (next === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
   document.documentElement.classList.toggle("dark", dark);
   for (const notify of listeners) notify();
 }

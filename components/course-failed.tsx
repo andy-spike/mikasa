@@ -47,17 +47,14 @@ export function CourseFailed({
       <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
         {topic}
       </h1>
-      <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-        {goal}
-      </p>
+      <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">{goal}</p>
       <div className="mt-8 border-t border-hair pt-6">
         <p className="label text-fg-3">The Course did not finish</p>
         <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
           {error ?? "Something went wrong while the Course was being built."}
         </p>
         <p className="mt-2 max-w-(--measure) text-[0.75rem] leading-[1.5] text-fg-3">
-          Everything already written is kept. Retrying picks up where this run
-          stopped.
+          Everything already written is kept. Retrying picks up where this run stopped.
         </p>
         {message ? (
           <p role="alert" className="mt-3 text-[0.8125rem] leading-[1.5] text-fg-2">

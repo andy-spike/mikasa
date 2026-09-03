@@ -23,9 +23,7 @@ const navigation = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => navigation);
 
-const { markLessonDoneAction, markLessonUndoneAction } = await import(
-  "@/lib/actions/completion"
-);
+const { markLessonDoneAction, markLessonUndoneAction } = await import("@/lib/actions/completion");
 const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
 const {
@@ -234,9 +232,9 @@ describe("markLessonDoneAction", () => {
     const courseId = await seedPublishedCourse(OWNER);
     const result = await markLessonDoneAction(courseId, "l-ghost");
     expect(result).toMatchObject({ ok: false, reason: "unknown-lesson" });
-    expect(
-      await db.select().from(completions).where(eq(completions.courseId, courseId)),
-    ).toEqual([]);
+    expect(await db.select().from(completions).where(eq(completions.courseId, courseId))).toEqual(
+      [],
+    );
   });
 
   it("reads another Learner's Course as not-found and never writes to it", async () => {
@@ -244,9 +242,9 @@ describe("markLessonDoneAction", () => {
     const courseId = await seedPublishedCourse(OWNER);
     const result = await markLessonDoneAction(courseId, "l1");
     expect(result).toMatchObject({ ok: false, reason: "not-found" });
-    expect(
-      await db.select().from(completions).where(eq(completions.courseId, courseId)),
-    ).toEqual([]);
+    expect(await db.select().from(completions).where(eq(completions.courseId, courseId))).toEqual(
+      [],
+    );
   });
 
   it("refuses a Course that has not published", async () => {

@@ -62,9 +62,7 @@ function toPlanView(row: ChangePlanRow): PlanView {
  * this after a turn (one may have been proposed) and whenever a review
  * did not land, so the server's state always wins.
  */
-export async function findProposedPlanAction(
-  courseId: string,
-): Promise<PlanView | null> {
+export async function findProposedPlanAction(courseId: string): Promise<PlanView | null> {
   const { user } = await requireLearner();
   const plan = await findProposedPlan(db, user.id, courseId);
   return plan ? toPlanView(plan) : null;
@@ -79,9 +77,7 @@ export type StagedPlanView = {
 };
 
 /** The active staged Course revision, including a failure the Learner can retry. */
-export async function findStagedPlanAction(
-  courseId: string,
-): Promise<StagedPlanView | null> {
+export async function findStagedPlanAction(courseId: string): Promise<StagedPlanView | null> {
   const { user } = await requireLearner();
   const plan = await findStagedPlan(db, user.id, courseId);
   if (!plan?.stagedOutlineVersion) return null;
@@ -202,9 +198,7 @@ export type PublishedPlanRow = {
  * The Course's published plans, newest first, each with its undo
  * availability (#15) — the pane's Published changes section.
  */
-export async function listPublishedPlansAction(
-  courseId: string,
-): Promise<PublishedPlanRow[]> {
+export async function listPublishedPlansAction(courseId: string): Promise<PublishedPlanRow[]> {
   const { user } = await requireLearner();
   /* The plans belong to the Course, and the Course to the caller: an
      unknown or foreign Course reads as no published changes. */
@@ -237,7 +231,6 @@ export async function listPublishedPlansAction(
     };
   });
 }
-
 
 /**
  * Stages a published Course's accepted plan as a new revision (#14) and

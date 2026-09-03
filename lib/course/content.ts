@@ -71,11 +71,7 @@ const lessonContentSchema = z.object({
   bridge: z.string().min(1),
 });
 
-export function parseLessonContent(
-  lessonId: string,
-  title: string,
-  value: unknown,
-): LessonContent {
+export function parseLessonContent(lessonId: string, title: string, value: unknown): LessonContent {
   const parsed = lessonContentSchema.parse(value);
   return { lessonId, title, ...parsed };
 }

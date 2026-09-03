@@ -34,14 +34,8 @@ const {
   saveFindings,
 } = await import("@/lib/db/review");
 const { saveLessonContent } = await import("@/lib/db/lessons");
-const {
-  courses,
-  courseSpecs,
-  generationRuns,
-  outlines,
-  revisions,
-  users,
-} = await import("@/lib/db/schema");
+const { courses, courseSpecs, generationRuns, outlines, revisions, users } =
+  await import("@/lib/db/schema");
 
 const OUTLINE = {
   modules: [
@@ -85,10 +79,7 @@ const SPEC = {
   evidence: [{ sourceRef: "src-1", supports: "The main claim" }],
 };
 
-function contentFor(
-  lessonId: string,
-  overrides: Partial<Record<string, unknown>> = {},
-) {
+function contentFor(lessonId: string, overrides: Partial<Record<string, unknown>> = {}) {
   return parseLessonContent(lessonId, `Lesson ${lessonId.slice(1)}`, {
     body: [{ kind: "p", text: "Explanation.", sourceRefs: ["src-1"] }],
     workedExample: [{ kind: "p", text: "Worked through the chat app." }],
@@ -155,9 +146,12 @@ async function seedCandidate(): Promise<string> {
     .returning();
   await db.insert(outlines).values({ courseId: course.id, version: 1, data: OUTLINE });
   await db.insert(courseSpecs).values({ courseId: course.id, spec: SPEC, outlineVersion: 1 });
-  await db
-    .insert(generationRuns)
-    .values({ courseId: course.id, outlineVersion: 1, status: "succeeded", currentStep: "complete" });
+  await db.insert(generationRuns).values({
+    courseId: course.id,
+    outlineVersion: 1,
+    status: "succeeded",
+    currentStep: "complete",
+  });
   return course.id;
 }
 
@@ -191,7 +185,7 @@ describe("structuralFindings", () => {
     });
 
     const details = findings.map((f) => f.detail).join("\n");
-    expect(details).toContain("cites Source \"src-9\"");
+    expect(details).toContain('cites Source "src-9"');
     expect(details).toContain("no worked example");
     expect(details).toContain("no bridge");
     /* Every finding names its Lesson. */
@@ -204,10 +198,7 @@ describe("structuralFindings", () => {
   it("catches a Lesson that assumes a skill taught later", () => {
     const late = {
       ...SPEC,
-      alignment: [
-        { ...SPEC.alignment[0], prerequisiteNodes: ["g2"] },
-        SPEC.alignment[1],
-      ],
+      alignment: [{ ...SPEC.alignment[0], prerequisiteNodes: ["g2"] }, SPEC.alignment[1]],
     };
     const findings = structuralFindings({
       spec: late,
@@ -221,8 +212,18 @@ describe("structuralFindings", () => {
 describe("model reviews", () => {
   it("maps the model's findings onto the factual and design slices", async () => {
     const model = scriptedModel([
-      json({ findings: [{ lessonRef: "l1", detail: "Wrong version number.", correction: "Fix to v7." }] }),
-      json({ findings: [{ lessonRef: null, detail: "Bridge contradicts next Lesson.", correction: "Rewrite the bridge." }] }),
+      json({
+        findings: [{ lessonRef: "l1", detail: "Wrong version number.", correction: "Fix to v7." }],
+      }),
+      json({
+        findings: [
+          {
+            lessonRef: null,
+            detail: "Bridge contradicts next Lesson.",
+            correction: "Rewrite the bridge.",
+          },
+        ],
+      }),
     ]);
     const courseMeta = { topic: "t", goal: "g", language: "en" };
     const lessons = [contentFor("l1"), contentFor("l2")];
@@ -231,7 +232,12 @@ describe("model reviews", () => {
     const design = await designFindings(model.model, courseMeta, SPEC, OUTLINE, lessons);
 
     expect(factual).toEqual([
-      { kind: "factual", lessonRef: "l1", detail: "Wrong version number.", correction: "Fix to v7." },
+      {
+        kind: "factual",
+        lessonRef: "l1",
+        detail: "Wrong version number.",
+        correction: "Fix to v7.",
+      },
     ]);
     expect(design[0].kind).toBe("learning-design");
     expect(design[0].lessonRef).toBeNull();
@@ -240,13 +246,9 @@ describe("model reviews", () => {
   it("treats a broken model response as a review failure, not a pass", async () => {
     const model = scriptedModel(["not json"]);
     await expect(
-      factualFindings(
-        model.model,
-        { topic: "t", goal: "g", language: "en" },
-        SPEC,
-        SOURCES,
-        [contentFor("l1")],
-      ),
+      factualFindings(model.model, { topic: "t", goal: "g", language: "en" }, SPEC, SOURCES, [
+        contentFor("l1"),
+      ]),
     ).rejects.toThrow();
   });
 });
@@ -325,7 +327,12 @@ describe("publication", () => {
     const courseId = await seedCandidate();
     const run = await openReviewRun(db, courseId, 1);
     await saveFindings(db, run.id, courseId, 1, 0, [
-      { kind: "learning-design", lessonRef: null, detail: "No throughline.", correction: "Rewrite." },
+      {
+        kind: "learning-design",
+        lessonRef: null,
+        detail: "No throughline.",
+        correction: "Rewrite.",
+      },
     ]);
     await failReview(db, courseId, run.id, "The review did not pass.");
 

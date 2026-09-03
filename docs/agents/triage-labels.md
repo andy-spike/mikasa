@@ -2,12 +2,12 @@
 
 The engineering skills use five canonical triage roles.
 
-| Role | GitHub label | Meaning |
-| --- | --- | --- |
-| `needs-triage` | `needs-triage` | A maintainer needs to evaluate the issue |
-| `needs-info` | `needs-info` | Waiting for more information |
-| `ready-for-agent` | `ready-for-agent` | Fully specified and ready for an agent |
-| `ready-for-human` | `ready-for-human` | Requires human implementation |
-| `wontfix` | `wontfix` | Will not be implemented |
+| Role              | GitHub label      | Meaning                                  |
+| ----------------- | ----------------- | ---------------------------------------- |
+| `needs-triage`    | `needs-triage`    | A maintainer needs to evaluate the issue |
+| `needs-info`      | `needs-info`      | Waiting for more information             |
+| `ready-for-agent` | `ready-for-agent` | Fully specified and ready for an agent   |
+| `ready-for-human` | `ready-for-human` | Requires human implementation            |
+| `wontfix`         | `wontfix`         | Will not be implemented                  |
 
 When a skill names a triage role, use the corresponding GitHub label.

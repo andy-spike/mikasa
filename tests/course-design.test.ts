@@ -115,9 +115,7 @@ describe("selectExcerpts", () => {
     const excerpts = await selectExcerpts(excerptModel.model, course, found);
 
     expect(excerpts.get("https://sdk.vercel.example/docs")).toHaveLength(600);
-    expect(excerpts.get("https://sdk.vercel.example/streaming")).toBe(
-      "streamText streams tokens.",
-    );
+    expect(excerpts.get("https://sdk.vercel.example/streaming")).toBe("streamText streams tokens.");
   });
 
   it("falls back to the page's opening lines when the model skips a url", async () => {
@@ -289,7 +287,13 @@ describe("designSpecification", () => {
   it("keeps only evidence that cites a real Source ref", async () => {
     const specModel = scriptedModel([json(specResponse())]);
     const sources = [
-      { ref: "src-a", title: "Docs", url: "https://a.example", fetchedAt: "2026-08-31T00:00:00.000Z", excerpt: "..." },
+      {
+        ref: "src-a",
+        title: "Docs",
+        url: "https://a.example",
+        fetchedAt: "2026-08-31T00:00:00.000Z",
+        excerpt: "...",
+      },
     ];
     const spec = await designSpecification(specModel.model, course, outline, REACH_DRAFT, sources);
 
@@ -321,7 +325,14 @@ describe("design persistence", () => {
   ) {
     const [user] = await db
       .insert(users)
-      .values({ id: "u1", name: "L", email: "l@example.com", emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
+      .values({
+        id: "u1",
+        name: "L",
+        email: "l@example.com",
+        emailVerified: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
       .returning();
     const [courseRow] = await db
       .insert(courses)
@@ -371,7 +382,13 @@ describe("design persistence", () => {
         evidence: sources.map((s) => ({ sourceRef: s.ref, supports: `${s.title} backs this` })),
       }),
     ]);
-    const specification = await designSpecification(specModel.model, runCourse, outline, draft, sources);
+    const specification = await designSpecification(
+      specModel.model,
+      runCourse,
+      outline,
+      draft,
+      sources,
+    );
     return { sources, outline, specification };
   }
 

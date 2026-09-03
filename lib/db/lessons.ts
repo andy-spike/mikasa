@@ -10,14 +10,7 @@
  */
 import { and, eq } from "drizzle-orm";
 import type { Db } from "./index";
-import {
-  courses,
-  courseSpecs,
-  generationRuns,
-  lessons,
-  outlines,
-  sources,
-} from "./schema";
+import { courses, courseSpecs, generationRuns, lessons, outlines, sources } from "./schema";
 import type { LessonContent, ContentBlock } from "../course/content";
 import { parseLessonContent } from "../course/content";
 import type { CourseSpecification } from "../course/types";
@@ -57,11 +50,7 @@ export async function loadGenerationContext(
   courseId: string,
   outlineVersion: number,
 ): Promise<GenerationContext | undefined> {
-  const [course] = await db
-    .select()
-    .from(courses)
-    .where(eq(courses.id, courseId))
-    .limit(1);
+  const [course] = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
   if (!course) return undefined;
 
   const [outline] = await db
@@ -74,25 +63,15 @@ export async function loadGenerationContext(
   const [specRow] = await db
     .select()
     .from(courseSpecs)
-    .where(
-      and(
-        eq(courseSpecs.courseId, courseId),
-        eq(courseSpecs.outlineVersion, outlineVersion),
-      ),
-    )
+    .where(and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, outlineVersion)))
     .limit(1);
   if (!specRow) return undefined;
 
-  const sourceRows = await db
-    .select()
-    .from(sources)
-    .where(eq(sources.courseId, courseId));
+  const sourceRows = await db.select().from(sources).where(eq(sources.courseId, courseId));
   const written = await db
     .select({ lessonRef: lessons.lessonRef })
     .from(lessons)
-    .where(
-      and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)),
-    );
+    .where(and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)));
 
   return {
     course: {
@@ -211,9 +190,7 @@ export async function finishGeneration(
   const written = await db
     .select({ lessonRef: lessons.lessonRef })
     .from(lessons)
-    .where(
-      and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)),
-    );
+    .where(and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)));
   const writtenSet = new Set(written.map((w) => w.lessonRef));
   const missing = planned.filter((id) => !writtenSet.has(id));
 
@@ -288,9 +265,7 @@ export async function getLessonsForVersion(
   const rows = await db
     .select()
     .from(lessons)
-    .where(
-      and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)),
-    );
+    .where(and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)));
   return rows.map((r) => ({
     lessonRef: r.lessonRef,
     title: r.title,
@@ -319,9 +294,7 @@ export async function getLessonContentsForVersion(
   const rows = await db
     .select()
     .from(lessons)
-    .where(
-      and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)),
-    );
+    .where(and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)));
   const byRef = new Map(rows.map((r) => [r.lessonRef, r]));
   const planned = outline.data.modules.flatMap((m) => m.lessons.map((l) => l.id));
 

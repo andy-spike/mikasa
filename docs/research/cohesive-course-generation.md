@@ -44,26 +44,26 @@ Use backward design expressed through constructive alignment:
    include a short retrieval prompt and a prompt asking the Learner to explain a
    key choice, prediction, or failure mode. The Exercise remains the single
    substantive task defined by Mikasa.
-Biggs's constructive alignment supplies the spine: intended performance,
-learning activity, and assessment must agree. [Biggs (1996)](https://doi.org/10.1007/BF00138871)
-Merrill independently frames instruction around progressively more complex
-whole problems, activation of prior knowledge, demonstration, application, and
-integration. [Merrill (2002)](https://doi.org/10.1007/BF02505024)
-Together they fit a Goal-shaped, text-based technical Course particularly well.
+   Biggs's constructive alignment supplies the spine: intended performance,
+   learning activity, and assessment must agree. [Biggs (1996)](https://doi.org/10.1007/BF00138871)
+   Merrill independently frames instruction around progressively more complex
+   whole problems, activation of prior knowledge, demonstration, application, and
+   integration. [Merrill (2002)](https://doi.org/10.1007/BF02505024)
+   Together they fit a Goal-shaped, text-based technical Course particularly well.
 
 ## The Course specification
 
 Generate and persist this specification before drafting prose. It is the
 authoritative context for every later call, not a Learner-facing document.
 
-| Part | Required content | Why it prevents drift |
-| --- | --- | --- |
-| Course contract | Topic, Goal, Background, Depth, language, Learner assumptions, exclusions, and terminal performances | Keeps scope and difficulty stable. |
-| Learning graph | Skills and concepts; prerequisite and dependency links; each link's rationale | Makes it possible to detect a Lesson that uses an idea too early. |
-| Alignment map | For every Lesson: performance, prerequisite nodes, Module milestone, Exercise contribution, and final-Exercise contribution | Lets an audit verify that every Lesson earns its place. |
-| Throughline | One running problem, project, dataset, codebase, or scenario; vocabulary, notation, API/version assumptions, and recurring examples | Prevents every Lesson from starting over with unrelated examples. |
+| Part            | Required content                                                                                                                                  | Why it prevents drift                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Course contract | Topic, Goal, Background, Depth, language, Learner assumptions, exclusions, and terminal performances                                              | Keeps scope and difficulty stable.                                                |
+| Learning graph  | Skills and concepts; prerequisite and dependency links; each link's rationale                                                                     | Makes it possible to detect a Lesson that uses an idea too early.                 |
+| Alignment map   | For every Lesson: performance, prerequisite nodes, Module milestone, Exercise contribution, and final-Exercise contribution                       | Lets an audit verify that every Lesson earns its place.                           |
+| Throughline     | One running problem, project, dataset, codebase, or scenario; vocabulary, notation, API/version assumptions, and recurring examples               | Prevents every Lesson from starting over with unrelated examples.                 |
 | Lesson contract | The fixed Lesson shape: motivation, explanation, worked example, guided practice, retrieval/self-explanation prompt, Exercise, and bridge forward | Gives every Lesson the same teaching grammar without making the prose repetitive. |
-| Evidence ledger | Grounding sources and date, plus claims they support | Supports factual correction without changing the teaching structure. |
+| Evidence ledger | Grounding sources and date, plus claims they support                                                                                              | Supports factual correction without changing the teaching structure.              |
 
 The Learner may approve the **Outline**, but the Course build should also
 materialize these hidden artifacts. The Outline alone is too thin to carry

@@ -36,7 +36,9 @@ async function startGoogleSignIn(auth: Auth, callbackURL = "/courses") {
   // The authorize URL must aim at Google and carry our client id; nothing
   // here follows it, so no network call happens.
   const authorize = new URL(body.url);
-  expect(authorize.origin + authorize.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
+  expect(authorize.origin + authorize.pathname).toBe(
+    "https://accounts.google.com/o/oauth2/v2/auth",
+  );
   expect(authorize.searchParams.get("client_id")).toBe("test-google-client-id");
   expect(authorize.searchParams.get("redirect_uri")).toBe(`${ORIGIN}/api/auth/callback/google`);
   const state = authorize.searchParams.get("state");
@@ -58,7 +60,10 @@ async function sessionUser(auth: Auth, cookie: string) {
     new Request(`${ORIGIN}/api/auth/get-session`, { headers: { cookie } }),
   );
   if (response.status !== 200) return null;
-  return (await response.json()) as { user: { id: string; email: string }; session: { id: string } } | null;
+  return (await response.json()) as {
+    user: { id: string; email: string };
+    session: { id: string };
+  } | null;
 }
 
 let db: Awaited<ReturnType<typeof makeTestDb>>;

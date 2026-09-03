@@ -40,12 +40,7 @@ export function fakeGoogle(profile: FakeGoogleProfile): FakeGoogle {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       fake.calls.push(url);
 
       if (url.startsWith("https://oauth2.googleapis.com/token")) {

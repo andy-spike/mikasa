@@ -39,9 +39,8 @@ const { saveLessonContent } = await import("@/lib/db/lessons");
 const { publishRevision, currentRevision } = await import("@/lib/db/review");
 const { failGenerationRun } = await import("@/lib/db/outline");
 const { createChangePlan, stagePlanRevision } = await import("@/lib/db/tailor");
-const { reviewTailorOperationAction, discardStagedRevisionAction } = await import(
-  "@/lib/actions/tailor"
-);
+const { reviewTailorOperationAction, discardStagedRevisionAction } =
+  await import("@/lib/actions/tailor");
 const { parseLessonContent } = await import("@/lib/course/content");
 
 const ORIGIN = "http://localhost:3000";
@@ -63,9 +62,7 @@ const OUTLINE = {
       ordinal: 2,
       numeral: "II",
       title: "Module two",
-      lessons: [
-        { id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 },
-      ],
+      lessons: [{ id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 }],
     },
   ],
 };
@@ -188,8 +185,7 @@ async function userIdOf(email: string): Promise<string> {
 async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<string> {
   const created = await createChangePlan(db, await userIdOf(OWNER), courseId, ops);
   expect(created.ok).toBe(true);
-  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } })
-    .plan;
+  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } }).plan;
   headerState.current = new Headers({ cookie: ownerCookie });
   for (const operation of plan.operations) {
     await reviewTailorOperationAction(plan.id, operation.id, "accepted");

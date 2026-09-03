@@ -16,9 +16,7 @@ export function ThemeToggle() {
       aria-label="Switch theme"
       title="Switch theme"
       onClick={() =>
-        setTheme(
-          document.documentElement.classList.contains("dark") ? "light" : "dark",
-        )
+        setTheme(document.documentElement.classList.contains("dark") ? "light" : "dark")
       }
     >
       <Sun className="h-4 w-4 dark:hidden" strokeWidth={1.75} />

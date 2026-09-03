@@ -75,9 +75,8 @@ async function stepReconcileSpec(
   "use step";
   const { db } = await import("@/lib/db");
   const { generationModel } = await import("@/lib/model");
-  const { reconcileSpecification, specNeedsReconciliation } = await import(
-    "@/lib/course/reconcile"
-  );
+  const { reconcileSpecification, specNeedsReconciliation } =
+    await import("@/lib/course/reconcile");
   const { planContentAdjustments, planHasStructuralChanges } = await import("@/lib/db/tailor");
   const { saveReconciledSpec } = await import("@/lib/db/outline");
 
@@ -126,11 +125,8 @@ async function stepGenerateLesson(
 ): Promise<{ newSource?: PromptSource }> {
   "use step";
   const { db } = await import("@/lib/db");
-  const {
-    planLessonSource,
-    generateLesson,
-    LESSON_SOURCE_LIMIT,
-  } = await import("@/lib/course/generate");
+  const { planLessonSource, generateLesson, LESSON_SOURCE_LIMIT } =
+    await import("@/lib/course/generate");
   const { saveLessonContent, saveLessonSource } = await import("@/lib/db/lessons");
   const { generationModel } = await import("@/lib/model");
   const { firecrawlSearcher } = await import("@/lib/course/design");
@@ -144,8 +140,7 @@ async function stepGenerateLesson(
     {
       title: lesson.title,
       summary: lesson.summary,
-      performance: context.spec.alignment.find((a) => a.lessonId === lesson.id)
-        ?.performance,
+      performance: context.spec.alignment.find((a) => a.lessonId === lesson.id)?.performance,
     },
     sources,
   );
@@ -201,26 +196,15 @@ async function stepReviewRound(
 ): Promise<ReviewPayload> {
   "use step";
   const { db } = await import("@/lib/db");
-  const { structuralFindings, factualFindings, designFindings } = await import(
-    "@/lib/course/review"
-  );
-  const {
-    needsCodeVerification,
-    planVerification,
-    runVerification,
-    verificationFindings,
-  } = await import("@/lib/course/sandbox-verify");
+  const { structuralFindings, factualFindings, designFindings } =
+    await import("@/lib/course/review");
+  const { needsCodeVerification, planVerification, runVerification, verificationFindings } =
+    await import("@/lib/course/sandbox-verify");
   const { vercelSandboxProvider } = await import("@/lib/sandbox");
   const { generationModel } = await import("@/lib/model");
-  const { loadGenerationContext, getLessonContentsForVersion } = await import(
-    "@/lib/db/lessons"
-  );
-  const {
-    saveFindings,
-    recordReviewStep,
-    saveCodeVerification,
-    findCodeVerification,
-  } = await import("@/lib/db/review");
+  const { loadGenerationContext, getLessonContentsForVersion } = await import("@/lib/db/lessons");
+  const { saveFindings, recordReviewStep, saveCodeVerification, findCodeVerification } =
+    await import("@/lib/db/review");
 
   const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
   const lessonContents = await getLessonContentsForVersion(db, courseId, outlineVersion);
@@ -319,7 +303,10 @@ async function stepCorrectLesson(
     findings as Parameters<typeof correctLesson>[4],
     all
       .filter((l) => l.lessonId !== lessonRef)
-      .map((l) => ({ title: l.title, summary: l.body.map(summaryOfBlock).join(" ").slice(0, 120) })),
+      .map((l) => ({
+        title: l.title,
+        summary: l.body.map(summaryOfBlock).join(" ").slice(0, 120),
+      })),
   );
   await saveLessonContent(db, courseId, outlineVersion, runId, corrected);
 }
@@ -336,10 +323,7 @@ async function stepMarkCorrected(runId: string, round: number): Promise<void> {
   await markFindingsCorrected(db, runId, round);
 }
 
-async function stepOpenReviewRun(
-  courseId: string,
-  outlineVersion: number,
-): Promise<string> {
+async function stepOpenReviewRun(courseId: string, outlineVersion: number): Promise<string> {
   "use step";
   const { openReviewRun } = await import("@/lib/db/review");
   const { db } = await import("@/lib/db");
@@ -350,11 +334,7 @@ async function stepOpenReviewRun(
   return run.id;
 }
 
-async function stepFailReview(
-  courseId: string,
-  runId: string,
-  message: string,
-): Promise<void> {
+async function stepFailReview(courseId: string, runId: string, message: string): Promise<void> {
   "use step";
   const { failReview } = await import("@/lib/db/review");
   const { db } = await import("@/lib/db");
@@ -421,7 +401,11 @@ async function stepEmbedAffected(
   } catch (error) {
     await db
       .update(generationRuns)
-      .set({ fragmentsStatus: "failed", fragmentsError: errorMessage(error), updatedAt: new Date() })
+      .set({
+        fragmentsStatus: "failed",
+        fragmentsError: errorMessage(error),
+        updatedAt: new Date(),
+      })
       .where(eq(generationRuns.id, runId));
   }
 }
@@ -491,27 +475,21 @@ async function stepReviewResumePoint(
   const [revision] = await db
     .select({ revisionNumber: revisions.revisionNumber })
     .from(revisions)
-    .where(
-      and(eq(revisions.courseId, courseId), eq(revisions.outlineVersion, outlineVersion)),
-    )
+    .where(and(eq(revisions.courseId, courseId), eq(revisions.outlineVersion, outlineVersion)))
     .limit(1);
   if (revision) return { action: "done", revisionNumber: revision.revisionNumber };
 
   const [review] = await db
     .select()
     .from(reviewRuns)
-    .where(
-      and(eq(reviewRuns.courseId, courseId), eq(reviewRuns.outlineVersion, outlineVersion)),
-    )
+    .where(and(eq(reviewRuns.courseId, courseId), eq(reviewRuns.outlineVersion, outlineVersion)))
     .orderBy(desc(reviewRuns.startedAt))
     .limit(1);
   if (review && review.status === "succeeded") {
     const open = await db
       .select({ id: reviewFindings.id })
       .from(reviewFindings)
-      .where(
-        and(eq(reviewFindings.reviewRunId, review.id), eq(reviewFindings.status, "open")),
-      )
+      .where(and(eq(reviewFindings.reviewRunId, review.id), eq(reviewFindings.status, "open")))
       .limit(1);
     if (open.length === 0) {
       return { action: "publish", reviewRunId: review.id };

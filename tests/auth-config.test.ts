@@ -51,9 +51,9 @@ describe("assertAuthConfig", () => {
     expect(() =>
       assertAuthConfig({ baseURL: "https://x.example.com", secret: "s", google: false }, {}),
     ).not.toThrow();
-    expect(() =>
-      assertAuthConfig({ google: { clientId: "id", clientSecret: "sec" } }, {}),
-    ).toThrow(/BETTER_AUTH_URL/);
+    expect(() => assertAuthConfig({ google: { clientId: "id", clientSecret: "sec" } }, {})).toThrow(
+      /BETTER_AUTH_URL/,
+    );
   });
 
   it("passes when everything is present", () => {

@@ -16,7 +16,13 @@ import type { FragmentInput } from "@/lib/db/fragments";
 /** The subset of a Lesson row the fragments read. */
 type FragmentSource = Pick<
   LessonRow,
-  "lessonRef" | "title" | "body" | "workedExample" | "exercise" | "recallPrompt" | "selfExplanationPrompt"
+  | "lessonRef"
+  | "title"
+  | "body"
+  | "workedExample"
+  | "exercise"
+  | "recallPrompt"
+  | "selfExplanationPrompt"
 >;
 
 /** One block's text, flattened for embedding. */
@@ -29,11 +35,7 @@ function blockText(block: ContentBlock): string {
     case "note":
       return `${block.title}: ${block.text}`;
     case "table":
-      return [
-        block.caption,
-        block.head.join(" | "),
-        ...block.rows.map((r) => r.join(" | ")),
-      ]
+      return [block.caption, block.head.join(" | "), ...block.rows.map((r) => r.join(" | "))]
         .filter(Boolean)
         .join("\n");
   }
@@ -111,9 +113,7 @@ export async function embedLessonFragments(
     wanted.has(r.lessonRef),
   );
   const fragments = buildCourseFragments(rows);
-  const embeddings = fragments.length
-    ? await embedTexts(fragments.map((f) => f.content))
-    : [];
+  const embeddings = fragments.length ? await embedTexts(fragments.map((f) => f.content)) : [];
   await replaceLessonFragments(db, courseId, lessonRefs, fragments, embeddings);
   return fragments.length;
 }

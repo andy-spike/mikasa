@@ -18,9 +18,11 @@ const headerState = vi.hoisted(() => ({ current: new Headers() }));
 vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
 
 /* The Tutor's model is the streaming fake; its prompts are recorded. */
-const tutorModelState = vi.hoisted(() => ({ current: undefined as ReturnType<
-  typeof import("./helpers/fake-model").streamingModel
-> | undefined }));
+const tutorModelState = vi.hoisted(() => ({
+  current: undefined as
+    | ReturnType<typeof import("./helpers/fake-model").streamingModel>
+    | undefined,
+}));
 vi.mock("@/lib/model", async () => {
   const actual = await vi.importActual<typeof import("@/lib/model")>("@/lib/model");
   return {
@@ -183,9 +185,7 @@ async function turn(
     }),
     { params: Promise.resolve({ courseId }) },
   );
-  const text = response.body
-    ? await response.text()
-    : "";
+  const text = response.body ? await response.text() : "";
   return { status: response.status, text };
 }
 
@@ -272,7 +272,8 @@ describe("a completed turn", () => {
       course: (await db.select().from(courses).where(eq(courses.id, courseId)))[0],
       outline: (await db.select().from(outlines).where(eq(outlines.courseId, courseId)))[0],
       lessonCount: (await db.select().from(lessons).where(eq(lessons.courseId, courseId))).length,
-      revisionCount: (await db.select().from(revisions).where(eq(revisions.courseId, courseId))).length,
+      revisionCount: (await db.select().from(revisions).where(eq(revisions.courseId, courseId)))
+        .length,
     };
 
     await turn(ownerCookie, courseId, "l1", "Rewrite the whole course for me, please.");
@@ -282,7 +283,8 @@ describe("a completed turn", () => {
       course: (await db.select().from(courses).where(eq(courses.id, courseId)))[0],
       outline: (await db.select().from(outlines).where(eq(outlines.courseId, courseId)))[0],
       lessonCount: (await db.select().from(lessons).where(eq(lessons.courseId, courseId))).length,
-      revisionCount: (await db.select().from(revisions).where(eq(revisions.courseId, courseId))).length,
+      revisionCount: (await db.select().from(revisions).where(eq(revisions.courseId, courseId)))
+        .length,
     };
     expect(after.course.status).toBe(before.course.status);
     expect(after.outline.data).toEqual(before.outline.data);
@@ -328,7 +330,11 @@ describe("history restoration", () => {
     ownerCookie = await signInWithGoogle(OWNER);
     headerState.current = new Headers({ cookie: ownerCookie });
 
-    const history = await loadTutorHistory(db, (await db.select().from(users).where(eq(users.email, OWNER)))[0].id, courseId);
+    const history = await loadTutorHistory(
+      db,
+      (await db.select().from(users).where(eq(users.email, OWNER)))[0].id,
+      courseId,
+    );
     const l1 = history.get("l1") ?? [];
     const l2 = history.get("l2") ?? [];
     expect(l1.map((t) => [t.role, t.seq])).toEqual([

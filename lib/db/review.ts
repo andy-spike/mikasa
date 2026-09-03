@@ -33,10 +33,7 @@ export async function openReviewRun(
   outlineVersion: number,
   options?: { touchCourse?: boolean },
 ): Promise<ReviewRun> {
-  const [run] = await db
-    .insert(reviewRuns)
-    .values({ courseId, outlineVersion })
-    .returning();
+  const [run] = await db.insert(reviewRuns).values({ courseId, outlineVersion }).returning();
   /* A staged revision (ticket #14) reviews without moving the Course:
      the published Course reads as itself the whole time. */
   if (options?.touchCourse === false) return run;
@@ -47,15 +44,8 @@ export async function openReviewRun(
   return run;
 }
 
-export async function recordReviewStep(
-  db: Db,
-  runId: string,
-  round: number,
-): Promise<void> {
-  await db
-    .update(reviewRuns)
-    .set({ round, updatedAt: new Date() })
-    .where(eq(reviewRuns.id, runId));
+export async function recordReviewStep(db: Db, runId: string, round: number): Promise<void> {
+  await db.update(reviewRuns).set({ round, updatedAt: new Date() }).where(eq(reviewRuns.id, runId));
 }
 
 /** Replaces the round's findings (a re-run of a round overwrites, not appends). */
@@ -70,12 +60,7 @@ export async function saveFindings(
   return db.transaction(async (tx) => {
     await tx
       .delete(reviewFindings)
-      .where(
-        and(
-          eq(reviewFindings.reviewRunId, runId),
-          eq(reviewFindings.round, round),
-        ),
-      );
+      .where(and(eq(reviewFindings.reviewRunId, runId), eq(reviewFindings.round, round)));
     if (findings.length === 0) return [];
     return tx
       .insert(reviewFindings)
@@ -104,23 +89,15 @@ export async function getFindings(
   return db
     .select()
     .from(reviewFindings)
-    .where(
-      and(eq(reviewFindings.reviewRunId, runId), eq(reviewFindings.round, round)),
-    );
+    .where(and(eq(reviewFindings.reviewRunId, runId), eq(reviewFindings.round, round)));
 }
 
 /** Marks a round's findings corrected by the corrections that just ran. */
-export async function markFindingsCorrected(
-  db: Db,
-  runId: string,
-  round: number,
-): Promise<void> {
+export async function markFindingsCorrected(db: Db, runId: string, round: number): Promise<void> {
   await db
     .update(reviewFindings)
     .set({ status: "corrected" })
-    .where(
-      and(eq(reviewFindings.reviewRunId, runId), eq(reviewFindings.round, round)),
-    );
+    .where(and(eq(reviewFindings.reviewRunId, runId), eq(reviewFindings.round, round)));
 }
 
 export async function finishReviewRun(
@@ -135,9 +112,7 @@ export async function finishReviewRun(
     .where(eq(reviewRuns.id, runId));
 }
 
-export type PublishResult =
-  | { ok: true; revision: Revision }
-  | { ok: false; reason: string };
+export type PublishResult = { ok: true; revision: Revision } | { ok: false; reason: string };
 
 /**
  * Publication: one transaction that verifies the candidate is whole, the
@@ -167,9 +142,7 @@ export async function publishRevision(
     const written = await tx
       .select({ lessonRef: lessons.lessonRef })
       .from(lessons)
-      .where(
-        and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)),
-      );
+      .where(and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)));
     const writtenSet = new Set(written.map((w) => w.lessonRef));
     const missing = planned.filter((id) => !writtenSet.has(id));
     if (missing.length > 0) {
@@ -179,11 +152,7 @@ export async function publishRevision(
       };
     }
 
-    const [run] = await tx
-      .select()
-      .from(reviewRuns)
-      .where(eq(reviewRuns.id, reviewRunId))
-      .limit(1);
+    const [run] = await tx.select().from(reviewRuns).where(eq(reviewRuns.id, reviewRunId)).limit(1);
     if (!run || run.status !== "succeeded") {
       return { ok: false as const, reason: "Refusing to publish before the review passes." };
     }
@@ -191,12 +160,7 @@ export async function publishRevision(
     const open = await tx
       .select({ id: reviewFindings.id })
       .from(reviewFindings)
-      .where(
-        and(
-          eq(reviewFindings.reviewRunId, reviewRunId),
-          eq(reviewFindings.status, "open"),
-        ),
-      )
+      .where(and(eq(reviewFindings.reviewRunId, reviewRunId), eq(reviewFindings.status, "open")))
       .limit(1);
     if (open.length > 0) {
       return { ok: false as const, reason: "Refusing to publish with open review findings." };
@@ -233,9 +197,7 @@ export async function publishRevision(
     const [existing] = await tx
       .select()
       .from(revisions)
-      .where(
-        and(eq(revisions.courseId, courseId), eq(revisions.outlineVersion, outlineVersion)),
-      )
+      .where(and(eq(revisions.courseId, courseId), eq(revisions.outlineVersion, outlineVersion)))
       .limit(1);
     if (existing) return { ok: true as const, revision: existing };
 
@@ -366,10 +328,7 @@ export async function failReview(
 }
 
 /** The current published revision, if the Course has one. */
-export async function currentRevision(
-  db: Db,
-  courseId: string,
-): Promise<Revision | undefined> {
+export async function currentRevision(db: Db, courseId: string): Promise<Revision | undefined> {
   const [revision] = await db
     .select()
     .from(revisions)
@@ -380,10 +339,7 @@ export async function currentRevision(
 }
 
 /** The Course's newest review run, if any. */
-export async function latestReviewRun(
-  db: Db,
-  courseId: string,
-): Promise<ReviewRun | undefined> {
+export async function latestReviewRun(db: Db, courseId: string): Promise<ReviewRun | undefined> {
   const [run] = await db
     .select()
     .from(reviewRuns)
@@ -407,9 +363,7 @@ export async function resetGenerationRun(
     const [run] = await tx
       .select()
       .from(generationRuns)
-      .where(
-        and(eq(generationRuns.id, runId), eq(generationRuns.courseId, courseId)),
-      )
+      .where(and(eq(generationRuns.id, runId), eq(generationRuns.courseId, courseId)))
       .limit(1);
     if (!run || run.status !== "failed") return false;
 
@@ -442,8 +396,8 @@ export type PublishedCourse = {
   course: Course;
   revision: Revision;
   outline: { version: number; data: typeof outlines.$inferSelect.data };
-  lessonRows: typeof lessons.$inferSelect[];
-  sourceRows: typeof sources.$inferSelect[];
+  lessonRows: (typeof lessons.$inferSelect)[];
+  sourceRows: (typeof sources.$inferSelect)[];
 };
 
 export async function findOwnedPublishedCourse(
@@ -464,9 +418,7 @@ export async function findOwnedPublishedCourse(
   const [outline] = await db
     .select()
     .from(outlines)
-    .where(
-      and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)),
-    )
+    .where(and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)))
     .limit(1);
   if (!outline) return undefined;
 
@@ -476,10 +428,7 @@ export async function findOwnedPublishedCourse(
     .where(
       and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, revision.outlineVersion)),
     );
-  const sourceRows = await db
-    .select()
-    .from(sources)
-    .where(eq(sources.courseId, courseId));
+  const sourceRows = await db.select().from(sources).where(eq(sources.courseId, courseId));
 
   return { course, revision, outline, lessonRows, sourceRows };
 }
@@ -498,10 +447,7 @@ export async function findGenerationRunFor(
     .select()
     .from(generationRuns)
     .where(
-      and(
-        eq(generationRuns.courseId, courseId),
-        eq(generationRuns.outlineVersion, outlineVersion),
-      ),
+      and(eq(generationRuns.courseId, courseId), eq(generationRuns.outlineVersion, outlineVersion)),
     )
     .limit(1);
   return run;

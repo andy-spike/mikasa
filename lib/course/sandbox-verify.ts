@@ -53,9 +53,7 @@ export function needsCodeVerification(
 ): boolean {
   const text = `${contract.topic} ${contract.goal}`.toLowerCase();
   if (CODING_MARKERS.some((marker) => text.includes(marker))) return true;
-  return lessons.some((l) =>
-    [...l.body, ...l.workedExample].some((b) => b.kind === "code"),
-  );
+  return lessons.some((l) => [...l.body, ...l.workedExample].some((b) => b.kind === "code"));
 }
 
 const planSchema = z.object({
@@ -116,7 +114,10 @@ export async function planVerification(
           `LESSON ${l.lessonId} "${l.title}"`,
           ...[...l.body, ...l.workedExample]
             .filter((b) => b.kind === "code")
-            .map((b) => `[${(b as { language?: string }).language ?? "code"}]\n${(b as { code: string }).code}`),
+            .map(
+              (b) =>
+                `[${(b as { language?: string }).language ?? "code"}]\n${(b as { code: string }).code}`,
+            ),
           `EXERCISE: ${l.exercise.task} | CHECK: ${l.exercise.check}`,
         ].join("\n"),
       ),
@@ -212,7 +213,11 @@ export async function runVerification(
     ];
     return {
       passed: failedLessonRefs.length === 0,
-      evidence: { written: plan.files.map((f) => ({ path: f.path, lessonRef: f.lessonRef })), files, commands },
+      evidence: {
+        written: plan.files.map((f) => ({ path: f.path, lessonRef: f.lessonRef })),
+        files,
+        commands,
+      },
       failedLessonRefs,
     };
   } finally {

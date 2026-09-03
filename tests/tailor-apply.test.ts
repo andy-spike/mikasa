@@ -70,15 +70,10 @@ vi.mock("@/lib/course/reconcile", () => ({
 
 const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
-const { changePlans, courseSpecs, courses, outlines, users } = await import(
-  "@/lib/db/schema"
-);
-const { applyOutlineOpAction, approveOutlineAction } = await import(
-  "@/lib/actions/outline"
-);
-const { applyPlanToOutlineAction, reviewTailorOperationAction } = await import(
-  "@/lib/actions/tailor"
-);
+const { changePlans, courseSpecs, courses, outlines, users } = await import("@/lib/db/schema");
+const { applyOutlineOpAction, approveOutlineAction } = await import("@/lib/actions/outline");
+const { applyPlanToOutlineAction, reviewTailorOperationAction } =
+  await import("@/lib/actions/tailor");
 const { createChangePlan } = await import("@/lib/db/tailor");
 const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
 
@@ -206,8 +201,7 @@ async function proposeThree(
     { kind: "removeLesson", lessonId: "l2" },
   ]);
   expect(created.ok).toBe(true);
-  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } })
-    .plan;
+  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } }).plan;
   asOwner();
   for (const [i, status] of reviews.entries()) {
     const result = await reviewTailorOperationAction(plan.id, plan.operations[i].id, status);
@@ -250,8 +244,7 @@ describe("applyPlanToOutlineAction", () => {
       { kind: "exercise", lessonId: "l1", task: "Stream by hand", check: "It prints chunks" },
     ]);
     expect(created.ok).toBe(true);
-    const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } })
-      .plan;
+    const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } }).plan;
     asOwner();
     for (const operation of plan.operations) {
       await reviewTailorOperationAction(plan.id, operation.id, "accepted");
@@ -272,7 +265,11 @@ describe("applyPlanToOutlineAction", () => {
     /* Approval reconciled, and the accepted demands rode with it. */
     expect(reconcileCalls.calls).toHaveLength(1);
     expect(reconcileCalls.calls[0].adjustments).toEqual([
-      { lessonId: "l1", prose: "Lead with the failure mode.", exercise: { task: "Stream by hand", check: "It prints chunks" } },
+      {
+        lessonId: "l1",
+        prose: "Lead with the failure mode.",
+        exercise: { task: "Stream by hand", check: "It prints chunks" },
+      },
     ]);
     const [reconciled] = await db
       .select()
@@ -320,8 +317,7 @@ describe("applyPlanToOutlineAction", () => {
       { kind: "lessonProse", lessonId: "l1", instruction: "Say it with tables." },
     ]);
     expect(created.ok).toBe(true);
-    const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } })
-      .plan;
+    const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } }).plan;
     asOwner();
     await reviewTailorOperationAction(plan.id, plan.operations[0].id, "accepted");
 

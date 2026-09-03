@@ -43,8 +43,7 @@ export async function webSearch(query: string): Promise<WebResult[]> {
     throw new FirecrawlError("The web search did not succeed.");
   }
   return (payload.data ?? [])
-    .filter((r): r is { title: string; url: string; description?: string } =>
-      Boolean(r.url))
+    .filter((r): r is { title: string; url: string; description?: string } => Boolean(r.url))
     .slice(0, RESULT_LIMIT)
     .map((r) => ({
       title: r.title ?? r.url,

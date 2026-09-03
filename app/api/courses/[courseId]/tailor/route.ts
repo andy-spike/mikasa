@@ -22,12 +22,7 @@ import {
   findTailorConversation,
   listTailorMessages,
 } from "@/lib/db/tailor";
-import {
-  changePlanSchema,
-  opDetail,
-  opEntry,
-  opVerb,
-} from "@/lib/course/change-plan";
+import { changePlanSchema, opDetail, opEntry, opVerb } from "@/lib/course/change-plan";
 import { designModel, designProviderOptions } from "@/lib/model";
 
 const turnSchema = z.object({

@@ -1,8 +1,8 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 const MONTHS = [
@@ -26,5 +26,5 @@ const MONTHS = [
  * three-letter rhythm does not bend for one month.
  */
 export function formatDayStamp(date: Date): string {
-  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }

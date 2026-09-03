@@ -160,9 +160,7 @@ export async function searchIsIncomplete(db: Db, courseId: string): Promise<bool
   const [outline] = await db
     .select({ data: outlines.data })
     .from(outlines)
-    .where(
-      and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)),
-    )
+    .where(and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)))
     .limit(1);
   if (!outline) return false;
   const refs = outline.data.modules.flatMap((m) => m.lessons.map((l) => l.id));

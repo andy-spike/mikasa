@@ -104,10 +104,7 @@ export async function applyOutlineChange(
       .insert(outlines)
       .values({ courseId, version: current.version + 1, data })
       .returning();
-    await tx
-      .update(courses)
-      .set({ updatedAt: new Date() })
-      .where(eq(courses.id, courseId));
+    await tx.update(courses).set({ updatedAt: new Date() }).where(eq(courses.id, courseId));
     return { ok: true, outline: next };
   });
 }
@@ -206,10 +203,7 @@ export async function openGenerationRun(
         )
         .limit(1);
       if (existing) return { ok: true, run: existing, duplicate: true };
-      return reject(
-        "not-approvable",
-        "This Course is not waiting for Outline approval.",
-      );
+      return reject("not-approvable", "This Course is not waiting for Outline approval.");
     }
 
     const problems = outlineApprovalProblems(outline.data);
@@ -302,7 +296,9 @@ export async function recordFragmentsStatus(
       fragmentsError: status === "failed" ? (error ?? "The embedding failed.") : null,
       updatedAt: new Date(),
     })
-    .where(and(eq(generationRuns.courseId, courseId), eq(generationRuns.outlineVersion, outlineVersion)));
+    .where(
+      and(eq(generationRuns.courseId, courseId), eq(generationRuns.outlineVersion, outlineVersion)),
+    );
 }
 
 export type ApprovalContext = {

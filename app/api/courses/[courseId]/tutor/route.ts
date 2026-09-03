@@ -15,11 +15,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/session";
 import { findOwnedPublishedCourse } from "@/lib/db/review";
 import { findCourseSpec } from "@/lib/db/design";
-import {
-  appendTutorTurn,
-  findTutorConversation,
-  listTutorMessages,
-} from "@/lib/db/tutor";
+import { appendTutorTurn, findTutorConversation, listTutorMessages } from "@/lib/db/tutor";
 import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
 import { tutorPrompt, tutorSystemPrompt } from "@/lib/course/tutor";
 import { tutorTools } from "@/lib/course/tutor-tools";
@@ -63,13 +59,10 @@ export async function POST(
     : [];
 
   /* The context the Tutor reads, in the reading adapter's own terms. */
-  const reading = toReadingCourse(
-    published.course,
-    published.outline.data,
-    published.lessonRows,
-  );
+  const reading = toReadingCourse(published.course, published.outline.data, published.lessonRows);
   const lesson = reading.modules.flatMap((m) => m.lessons).find((l) => l.id === lessonId);
-  if (!lesson) return json(409, { error: "That Lesson is not part of the Course as it is published." });
+  if (!lesson)
+    return json(409, { error: "That Lesson is not part of the Course as it is published." });
 
   const spec = await findCourseSpec(db, courseId, published.revision.outlineVersion);
 

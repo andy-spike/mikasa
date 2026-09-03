@@ -36,8 +36,7 @@ export const DEPTH_CHOICES = [
   {
     id: "reach",
     title: "Just enough to reach the Goal",
-    detail:
-      "The shortest line from where you are to the outcome. Nothing beside the point.",
+    detail: "The shortest line from where you are to the outcome. Nothing beside the point.",
   },
   {
     id: "working",
@@ -48,8 +47,7 @@ export const DEPTH_CHOICES = [
   {
     id: "mastery",
     title: "Deep mastery",
-    detail:
-      "Past the Goal into the edges: the internals, the failure modes, the arguments.",
+    detail: "Past the Goal into the edges: the internals, the failure modes, the arguments.",
   },
 ] as const;
 
@@ -67,7 +65,12 @@ export const DEPTH_IDS = DEPTH_CHOICES.map((d) => d.id);
  */
 export const DEPTH_BOUNDS: Record<
   DepthId,
-  { minModules: number; maxModules: number; minLessonsPerModule: number; maxLessonsPerModule: number }
+  {
+    minModules: number;
+    maxModules: number;
+    minLessonsPerModule: number;
+    maxLessonsPerModule: number;
+  }
 > = {
   reach: { minModules: 3, maxModules: 4, minLessonsPerModule: 2, maxLessonsPerModule: 3 },
   working: { minModules: 5, maxModules: 7, minLessonsPerModule: 3, maxLessonsPerModule: 4 },
@@ -88,12 +91,9 @@ export type CourseInput = {
   grounding: boolean;
 };
 
-export type CourseInputErrors = Partial<
-  Record<keyof CourseInput | "form", string>
->;
+export type CourseInputErrors = Partial<Record<keyof CourseInput | "form", string>>;
 
-const trim = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : "";
+const trim = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
 /**
  * Validates one Course creation. Returns every field error at once, so the
@@ -124,8 +124,7 @@ export function validateCourseInput(
     errors.language = "Choose one of the supported Course Languages.";
 
   const depth = trim(raw.depth);
-  if (!DEPTH_IDS.includes(depth as DepthId))
-    errors.depth = "Choose a Depth.";
+  if (!DEPTH_IDS.includes(depth as DepthId)) errors.depth = "Choose a Depth.";
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 

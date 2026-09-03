@@ -20,9 +20,11 @@ const headerState = vi.hoisted(() => ({ current: new Headers() }));
 vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
 
 /* The Tailor's model is the streaming fake; its prompts are recorded. */
-const tailorModelState = vi.hoisted(() => ({ current: undefined as ReturnType<
-  typeof import("./helpers/fake-model").streamingModel
-> | undefined }));
+const tailorModelState = vi.hoisted(() => ({
+  current: undefined as
+    | ReturnType<typeof import("./helpers/fake-model").streamingModel>
+    | undefined,
+}));
 vi.mock("@/lib/model", async () => {
   const actual = await vi.importActual<typeof import("@/lib/model")>("@/lib/model");
   return {
@@ -60,9 +62,7 @@ const {
 const { parseLessonContent } = await import("@/lib/course/content");
 const { saveLessonContent } = await import("@/lib/db/lessons");
 const { publishRevision } = await import("@/lib/db/review");
-const { loadTailorHistory, findProposedPlan, createChangePlan } = await import(
-  "@/lib/db/tailor"
-);
+const { loadTailorHistory, findProposedPlan, createChangePlan } = await import("@/lib/db/tailor");
 const { reviewTailorOperationAction } = await import("@/lib/actions/tailor");
 const { validatePlanOps } = await import("@/lib/course/change-plan");
 const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
@@ -294,8 +294,18 @@ describe("the proposal tool", () => {
     tailorModelState.current = streamingModel(
       planThenText(
         [
-          { kind: "renameLesson", lessonId: "l1", title: "Lesson one, renamed", summary: "Still first." },
-          { kind: "addLesson", moduleId: "m1", title: "Warm-up", summary: "Before the first proper Lesson." },
+          {
+            kind: "renameLesson",
+            lessonId: "l1",
+            title: "Lesson one, renamed",
+            summary: "Still first.",
+          },
+          {
+            kind: "addLesson",
+            moduleId: "m1",
+            title: "Warm-up",
+            summary: "Before the first proper Lesson.",
+          },
         ],
         "I proposed both for your review.",
       ),
@@ -366,7 +376,10 @@ describe("the proposal tool", () => {
   it("leaves the newest proposal the only one under review", async () => {
     const courseId = await seedPublishedCourse(OWNER);
     tailorModelState.current = streamingModel(
-      planThenText([{ kind: "renameLesson", lessonId: "l1", title: "A", summary: "a" }], "Proposed."),
+      planThenText(
+        [{ kind: "renameLesson", lessonId: "l1", title: "A", summary: "a" }],
+        "Proposed.",
+      ),
     );
     await turn(ownerCookie, courseId, "First idea.");
     tailorModelState.current = streamingModel(
@@ -394,10 +407,23 @@ describe("the proposal tool", () => {
 });
 
 describe("the review", () => {
-  async function proposeTwo(userId: string, courseId: string): Promise<{ planId: string; first: string; second: string }> {
+  async function proposeTwo(
+    userId: string,
+    courseId: string,
+  ): Promise<{ planId: string; first: string; second: string }> {
     const created = await createChangePlan(db, userId, courseId, [
-      { kind: "renameLesson", lessonId: "l1", title: "Lesson one, renamed", summary: "Still first." },
-      { kind: "addLesson", moduleId: "m1", title: "Warm-up", summary: "Before the first proper Lesson." },
+      {
+        kind: "renameLesson",
+        lessonId: "l1",
+        title: "Lesson one, renamed",
+        summary: "Still first.",
+      },
+      {
+        kind: "addLesson",
+        moduleId: "m1",
+        title: "Warm-up",
+        summary: "Before the first proper Lesson.",
+      },
     ]);
     expect(created.ok).toBe(true);
     const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } }).plan;
@@ -438,10 +464,12 @@ describe("the review", () => {
 
     const before = {
       course: (await db.select().from(courses).where(eq(courses.id, courseId)))[0],
-      outlineCount: (await db.select().from(outlines).where(eq(outlines.courseId, courseId))).length,
+      outlineCount: (await db.select().from(outlines).where(eq(outlines.courseId, courseId)))
+        .length,
       outline: (await db.select().from(outlines).where(eq(outlines.courseId, courseId)))[0],
       lessonCount: (await db.select().from(lessons).where(eq(lessons.courseId, courseId))).length,
-      revisionCount: (await db.select().from(revisions).where(eq(revisions.courseId, courseId))).length,
+      revisionCount: (await db.select().from(revisions).where(eq(revisions.courseId, courseId)))
+        .length,
     };
 
     headerState.current = new Headers({ cookie: ownerCookie });
@@ -452,10 +480,12 @@ describe("the review", () => {
 
     const after = {
       course: (await db.select().from(courses).where(eq(courses.id, courseId)))[0],
-      outlineCount: (await db.select().from(outlines).where(eq(outlines.courseId, courseId))).length,
+      outlineCount: (await db.select().from(outlines).where(eq(outlines.courseId, courseId)))
+        .length,
       outline: (await db.select().from(outlines).where(eq(outlines.courseId, courseId)))[0],
       lessonCount: (await db.select().from(lessons).where(eq(lessons.courseId, courseId))).length,
-      revisionCount: (await db.select().from(revisions).where(eq(revisions.courseId, courseId))).length,
+      revisionCount: (await db.select().from(revisions).where(eq(revisions.courseId, courseId)))
+        .length,
     };
     expect(after.course.status).toBe(before.course.status);
     expect(after.outlineCount).toBe(before.outlineCount);

@@ -32,15 +32,8 @@ import type { OutlineDraft } from "../course/design";
  * Learner request context. Entry points that do take a Learner must go
  * through `findOwnedCourse`, which filters by owner.
  */
-export async function findCourseForDesign(
-  db: Db,
-  courseId: string,
-): Promise<Course | undefined> {
-  const [course] = await db
-    .select()
-    .from(courses)
-    .where(eq(courses.id, courseId))
-    .limit(1);
+export async function findCourseForDesign(db: Db, courseId: string): Promise<Course | undefined> {
+  const [course] = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
   return course;
 }
 
@@ -62,11 +55,7 @@ export async function startDesignRun(
 }
 
 /** Marks which step a run is in, for the progress interface. */
-export async function recordDesignStep(
-  db: Db,
-  runId: string,
-  currentStep: string,
-): Promise<void> {
+export async function recordDesignStep(db: Db, runId: string, currentStep: string): Promise<void> {
   await db
     .update(designRuns)
     .set({ currentStep, updatedAt: new Date() })
@@ -164,11 +153,7 @@ export async function saveDesignResult(
 }
 
 /** The final design step: the Course reaches the Outline checkpoint. */
-export async function completeDesignRun(
-  db: Db,
-  courseId: string,
-  runId: string,
-): Promise<void> {
+export async function completeDesignRun(db: Db, courseId: string, runId: string): Promise<void> {
   await db.transaction(async (tx) => {
     await tx
       .update(courses)
@@ -204,10 +189,7 @@ export async function failDesignRun(
 }
 
 /** The most recent design run for a Course, if any. */
-export async function latestDesignRun(
-  db: Db,
-  courseId: string,
-): Promise<DesignRun | undefined> {
+export async function latestDesignRun(db: Db, courseId: string): Promise<DesignRun | undefined> {
   const [run] = await db
     .select()
     .from(designRuns)
@@ -218,10 +200,7 @@ export async function latestDesignRun(
 }
 
 /** The current Outline: the highest version for the Course. */
-export async function latestOutline(
-  db: Db,
-  courseId: string,
-): Promise<Outline | undefined> {
+export async function latestOutline(db: Db, courseId: string): Promise<Outline | undefined> {
   const [outline] = await db
     .select()
     .from(outlines)
@@ -249,15 +228,8 @@ export async function findCourseSpec(
   return row?.spec;
 }
 
-export async function listCourseSources(
-  db: Db,
-  courseId: string,
-): Promise<SourceRow[]> {
-  return db
-    .select()
-    .from(sources)
-    .where(eq(sources.courseId, courseId))
-    .orderBy(sources.ref);
+export async function listCourseSources(db: Db, courseId: string): Promise<SourceRow[]> {
+  return db.select().from(sources).where(eq(sources.courseId, courseId)).orderBy(sources.ref);
 }
 
 /** Moves an owned Course to a new status; the only status door there is. */

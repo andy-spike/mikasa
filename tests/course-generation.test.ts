@@ -35,15 +35,11 @@ vi.mock("workflow/api", () => ({
 import { json, scriptedModel } from "./helpers/fake-model";
 import { makeTestDb } from "./helpers/test-db";
 
-const {
-  candidateIsComplete,
-  generateLesson,
-  generationOrder,
-  GenerationError,
-  planLessonSource,
-} = await import("@/lib/course/generate");
+const { candidateIsComplete, generateLesson, generationOrder, GenerationError, planLessonSource } =
+  await import("@/lib/course/generate");
 const { users, courses, outlines, courseSpecs, sources, generationRuns, lessons } =
-  await import("@/lib/db/schema");const {
+  await import("@/lib/db/schema");
+const {
   finishGeneration,
   getLessonsForVersion,
   loadGenerationContext,
@@ -87,7 +83,11 @@ const SPEC = {
     exclusions: [],
     learnerAssumptions: ["React"],
   },
-  throughline: { premise: "One app, grown lesson by lesson", runningExample: "The chat app", vocabulary: ["stream"] },
+  throughline: {
+    premise: "One app, grown lesson by lesson",
+    runningExample: "The chat app",
+    vocabulary: ["stream"],
+  },
   learningGraph: [
     { id: "g1", skill: "Stream text", requires: [], lessonId: "l1" },
     { id: "g2", skill: "Call tools", requires: ["g1"], lessonId: "l3" },
@@ -171,7 +171,10 @@ describe("generationOrder", () => {
        before l1. */
     const wrong = {
       modules: [
-        { ...OUTLINE.modules[0], lessons: [OUTLINE.modules[1].lessons[0], OUTLINE.modules[0].lessons[1]] },
+        {
+          ...OUTLINE.modules[0],
+          lessons: [OUTLINE.modules[1].lessons[0], OUTLINE.modules[0].lessons[1]],
+        },
         {
           ...OUTLINE.modules[1],
           lessons: [OUTLINE.modules[0].lessons[0], OUTLINE.modules[1].lessons[1]],
@@ -347,10 +350,7 @@ describe("a full candidate", () => {
 
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
     expect(course.status).toBe("generating");
-    const [record] = await db
-      .select()
-      .from(generationRuns)
-      .where(eq(generationRuns.id, run.id));
+    const [record] = await db.select().from(generationRuns).where(eq(generationRuns.id, run.id));
     expect(record.status).toBe("failed");
     expect(record.error).toContain("unwritten");
   });

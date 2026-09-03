@@ -75,8 +75,7 @@ export function NewCourseForm() {
     }
   }
 
-  const errorsToShow = (key: keyof CourseInput) =>
-    (touched[key] && errors[key]) || undefined;
+  const errorsToShow = (key: keyof CourseInput) => (touched[key] && errors[key]) || undefined;
 
   function submit() {
     setTouched({ topic: true, goal: true, background: true, language: true, depth: true });
@@ -107,8 +106,8 @@ export function NewCourseForm() {
           {values.topic.trim() || "New Course"}
         </h1>
         <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-          Starting the design. You can leave this page — the Outline will be
-          waiting here when you come back.
+          Starting the design. You can leave this page — the Outline will be waiting here when you
+          come back.
         </p>
         <div className="mt-9 space-y-2.5">
           {[10, 6, 8, 5, 9, 7, 4].map((w, i) => (
@@ -129,8 +128,8 @@ export function NewCourseForm() {
         New Course
       </h1>
       <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-        Mikasa drafts the Outline from these answers and stops there. You
-        shape it before a Lesson is written.
+        Mikasa drafts the Outline from these answers and stops there. You shape it before a Lesson
+        is written.
       </p>
 
       <form
@@ -224,8 +223,8 @@ export function NewCourseForm() {
             Course Language
           </label>
           <p className="mt-1.5 text-[0.75rem] leading-[1.5] text-fg-3">
-            The language of the Outline, the Lessons and every conversation.
-            Fixed once the Course is created.
+            The language of the Outline, the Lessons and every conversation. Fixed once the Course
+            is created.
           </p>
           <Select
             value={values.language}
@@ -278,8 +277,7 @@ export function NewCourseForm() {
           <div className="min-w-0">
             <p className="label text-fg-3">Grounding</p>
             <p className="mt-1.5 max-w-[24rem] text-[0.75rem] leading-[1.5] text-fg-3">
-              Consult live web search while generating. Fixed once the
-              Course is created.
+              Consult live web search while generating. Fixed once the Course is created.
             </p>
           </div>
           <ToggleGroup

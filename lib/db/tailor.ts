@@ -84,9 +84,7 @@ export async function findTailorConversation(
     .select({ id: tailorConversations.id })
     .from(tailorConversations)
     .innerJoin(courses, eq(courses.id, tailorConversations.courseId))
-    .where(
-      and(eq(tailorConversations.courseId, courseId), eq(courses.ownerId, ownerId)),
-    )
+    .where(and(eq(tailorConversations.courseId, courseId), eq(courses.ownerId, ownerId)))
     .limit(1);
   return row?.id;
 }
@@ -130,10 +128,7 @@ export async function getOrCreateTailorConversation(
 }
 
 /** The conversation's completed turns, in order. */
-export async function listTailorMessages(
-  db: Db,
-  conversationId: string,
-): Promise<TailorTurnRow[]> {
+export async function listTailorMessages(db: Db, conversationId: string): Promise<TailorTurnRow[]> {
   const rows = await db
     .select()
     .from(tailorMessages)
@@ -158,9 +153,7 @@ export async function loadTailorHistory(
     .select({ id: tailorConversations.id })
     .from(tailorConversations)
     .innerJoin(courses, eq(courses.id, tailorConversations.courseId))
-    .where(
-      and(eq(tailorConversations.courseId, courseId), eq(courses.ownerId, ownerId)),
-    )
+    .where(and(eq(tailorConversations.courseId, courseId), eq(courses.ownerId, ownerId)))
     .limit(1);
   if (!conversation) return [];
   return listTailorMessages(db, conversation.id);
@@ -252,7 +245,7 @@ export async function createChangePlan(
       })
       .returning();
     await tx.insert(changeOperations).values(
-        normalized.map((op, position) => ({
+      normalized.map((op, position) => ({
         planId: row.id,
         position,
         kind: op.kind,
@@ -357,11 +350,7 @@ export async function setOperationStatus(
     .limit(1);
   if (!course) return { ok: false, message: "Plan not found." };
 
-  const [plan] = await db
-    .select()
-    .from(changePlans)
-    .where(eq(changePlans.id, planId))
-    .limit(1);
+  const [plan] = await db.select().from(changePlans).where(eq(changePlans.id, planId)).limit(1);
   if (!plan || plan.status !== "proposed") {
     return { ok: false, message: "This plan is no longer under review." };
   }
@@ -407,10 +396,7 @@ export async function findPlan(
 }
 
 /** Every plan of the Course, for the undo-overlap check (#15). */
-export async function listPlansWithOperations(
-  db: Db,
-  courseId: string,
-): Promise<ChangePlanRow[]> {
+export async function listPlansWithOperations(db: Db, courseId: string): Promise<ChangePlanRow[]> {
   const plans = await db
     .select()
     .from(changePlans)
@@ -473,11 +459,7 @@ export async function applyPlanToOutline(
       return { ok: false, reason: "not-found", message: "Course not found." };
     }
 
-    const [plan] = await tx
-      .select()
-      .from(changePlans)
-      .where(eq(changePlans.id, planId))
-      .limit(1);
+    const [plan] = await tx.select().from(changePlans).where(eq(changePlans.id, planId)).limit(1);
     if (!plan || plan.courseId !== courseId) {
       return { ok: false, reason: "not-found", message: "Plan not found." };
     }
@@ -492,8 +474,7 @@ export async function applyPlanToOutline(
       return {
         ok: false,
         reason: "not-reviewable",
-        message:
-          "This Course has left the Outline checkpoint; it changes through revisions now.",
+        message: "This Course has left the Outline checkpoint; it changes through revisions now.",
       };
     }
 
@@ -589,10 +570,7 @@ export async function activeContentAdjustments(
  * reconciliation (#17) bakes these into the specification, so generation
  * honors what the Learner accepted for the Lessons it regenerates.
  */
-export async function planContentAdjustments(
-  db: Db,
-  planId: string,
-): Promise<LessonAdjustment[]> {
+export async function planContentAdjustments(db: Db, planId: string): Promise<LessonAdjustment[]> {
   const operations = await db
     .select()
     .from(changeOperations)
@@ -681,11 +659,7 @@ export async function stagePlanRevision(
       return { ok: false, reason: "not-found", message: "Course not found." };
     }
 
-    const [plan] = await tx
-      .select()
-      .from(changePlans)
-      .where(eq(changePlans.id, planId))
-      .limit(1);
+    const [plan] = await tx.select().from(changePlans).where(eq(changePlans.id, planId)).limit(1);
     if (!plan || plan.courseId !== courseId) {
       return { ok: false, reason: "not-found", message: "Plan not found." };
     }
@@ -725,7 +699,8 @@ export async function stagePlanRevision(
       return {
         ok: false,
         reason: "stale",
-        message: "The Outline has moved past this plan. Review the Course as it is now and ask again.",
+        message:
+          "The Outline has moved past this plan. Review the Course as it is now and ask again.",
       };
     }
 
@@ -796,7 +771,11 @@ export async function stagePlanRevision(
       )
       .limit(1);
     if (!baseSpec) {
-      return { ok: false, reason: "invalid", message: "The published Course specification is gone." };
+      return {
+        ok: false,
+        reason: "invalid",
+        message: "The published Course specification is gone.",
+      };
     }
     await tx.insert(courseSpecs).values({
       courseId,
@@ -830,8 +809,7 @@ export async function stagePlanRevision(
     const publishedByRef = new Map(publishedRows.map((r) => [r.lessonRef, r]));
     const copies: (typeof lessons.$inferInsert)[] = [];
     const newTitles = new Map<string, string>();
-    for (const m of nextData.modules)
-      for (const l of m.lessons) newTitles.set(l.id, l.title);
+    for (const m of nextData.modules) for (const l of m.lessons) newTitles.set(l.id, l.title);
     for (const [id, title] of newTitles) {
       if (affected.regenerate.includes(id)) continue;
       const row = byRef.get(id) ?? publishedByRef.get(id);
@@ -979,9 +957,7 @@ export async function resumeStagedRevision(
   const [stagedOutline] = await db
     .select()
     .from(outlines)
-    .where(
-      and(eq(outlines.courseId, courseId), eq(outlines.version, plan.stagedOutlineVersion)),
-    )
+    .where(and(eq(outlines.courseId, courseId), eq(outlines.version, plan.stagedOutlineVersion)))
     .limit(1);
   if (!stagedOutline) {
     return { ok: false, reason: "not-retryable", message: "The staged Outline is gone." };
@@ -989,20 +965,13 @@ export async function resumeStagedRevision(
   const [baseOutline] = await db
     .select()
     .from(outlines)
-    .where(
-      and(
-        eq(outlines.courseId, courseId),
-        eq(outlines.version, plan.baseOutlineVersion),
-      ),
-    )
+    .where(and(eq(outlines.courseId, courseId), eq(outlines.version, plan.baseOutlineVersion)))
     .limit(1);
   if (!baseOutline) {
     return { ok: false, reason: "not-retryable", message: "The base Outline is gone." };
   }
 
-  const accepted = plan.operations
-    .filter((o) => o.status === "accepted")
-    .map((o) => o.payload);
+  const accepted = plan.operations.filter((o) => o.status === "accepted").map((o) => o.payload);
   const affected = affectedLessonSets(baseOutline.data, stagedOutline.data, accepted);
 
   const [run] = await db
@@ -1132,11 +1101,7 @@ export async function markRevisionPublished(
   revisionNumber: number,
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    const [plan] = await tx
-      .select()
-      .from(changePlans)
-      .where(eq(changePlans.id, planId))
-      .limit(1);
+    const [plan] = await tx.select().from(changePlans).where(eq(changePlans.id, planId)).limit(1);
     if (!plan) throw new Error("The published plan vanished.");
 
     const operations = await tx
@@ -1160,10 +1125,7 @@ export async function markRevisionPublished(
     if (!baseOutline) throw new Error("The plan's base Outline vanished.");
     const resetRefs = completionResetRefs(accepted, baseOutline.data);
 
-    const rows = await tx
-      .select()
-      .from(completions)
-      .where(eq(completions.courseId, plan.courseId));
+    const rows = await tx.select().from(completions).where(eq(completions.courseId, plan.courseId));
     const snapshot = rows.map((r) => ({
       lessonRef: r.lessonRef,
       doneAt: r.doneAt.toISOString(),
@@ -1183,10 +1145,7 @@ export async function markRevisionPublished(
       await tx
         .delete(completions)
         .where(
-          and(
-            eq(completions.courseId, plan.courseId),
-            inArray(completions.lessonRef, resetRefs),
-          ),
+          and(eq(completions.courseId, plan.courseId), inArray(completions.lessonRef, resetRefs)),
         );
     }
     await recomputeCourseCompletion(tx, plan.courseId);
@@ -1205,12 +1164,7 @@ export type UndoResult =
     }
   | {
       ok: false;
-      reason:
-        | "not-found"
-        | "not-undoable"
-        | "blocked-overlap"
-        | "blocked-inflight"
-        | "invalid";
+      reason: "not-found" | "not-undoable" | "blocked-overlap" | "blocked-inflight" | "invalid";
       message: string;
     };
 
@@ -1240,11 +1194,7 @@ export async function undoPlanRevision(
       return { ok: false, reason: "not-found", message: "Course not found." };
     }
 
-    const [plan] = await tx
-      .select()
-      .from(changePlans)
-      .where(eq(changePlans.id, planId))
-      .limit(1);
+    const [plan] = await tx.select().from(changePlans).where(eq(changePlans.id, planId)).limit(1);
     if (!plan || plan.courseId !== courseId) {
       return { ok: false, reason: "not-found", message: "Plan not found." };
     }
@@ -1322,19 +1272,12 @@ export async function undoPlanRevision(
     const [baseOutline] = await tx
       .select()
       .from(outlines)
-      .where(
-        and(eq(outlines.courseId, courseId), eq(outlines.version, plan.baseOutlineVersion)),
-      )
+      .where(and(eq(outlines.courseId, courseId), eq(outlines.version, plan.baseOutlineVersion)))
       .limit(1);
     const [currentOutline] = await tx
       .select()
       .from(outlines)
-      .where(
-        and(
-          eq(outlines.courseId, courseId),
-          eq(outlines.version, revision.outlineVersion),
-        ),
-      )
+      .where(and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)))
       .limit(1);
     if (!baseOutline || !currentOutline) {
       return { ok: false, reason: "invalid", message: "The Outline to undo from is gone." };
@@ -1385,10 +1328,7 @@ export async function undoPlanRevision(
       .select()
       .from(lessons)
       .where(
-        and(
-          eq(lessons.courseId, courseId),
-          eq(lessons.outlineVersion, currentOutline.version),
-        ),
+        and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, currentOutline.version)),
       );
     const baseByRef = new Map(baseRows.map((r) => [r.lessonRef, r]));
     const currentByRef = new Map(currentRows.map((r) => [r.lessonRef, r]));
@@ -1398,9 +1338,7 @@ export async function undoPlanRevision(
 
     /* Lessons the undo removes (an added Lesson leaving): their fragments
        must be deleted, not just left behind. */
-    const undoRefs = new Set(
-      inverted.modules.flatMap((m) => m.lessons.map((l) => l.id)),
-    );
+    const undoRefs = new Set(inverted.modules.flatMap((m) => m.lessons.map((l) => l.id)));
     const removedLessons = [...currentByRef.values()]
       .map((r) => r.lessonRef)
       .filter((ref) => !undoRefs.has(ref));

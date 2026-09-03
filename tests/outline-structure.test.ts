@@ -148,12 +148,8 @@ describe("guards", () => {
         },
       ],
     };
-    expect(() => apply(single, { kind: "removeModule", moduleId: "m1" })).toThrow(
-      StructureError,
-    );
-    expect(() => apply(single, { kind: "removeLesson", lessonId: "l1" })).toThrow(
-      StructureError,
-    );
+    expect(() => apply(single, { kind: "removeModule", moduleId: "m1" })).toThrow(StructureError);
+    expect(() => apply(single, { kind: "removeLesson", lessonId: "l1" })).toThrow(StructureError);
   });
 
   it("refuses merges and moves that do not apply", () => {
@@ -163,18 +159,16 @@ describe("guards", () => {
     expect(() =>
       apply(fixture(), { kind: "moveLesson", lessonId: "l1", toModuleId: "m1", toIndex: 9 }),
     ).toThrow(StructureError);
-    expect(() =>
-      apply(fixture(), { kind: "moveModule", moduleId: "m1", toIndex: 5 }),
-    ).toThrow(StructureError);
+    expect(() => apply(fixture(), { kind: "moveModule", moduleId: "m1", toIndex: 5 })).toThrow(
+      StructureError,
+    );
     expect(() =>
       apply(fixture(), { kind: "renameLesson", lessonId: "nope", title: "X", summary: "S" }),
     ).toThrow(StructureError);
   });
 
   it("refuses empty titles", () => {
-    expect(() => apply(fixture(), { kind: "addModule", title: "   " })).toThrow(
-      StructureError,
-    );
+    expect(() => apply(fixture(), { kind: "addModule", title: "   " })).toThrow(StructureError);
     expect(() =>
       apply(fixture(), { kind: "renameLesson", lessonId: "l1", title: "", summary: "S" }),
     ).toThrow(StructureError);
@@ -197,8 +191,6 @@ describe("approval sanity", () => {
     expect(outlineApprovalProblems(withEmptyModule)).toEqual([]);
 
     const emptied = apply(withEmptyModule, { kind: "removeLesson", lessonId: "l2" });
-    expect(outlineApprovalProblems(emptied)).toEqual([
-      'Module "Module one" has no Lessons.',
-    ]);
+    expect(outlineApprovalProblems(emptied)).toEqual(['Module "Module one" has no Lessons.']);
   });
 });

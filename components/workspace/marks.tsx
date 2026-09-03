@@ -12,14 +12,7 @@ export function DoneCheck({
   className?: string;
 }) {
   return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 12 12"
-      fill="none"
-      aria-hidden
-      className={className}
-    >
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden className={className}>
       <path
         d="M1.5 6.4 4.4 9.3 10.5 2.9"
         stroke="currentColor"
@@ -66,4 +59,3 @@ export function UnsetMark() {
     </svg>
   );
 }
-

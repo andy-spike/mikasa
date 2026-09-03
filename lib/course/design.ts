@@ -16,21 +16,9 @@ import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import {
-  designProviderOptions,
-  groundingProviderOptions,
-} from "@/lib/model";
-import {
-  depthBounds,
-  type CourseInput,
-  type DepthId,
-} from "./limits";
-import type {
-  CourseSpecification,
-  GatheredSource,
-  OutlineData,
-  OutlineModule,
-} from "./types";
+import { designProviderOptions, groundingProviderOptions } from "@/lib/model";
+import { depthBounds, type CourseInput, type DepthId } from "./limits";
+import type { CourseSpecification, GatheredSource, OutlineData, OutlineModule } from "./types";
 
 /** A design failure worth recording on the Course, not a bug to crash on. */
 export class DesignError extends Error {
@@ -98,9 +86,12 @@ export function firecrawlSearcher(): SourceSearcher {
       const url = "url" in doc ? doc.url : undefined;
       if (!url) continue;
       const metadata = "metadata" in doc ? doc.metadata : undefined;
-      const content = "markdown" in doc && typeof doc.markdown === "string"
-        ? doc.markdown
-        : ("description" in doc && typeof doc.description === "string" ? doc.description : "");
+      const content =
+        "markdown" in doc && typeof doc.markdown === "string"
+          ? doc.markdown
+          : "description" in doc && typeof doc.description === "string"
+            ? doc.description
+            : "";
       pages.push({
         title: metadata?.title || ("title" in doc && doc.title) || url,
         url,
@@ -147,8 +138,7 @@ export async function selectExcerpts(
   course: DesignCourse,
   pages: FetchedPage[],
 ): Promise<Map<string, string>> {
-  const fallback = (page: FetchedPage) =>
-    page.content.slice(0, EXCERPT_MAX_CHARS).trim();
+  const fallback = (page: FetchedPage) => page.content.slice(0, EXCERPT_MAX_CHARS).trim();
 
   if (pages.length === 0) return new Map();
 
@@ -168,8 +158,7 @@ export async function selectExcerpts(
         "Return every URL you were given, each with its excerpt, verbatim from the page.",
         "",
         ...pages.map(
-          (p) =>
-            `URL: ${p.url}\nTITLE: ${p.title}\nCONTENT:\n${p.content.slice(0, 4000)}`,
+          (p) => `URL: ${p.url}\nTITLE: ${p.title}\nCONTENT:\n${p.content.slice(0, 4000)}`,
         ),
       ].join("\n"),
     });
@@ -186,10 +175,7 @@ export async function selectExcerpts(
   const result = new Map<string, string>();
   for (const page of pages) {
     const picked = chosen.get(page.url);
-    result.set(
-      page.url,
-      picked && picked.length > 0 ? picked : fallback(page),
-    );
+    result.set(page.url, picked && picked.length > 0 ? picked : fallback(page));
   }
   return result;
 }
@@ -293,7 +279,9 @@ export async function draftOutline(
       "",
       `Topic: ${course.topic}`,
       `Goal: ${course.goal}`,
-      course.background ? `Background (skip fundamentals this names): ${course.background}` : "Background: none given.",
+      course.background
+        ? `Background (skip fundamentals this names): ${course.background}`
+        : "Background: none given.",
       `Depth: ${course.depth}. ${depthIntent(course.depth)} The outline must land inside ${describeBounds(course.depth)}.`,
       `Course language: write every title, summary and sentence in ${courseLanguageName(course.language)}.`,
       "",
@@ -409,9 +397,7 @@ export async function designSpecification(
   draft: OutlineDraft,
   sources: GatheredSource[],
 ): Promise<CourseSpecification> {
-  const lessons = outline.modules.flatMap((m) =>
-    m.lessons.map((l) => ({ ...l, module: m.title })),
-  );
+  const lessons = outline.modules.flatMap((m) => m.lessons.map((l) => ({ ...l, module: m.title })));
 
   const { output } = await generateText({
     model,
@@ -430,10 +416,14 @@ export async function designSpecification(
       "The Outline is frozen. Use exactly these lesson ids:",
       ...lessons.map((l) => `- ${l.id} — Module "${l.module}", "${l.title}": ${l.summary}`),
       "",
-      "Terminal performances:", ...draft.terminalPerformances.map((p) => `- ${p}`),
-      "Throughline:", JSON.stringify(draft.throughline),
+      "Terminal performances:",
+      ...draft.terminalPerformances.map((p) => `- ${p}`),
+      "Throughline:",
+      JSON.stringify(draft.throughline),
       draft.exclusions.length ? `Exclusions: ${draft.exclusions.join("; ")}` : "",
-      draft.learnerAssumptions.length ? `Learner assumptions: ${draft.learnerAssumptions.join("; ")}` : "",
+      draft.learnerAssumptions.length
+        ? `Learner assumptions: ${draft.learnerAssumptions.join("; ")}`
+        : "",
       "",
       sources.length
         ? "Source refs you may cite (use exactly these): " +

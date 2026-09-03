@@ -14,11 +14,11 @@ import { requireLearner } from "@/lib/session";
  * readable Course (bug 1's defensive guard); everything else happens on
  * the Outline — designing, failed, or waiting for approval.
  */
-function rowFor(course: {
-  id: string;
-  status: string;
-  published: boolean;
-}): { href: string; label: string; reading: boolean } {
+function rowFor(course: { id: string; status: string; published: boolean }): {
+  href: string;
+  label: string;
+  reading: boolean;
+} {
   if (course.published || course.status === "ready") {
     return { href: `/courses/${course.id}`, label: "", reading: true };
   }
@@ -60,12 +60,10 @@ export default async function CoursesPage() {
 
         {owned.length === 0 ? (
           <div className="mt-8 border-t border-hair pt-10">
-            <p className="text-[0.9375rem] leading-[1.66] text-fg-2">
-              No Courses yet.
-            </p>
+            <p className="text-[0.9375rem] leading-[1.66] text-fg-2">No Courses yet.</p>
             <p className="mt-2 max-w-(--measure) text-[0.8125rem] leading-[1.55] text-fg-3">
-              Name a Topic and a Goal, and Mikasa drafts the Outline. You shape
-              it before a Lesson is written.
+              Name a Topic and a Goal, and Mikasa drafts the Outline. You shape it before a Lesson
+              is written.
             </p>
             <Button variant="hero" render={<Link href="/courses/new" />} className="mt-6">
               Start a Course
@@ -78,8 +76,7 @@ export default async function CoursesPage() {
               const { href, label, reading } = rowFor(c);
               /* The accent marks where you are up to: a readable Course
                  with every Exercise done carries the neutral check. */
-              const complete =
-                reading && c.completion && c.completion.done >= c.completion.total;
+              const complete = reading && c.completion && c.completion.done >= c.completion.total;
               return (
                 <li key={c.id} className="border-b border-hair">
                   <Link
@@ -124,7 +121,6 @@ export default async function CoursesPage() {
             })}
           </ul>
         )}
-
       </div>
     </AppShell>
   );

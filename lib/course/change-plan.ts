@@ -7,7 +7,12 @@
  * Lesson's prose or Exercise.
  */
 import { z } from "zod";
-import { applyOutlineOps, outlineApprovalProblems, renumberOutline, StructureError } from "./structure";
+import {
+  applyOutlineOps,
+  outlineApprovalProblems,
+  renumberOutline,
+  StructureError,
+} from "./structure";
 import type { OutlineOp } from "./structure";
 import type { OutlineData, OutlineLesson, OutlineModule } from "./types";
 
@@ -29,18 +34,63 @@ export type ExerciseOp = {
 export type ChangePlanOp = OutlineOp | LessonProseOp | ExerciseOp;
 
 export const changePlanOpSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("addModule"), title: z.string().min(1).max(200), moduleId: z.string().min(1).optional() }),
-  z.object({ kind: z.literal("renameModule"), moduleId: z.string().min(1), title: z.string().min(1).max(200) }),
+  z.object({
+    kind: z.literal("addModule"),
+    title: z.string().min(1).max(200),
+    moduleId: z.string().min(1).optional(),
+  }),
+  z.object({
+    kind: z.literal("renameModule"),
+    moduleId: z.string().min(1),
+    title: z.string().min(1).max(200),
+  }),
   z.object({ kind: z.literal("removeModule"), moduleId: z.string().min(1) }),
-  z.object({ kind: z.literal("moveModule"), moduleId: z.string().min(1), toIndex: z.number().int().min(0) }),
-  z.object({ kind: z.literal("addLesson"), moduleId: z.string().min(1), title: z.string().min(1).max(200), summary: z.string().max(500) }),
-  z.object({ kind: z.literal("renameLesson"), lessonId: z.string().min(1), title: z.string().min(1).max(200), summary: z.string().max(500) }),
+  z.object({
+    kind: z.literal("moveModule"),
+    moduleId: z.string().min(1),
+    toIndex: z.number().int().min(0),
+  }),
+  z.object({
+    kind: z.literal("addLesson"),
+    moduleId: z.string().min(1),
+    title: z.string().min(1).max(200),
+    summary: z.string().max(500),
+  }),
+  z.object({
+    kind: z.literal("renameLesson"),
+    lessonId: z.string().min(1),
+    title: z.string().min(1).max(200),
+    summary: z.string().max(500),
+  }),
   z.object({ kind: z.literal("removeLesson"), lessonId: z.string().min(1) }),
-  z.object({ kind: z.literal("moveLesson"), lessonId: z.string().min(1), toModuleId: z.string().min(1), toIndex: z.number().int().min(0) }),
-  z.object({ kind: z.literal("splitLesson"), lessonId: z.string().min(1), secondTitle: z.string().min(1).max(200), secondSummary: z.string().max(500) }),
-  z.object({ kind: z.literal("mergeLesson"), lessonId: z.string().min(1), direction: z.enum(["next", "previous"]) }),
-  z.object({ kind: z.literal("lessonProse"), lessonId: z.string().min(1), instruction: z.string().min(1).max(2000) }),
-  z.object({ kind: z.literal("exercise"), lessonId: z.string().min(1), task: z.string().min(1).max(2000), check: z.string().min(1).max(2000) }),
+  z.object({
+    kind: z.literal("moveLesson"),
+    lessonId: z.string().min(1),
+    toModuleId: z.string().min(1),
+    toIndex: z.number().int().min(0),
+  }),
+  z.object({
+    kind: z.literal("splitLesson"),
+    lessonId: z.string().min(1),
+    secondTitle: z.string().min(1).max(200),
+    secondSummary: z.string().max(500),
+  }),
+  z.object({
+    kind: z.literal("mergeLesson"),
+    lessonId: z.string().min(1),
+    direction: z.enum(["next", "previous"]),
+  }),
+  z.object({
+    kind: z.literal("lessonProse"),
+    lessonId: z.string().min(1),
+    instruction: z.string().min(1).max(2000),
+  }),
+  z.object({
+    kind: z.literal("exercise"),
+    lessonId: z.string().min(1),
+    task: z.string().min(1).max(2000),
+    check: z.string().min(1).max(2000),
+  }),
 ]) satisfies z.ZodType<ChangePlanOp>;
 
 export const changePlanSchema = z.object({
@@ -381,10 +431,7 @@ export function undoOutline(
 ): OutlineData {
   const lessons = new Set(touchedLessons);
   const modules = new Set(touchedModules);
-  const baseLessons = new Map<
-    string,
-    { module: string; index: number; lesson: OutlineLesson }
-  >();
+  const baseLessons = new Map<string, { module: string; index: number; lesson: OutlineLesson }>();
   for (const m of base.modules) {
     for (const [index, l] of m.lessons.entries()) {
       baseLessons.set(l.id, { module: m.id, index, lesson: l });

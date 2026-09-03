@@ -112,9 +112,9 @@ describe("reconcileSpecification", () => {
       }),
     ]);
 
-    await expect(
-      reconcileSpecification(model.model, OUTLINE, PREVIOUS),
-    ).rejects.toThrow(/skipped 1 Lesson/);
+    await expect(reconcileSpecification(model.model, OUTLINE, PREVIOUS)).rejects.toThrow(
+      /skipped 1 Lesson/,
+    );
   });
 
   it("carries the learner's adjustments into the prompt and the specification, live Lessons only", async () => {

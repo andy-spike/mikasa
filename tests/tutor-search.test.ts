@@ -19,9 +19,11 @@ const headerState = vi.hoisted(() => ({ current: new Headers() }));
 vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
 
 /* The Tutor's model and embedder are fakes; web search is stubbed. */
-const tutorModelState = vi.hoisted(() => ({ current: undefined as ReturnType<
-  typeof import("./helpers/fake-model").streamingModel
-> | undefined }));
+const tutorModelState = vi.hoisted(() => ({
+  current: undefined as
+    | ReturnType<typeof import("./helpers/fake-model").streamingModel>
+    | undefined,
+}));
 const embedState = vi.hoisted(() => ({
   queries: [] as string[],
 }));
@@ -65,10 +67,7 @@ function keywordEmbed(text: string): number[] {
 
 const { parseLessonContent } = await import("@/lib/course/content");
 const { saveLessonContent } = await import("@/lib/db/lessons");
-const {
-  buildCourseFragments,
-  embedCourseFragments,
-} = await import("@/lib/course/fragments");
+const { buildCourseFragments, embedCourseFragments } = await import("@/lib/course/fragments");
 const { searchFragments, listFragments } = await import("@/lib/db/fragments");
 const { tutorTools } = await import("@/lib/course/tutor-tools");
 const { publishRevision } = await import("@/lib/db/review");
@@ -95,9 +94,7 @@ const OUTLINE = {
       ordinal: 1,
       numeral: "I",
       title: "Module one",
-      lessons: [
-        { id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 },
-      ],
+      lessons: [{ id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 }],
     },
   ],
 };
@@ -344,10 +341,11 @@ describe("the Tutor's tools", () => {
       },
     });
 
-    const result = (await tools.searchCourse.execute!(
-      { query: "how do windows work" },
-      { toolCallId: "t", messages: [], context: {} } as never,
-    )) as { hits: { text: string }[] };
+    const result = (await tools.searchCourse.execute!({ query: "how do windows work" }, {
+      toolCallId: "t",
+      messages: [],
+      context: {},
+    } as never)) as { hits: { text: string }[] };
     expect(result.hits.length).toBeGreaterThan(0);
     expect(result.hits[0].text.toLowerCase()).toContain("window");
     expect(embedState.queries).toEqual([]);
@@ -372,10 +370,11 @@ describe("the Tutor's tools", () => {
       webSearch: webSearchState.current,
     });
 
-    const result = (await tools.searchWeb.execute!(
-      { query: "postgres 17 features" },
-      { toolCallId: "t", messages: [], context: {} } as never,
-    )) as { results: { title: string; url: string; snippet: string }[] };
+    const result = (await tools.searchWeb.execute!({ query: "postgres 17 features" }, {
+      toolCallId: "t",
+      messages: [],
+      context: {},
+    } as never)) as { results: { title: string; url: string; snippet: string }[] };
     expect(result.results).toEqual([
       { title: "Postgres 17 release", url: "https://example.com/pg17", snippet: "New." },
     ]);

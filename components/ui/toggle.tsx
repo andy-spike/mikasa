@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { Toggle as TogglePrimitive } from "@base-ui/react/toggle"
-import { cva, type VariantProps } from "class-variance-authority"
+import { Toggle as TogglePrimitive } from "@base-ui/react/toggle";
+import { cva, type VariantProps } from "class-variance-authority";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 /* Adapted at this line: the shipped variants are uppercase at
    tracking-widest, which spends the system's one label style on a control,
@@ -28,8 +28,8 @@ const toggleVariants = cva(
       variant: "default",
       size: "default",
     },
-  }
-)
+  },
+);
 
 function Toggle({
   className,
@@ -43,7 +43,7 @@ function Toggle({
       className={cn(toggleVariants({ variant, size, className }))}
       {...props}
     />
-  )
+  );
 }
 
-export { Toggle, toggleVariants }
+export { Toggle, toggleVariants };

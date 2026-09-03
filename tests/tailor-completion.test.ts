@@ -48,17 +48,14 @@ vi.mock("@/lib/course/review", () => ({
 
 /* The generation model and the embedder, scripted per test. */
 const revisionModelState = vi.hoisted(() => ({
-  current: undefined as ReturnType<
-    typeof import("./helpers/fake-model").scriptedModel
-  > | undefined,
+  current: undefined as ReturnType<typeof import("./helpers/fake-model").scriptedModel> | undefined,
 }));
 vi.mock("@/lib/model", async () => {
   const actual = await vi.importActual<typeof import("@/lib/model")>("@/lib/model");
   return {
     ...actual,
     generationModel: () => revisionModelState.current!.model,
-    embedTexts: async (texts: string[]) =>
-      texts.map(() => new Array<number>(768).fill(0.01)),
+    embedTexts: async (texts: string[]) => texts.map(() => new Array<number>(768).fill(0.01)),
   };
 });
 
@@ -82,14 +79,9 @@ const { createChangePlan, stagePlanRevision, planContentAdjustments, planHasStru
   await import("@/lib/db/tailor");
 const { specNeedsReconciliation } = await import("@/lib/course/reconcile");
 const { embedCourseFragments } = await import("@/lib/course/fragments");
-const {
-  listPublishedPlansAction,
-  reviewTailorOperationAction,
-  undoPlanRevisionAction,
-} = await import("@/lib/actions/tailor");
-const { markLessonDoneAction, markLessonUndoneAction } = await import(
-  "@/lib/actions/completion"
-);
+const { listPublishedPlansAction, reviewTailorOperationAction, undoPlanRevisionAction } =
+  await import("@/lib/actions/tailor");
+const { markLessonDoneAction, markLessonUndoneAction } = await import("@/lib/actions/completion");
 const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
 const { json, scriptedModel } = await import("./helpers/fake-model");
 const { stageRevisionWorkflow } = await import("@/workflows/course-revision");
@@ -113,9 +105,7 @@ const OUTLINE = {
       ordinal: 2,
       numeral: "II",
       title: "Module two",
-      lessons: [
-        { id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 },
-      ],
+      lessons: [{ id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 }],
     },
   ],
 };
@@ -134,9 +124,27 @@ const SPEC = {
   throughline: { premise: "Water first", runningExample: "The sky wash", vocabulary: [] },
   learningGraph: [],
   alignment: [
-    { lessonId: "l1", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
-    { lessonId: "l2", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
-    { lessonId: "l3", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
+    {
+      lessonId: "l1",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
+    {
+      lessonId: "l2",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
+    {
+      lessonId: "l3",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
   ],
   finalExercise: { task: "Paint it", acceptanceChecks: ["It holds"] },
   evidence: [],
@@ -255,8 +263,7 @@ async function userIdOf(email: string): Promise<string> {
 async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<string> {
   const created = await createChangePlan(db, await userIdOf(OWNER), courseId, ops);
   expect(created.ok).toBe(true);
-  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } })
-    .plan;
+  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } }).plan;
   headerState.current = new Headers({ cookie: ownerCookie });
   for (const operation of plan.operations) {
     await reviewTailorOperationAction(plan.id, operation.id, "accepted");
@@ -301,14 +308,13 @@ async function stageAndPublish(
   const [stagedOutline] = await db
     .select()
     .from(outlines)
-    .where(
-      and(eq(outlines.courseId, courseId), eq(outlines.version, staged.stagedOutlineVersion)),
-    );
+    .where(and(eq(outlines.courseId, courseId), eq(outlines.version, staged.stagedOutlineVersion)));
   const adjustments = await planContentAdjustments(db, planId);
   const structural = await planHasStructuralChanges(db, planId);
-  const full = structural || specNeedsReconciliation(specRow.spec, stagedOutline.data, adjustments)
-    ? [reconcileJson(stagedOutline.data), ...responses]
-    : responses;
+  const full =
+    structural || specNeedsReconciliation(specRow.spec, stagedOutline.data, adjustments)
+      ? [reconcileJson(stagedOutline.data), ...responses]
+      : responses;
   revisionModelState.current = scriptedModel(full);
   const result = await stageRevisionWorkflow(
     courseId,
@@ -346,9 +352,7 @@ async function currentOutlineData(courseId: string) {
   const [outline] = await db
     .select()
     .from(outlines)
-    .where(
-      and(eq(outlines.courseId, courseId), eq(outlines.version, revision!.outlineVersion)),
-    );
+    .where(and(eq(outlines.courseId, courseId), eq(outlines.version, revision!.outlineVersion)));
   return outline.data;
 }
 
@@ -408,10 +412,7 @@ describe("publishing a revision", () => {
         check: "Three tones, no blooms.",
       },
     ]);
-    await stageAndPublish(courseId, planId, [
-      lessonJson("Lesson one"),
-      lessonJson("Lesson four"),
-    ]);
+    await stageAndPublish(courseId, planId, [lessonJson("Lesson one"), lessonJson("Lesson four")]);
 
     /* The rewritten Exercise redefined "done" for its Lesson; the new
        Lesson has never been done; the rest kept their moment. */
@@ -439,11 +440,15 @@ describe("publishing a revision", () => {
       expect.arrayContaining(["l1", "l2", "l3", added.id]),
     );
     expect(specRow.spec.adjustments).toEqual([
-      { lessonId: "l1", exercise: { task: "Wash the sky, graded", check: "Three tones, no blooms." } },
+      {
+        lessonId: "l1",
+        exercise: { task: "Wash the sky, graded", check: "Three tones, no blooms." },
+      },
     ]);
     expect(
-      revisionModelState
-        .current!.prompts.some((p) => p.includes("The learner set this Lesson's Exercise")),
+      revisionModelState.current!.prompts.some((p) =>
+        p.includes("The learner set this Lesson's Exercise"),
+      ),
     ).toBe(true);
   });
 
@@ -508,9 +513,7 @@ describe("publishing a revision", () => {
     );
     const restored = await completionRows();
     expect(restored).toHaveLength(4);
-    expect(new Set(restored.map(([ref]) => ref))).toEqual(
-      new Set(["l1", "l2", "l3", half.id]),
-    );
+    expect(new Set(restored.map(([ref]) => ref))).toEqual(new Set(["l1", "l2", "l3", half.id]));
     expect((await planRow(mergeId)).status).toBe("undone");
   });
 
@@ -700,17 +703,11 @@ describe("undoing a published change", () => {
     expect(undoneB).toMatchObject({ ok: true, revisionNumber: 4 });
     const outline = await currentOutlineData(courseId);
     expect(outline.modules[0].title).toBe("Module one, retitled");
-    expect(outline.modules.flatMap((m) => m.lessons.map((l) => l.id))).toEqual([
-      "l1",
-      "l2",
-      "l3",
-    ]);
+    expect(outline.modules.flatMap((m) => m.lessons.map((l) => l.id))).toEqual(["l1", "l2", "l3"]);
     expect(await completionRows()).toEqual([["l1", doneAt]]);
 
     /* With the overlap gone, the first change undoes too. */
-    expect(
-      (await listPublishedPlansAction(courseId)).map((r) => r.canUndo),
-    ).toEqual([true]);
+    expect((await listPublishedPlansAction(courseId)).map((r) => r.canUndo)).toEqual([true]);
     const undoneA = await undoPlanRevisionAction(courseId, planA);
     expect(undoneA).toMatchObject({ ok: true, revisionNumber: 5 });
     expect((await currentOutlineData(courseId)).modules[0].title).toBe("Module one");
@@ -737,10 +734,7 @@ describe("undoing a published change", () => {
 
     headerState.current = new Headers({ cookie: ownerCookie });
     /* Newest revision first. */
-    expect((await listPublishedPlansAction(courseId)).map((r) => r.canUndo)).toEqual([
-      true,
-      false,
-    ]);
+    expect((await listPublishedPlansAction(courseId)).map((r) => r.canUndo)).toEqual([true, false]);
 
     /* Another Learner reads no published changes for this Course. */
     const strangerCookie = await signInWithGoogle("stranger@example.com");

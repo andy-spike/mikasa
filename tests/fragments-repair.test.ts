@@ -52,13 +52,10 @@ vi.mock("@/lib/course/review", () => ({
 /* The generation model is scripted per test; the embedder is switched
    per test, so a failure can be injected exactly once. */
 const modelState = vi.hoisted(() => ({
-  current: undefined as ReturnType<
-    typeof import("./helpers/fake-model").scriptedModel
-  > | undefined,
+  current: undefined as ReturnType<typeof import("./helpers/fake-model").scriptedModel> | undefined,
 }));
 const embedState = vi.hoisted(() => ({
-  current: (texts: string[]) =>
-    Promise.resolve(texts.map(() => new Array<number>(768).fill(0.01))),
+  current: (texts: string[]) => Promise.resolve(texts.map(() => new Array<number>(768).fill(0.01))),
 }));
 vi.mock("@/lib/model", async () => {
   const actual = await vi.importActual<typeof import("@/lib/model")>("@/lib/model");
@@ -73,14 +70,8 @@ const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
 const { json, scriptedModel } = await import("./helpers/fake-model");
 const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
-const {
-  courseSpecs,
-  courses,
-  generationRuns,
-  outlines,
-  reviewRuns,
-  users,
-} = await import("@/lib/db/schema");
+const { courseSpecs, courses, generationRuns, outlines, reviewRuns, users } =
+  await import("@/lib/db/schema");
 const { saveLessonContent } = await import("@/lib/db/lessons");
 const { publishRevision, currentRevision } = await import("@/lib/db/review");
 const { listFragments, searchIsIncomplete } = await import("@/lib/db/fragments");
@@ -88,13 +79,11 @@ const { createChangePlan, stagePlanRevision, planContentAdjustments, planHasStru
   await import("@/lib/db/tailor");
 const { specNeedsReconciliation } = await import("@/lib/course/reconcile");
 const { embedCourseFragments } = await import("@/lib/course/fragments");
-const { reviewTailorOperationAction, undoPlanRevisionAction } = await import(
-  "@/lib/actions/tailor"
-);
+const { reviewTailorOperationAction, undoPlanRevisionAction } =
+  await import("@/lib/actions/tailor");
 const { rebuildFragmentsAction } = await import("@/lib/actions/courses");
-const { repairFragmentsBody, repairFragmentsWorkflow } = await import(
-  "@/workflows/repair-fragments"
-);
+const { repairFragmentsBody, repairFragmentsWorkflow } =
+  await import("@/workflows/repair-fragments");
 const { stageRevisionWorkflow } = await import("@/workflows/course-revision");
 const { parseLessonContent } = await import("@/lib/course/content");
 
@@ -117,9 +106,7 @@ const OUTLINE = {
       ordinal: 2,
       numeral: "II",
       title: "Module two",
-      lessons: [
-        { id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 },
-      ],
+      lessons: [{ id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 }],
     },
   ],
 };
@@ -138,9 +125,27 @@ const SPEC = {
   throughline: { premise: "Water first", runningExample: "The sky wash", vocabulary: [] },
   learningGraph: [],
   alignment: [
-    { lessonId: "l1", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
-    { lessonId: "l2", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
-    { lessonId: "l3", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
+    {
+      lessonId: "l1",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
+    {
+      lessonId: "l2",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
+    {
+      lessonId: "l3",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
   ],
   finalExercise: { task: "Paint it", acceptanceChecks: ["It holds"] },
   evidence: [],
@@ -275,8 +280,7 @@ async function userIdOf(email: string): Promise<string> {
 async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<string> {
   const created = await createChangePlan(db, await userIdOf(OWNER), courseId, ops);
   expect(created.ok).toBe(true);
-  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } })
-    .plan;
+  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } }).plan;
   headerState.current = new Headers({ cookie: ownerCookie });
   for (const operation of plan.operations) {
     await reviewTailorOperationAction(plan.id, operation.id, "accepted");
@@ -303,14 +307,13 @@ async function stageAndPublish(
   const [stagedOutline] = await db
     .select()
     .from(outlines)
-    .where(
-      and(eq(outlines.courseId, courseId), eq(outlines.version, staged.stagedOutlineVersion)),
-    );
+    .where(and(eq(outlines.courseId, courseId), eq(outlines.version, staged.stagedOutlineVersion)));
   const adjustments = await planContentAdjustments(db, planId);
   const structural = await planHasStructuralChanges(db, planId);
-  const full = structural || specNeedsReconciliation(specRow.spec, stagedOutline.data, adjustments)
-    ? [reconcileJson(stagedOutline.data), ...responses]
-    : responses;
+  const full =
+    structural || specNeedsReconciliation(specRow.spec, stagedOutline.data, adjustments)
+      ? [reconcileJson(stagedOutline.data), ...responses]
+      : responses;
   modelState.current = scriptedModel(full);
   return stageRevisionWorkflow(
     courseId,
@@ -328,10 +331,7 @@ async function runRow(courseId: string, outlineVersion: number) {
     .select()
     .from(generationRuns)
     .where(
-      and(
-        eq(generationRuns.courseId, courseId),
-        eq(generationRuns.outlineVersion, outlineVersion),
-      ),
+      and(eq(generationRuns.courseId, courseId), eq(generationRuns.outlineVersion, outlineVersion)),
     );
   return run;
 }
@@ -346,9 +346,7 @@ describe("a revision whose embedding fails", () => {
       throw new Error("The embedding provider is down.");
     };
 
-    const result = await stageAndPublish(courseId, planId, [
-      lessonJson("Lesson one"),
-    ]);
+    const result = await stageAndPublish(courseId, planId, [lessonJson("Lesson one")]);
 
     /* The publication stands; only the search index is behind. */
     expect(result).toMatchObject({ ok: true, revisionNumber: 2 });

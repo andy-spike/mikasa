@@ -2,11 +2,7 @@
 
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-} from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {

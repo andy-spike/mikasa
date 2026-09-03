@@ -72,9 +72,7 @@ vi.mock("@/lib/course/review", () => ({
 
 /* The generation model and the embedder, scripted per test. */
 const revisionModelState = vi.hoisted(() => ({
-  current: undefined as ReturnType<
-    typeof import("./helpers/fake-model").scriptedModel
-  > | undefined,
+  current: undefined as ReturnType<typeof import("./helpers/fake-model").scriptedModel> | undefined,
 }));
 const embedCalls = vi.hoisted(() => ({ count: 0 }));
 vi.mock("@/lib/model", async () => {
@@ -107,11 +105,9 @@ const { parseLessonContent } = await import("@/lib/course/content");
 const { saveLessonContent } = await import("@/lib/db/lessons");
 const { publishRevision, currentRevision } = await import("@/lib/db/review");
 const { createChangePlan } = await import("@/lib/db/tailor");
-const { embedCourseFragments } = await import("@/lib/course/fragments");const {
-  reviewTailorOperationAction,
-  retryPlanRevisionAction,
-  stagePlanRevisionAction,
-} = await import("@/lib/actions/tailor");
+const { embedCourseFragments } = await import("@/lib/course/fragments");
+const { reviewTailorOperationAction, retryPlanRevisionAction, stagePlanRevisionAction } =
+  await import("@/lib/actions/tailor");
 const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
 const { json, scriptedModel } = await import("./helpers/fake-model");
 const { stageRevisionWorkflow } = await import("@/workflows/course-revision");
@@ -148,9 +144,27 @@ const SPEC = {
   throughline: { premise: "Water first", runningExample: "The sky wash", vocabulary: [] },
   learningGraph: [{ id: "g1", skill: "Load the brush", requires: [], lessonId: "l1" }],
   alignment: [
-    { lessonId: "l1", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
-    { lessonId: "l2", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
-    { lessonId: "l3", performance: "does", prerequisiteNodes: [], moduleMilestone: "m", exerciseContribution: "c" },
+    {
+      lessonId: "l1",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
+    {
+      lessonId: "l2",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
+    {
+      lessonId: "l3",
+      performance: "does",
+      prerequisiteNodes: [],
+      moduleMilestone: "m",
+      exerciseContribution: "c",
+    },
   ],
   finalExercise: { task: "Paint it", acceptanceChecks: ["It holds"] },
   evidence: [],
@@ -323,9 +337,7 @@ describe("stagePlanRevisionAction", () => {
     /* Only the retitled Lesson was copied, under its new name; the
        regenerated one is the workflow's job. */
     const rows = await db.select().from(lessons).where(eq(lessons.outlineVersion, 2));
-    expect(rows.map((r) => [r.lessonRef, r.title])).toEqual([
-      ["l3", "Lesson three, Repainted"],
-    ]);
+    expect(rows.map((r) => [r.lessonRef, r.title])).toEqual([["l3", "Lesson three, Repainted"]]);
 
     const [plan] = await db.select().from(changePlans).where(eq(changePlans.id, planId));
     expect(plan.status).toBe("staged");
@@ -489,10 +501,7 @@ describe("stageRevisionWorkflow", () => {
     const after = await currentRevision(db, courseId);
     expect(after?.revisionNumber).toBe(2);
     expect(after?.outlineVersion).toBe(2);
-    const [planAfter] = await db
-      .select()
-      .from(changePlans)
-      .where(eq(changePlans.id, planId));
+    const [planAfter] = await db.select().from(changePlans).where(eq(changePlans.id, planId));
     expect(planAfter.status).toBe("published");
   });
 });

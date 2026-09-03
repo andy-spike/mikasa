@@ -41,7 +41,11 @@ vi.mock("workflow/api", () => ({
    whichever Outline the action passes in. */
 const reconcileCalls = vi.hoisted(() => ({ count: 0 }));
 vi.mock("@/lib/course/reconcile", () => ({
-  reconcileSpecification: async (_model: unknown, outline: { modules: { lessons: { id: string }[] }[] }, previous: { alignment: unknown[] }) => {
+  reconcileSpecification: async (
+    _model: unknown,
+    outline: { modules: { lessons: { id: string }[] }[] },
+    previous: { alignment: unknown[] },
+  ) => {
     reconcileCalls.count += 1;
     return {
       ...previous,
@@ -60,12 +64,8 @@ vi.mock("@/lib/course/reconcile", () => ({
 
 const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
-const { courses, courseSpecs, generationRuns, outlines, users } = await import(
-  "@/lib/db/schema"
-);
-const { applyOutlineOpAction, approveOutlineAction } = await import(
-  "@/lib/actions/outline"
-);
+const { courses, courseSpecs, generationRuns, outlines, users } = await import("@/lib/db/schema");
+const { applyOutlineOpAction, approveOutlineAction } = await import("@/lib/actions/outline");
 const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
 
 const ORIGIN = "http://localhost:3000";
@@ -133,9 +133,7 @@ const SPEC = {
     learnerAssumptions: [],
   },
   throughline: { premise: "One app", runningExample: "The chat app", vocabulary: [] },
-  learningGraph: [
-    { id: "g1", skill: "Stream text", requires: [], lessonId: "l1" },
-  ],
+  learningGraph: [{ id: "g1", skill: "Stream text", requires: [], lessonId: "l1" }],
   alignment: OUTLINE.modules.flatMap((m) =>
     m.lessons.map((l) => ({
       lessonId: l.id,
@@ -150,11 +148,7 @@ const SPEC = {
 };
 
 async function seedAwaitingApproval(ownerEmail: string): Promise<string> {
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, ownerEmail))
-    .limit(1);
+  const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
     .insert(courses)
     .values({
@@ -166,9 +160,7 @@ async function seedAwaitingApproval(ownerEmail: string): Promise<string> {
     })
     .returning();
   await db.insert(outlines).values({ courseId: course.id, version: 1, data: OUTLINE });
-  await db
-    .insert(courseSpecs)
-    .values({ courseId: course.id, spec: SPEC, outlineVersion: 1 });
+  await db.insert(courseSpecs).values({ courseId: course.id, spec: SPEC, outlineVersion: 1 });
   return course.id;
 }
 
@@ -212,10 +204,7 @@ describe("applyOutlineOpAction", () => {
     expect(result.outline.version).toBe(2);
     expect(result.outline.data.modules[0].lessons[0].title).toBe("Renamed");
 
-    const [spec] = await db
-      .select()
-      .from(courseSpecs)
-      .where(eq(courseSpecs.courseId, courseId));
+    const [spec] = await db.select().from(courseSpecs).where(eq(courseSpecs.courseId, courseId));
     expect(spec.outlineVersion).toBe(1);
   });
 
@@ -261,10 +250,7 @@ describe("applyOutlineOpAction", () => {
   it("rejects a shape change once the Course left the checkpoint", async () => {
     asOwner();
     const courseId = await seedAwaitingApproval(OWNER_EMAIL);
-    await db
-      .update(courses)
-      .set({ status: "ready" })
-      .where(eq(courses.id, courseId));
+    await db.update(courses).set({ status: "ready" }).where(eq(courses.id, courseId));
 
     const result = await applyOutlineOpAction(courseId, 1, {
       kind: "removeLesson",
@@ -318,9 +304,7 @@ describe("approveOutlineAction", () => {
       .where(eq(generationRuns.courseId, courseId));
     expect(runs).toHaveLength(1);
     expect(runs[0].outlineVersion).toBe(2);
-    expect(workflowStarts.calls).toEqual([
-      { courseId, runId: runs[0].id, outlineVersion: 2 },
-    ]);
+    expect(workflowStarts.calls).toEqual([{ courseId, runId: runs[0].id, outlineVersion: 2 }]);
   });
 
   it("approves without reconciling when the specification already fits", async () => {

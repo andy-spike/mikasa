@@ -55,9 +55,7 @@ export async function reconcileSpecification(
   previous: CourseSpecification,
   adjustments: LessonAdjustment[] = [],
 ): Promise<CourseSpecification> {
-  const lessons = outline.modules.flatMap((m) =>
-    m.lessons.map((l) => ({ ...l, module: m.title })),
-  );
+  const lessons = outline.modules.flatMap((m) => m.lessons.map((l) => ({ ...l, module: m.title })));
   const titleFor = new Map(lessons.map((l) => [l.id, l.title]));
   const lessonIds = new Set(lessons.map((l) => l.id));
   const live = adjustments.filter((a) => lessonIds.has(a.lessonId));

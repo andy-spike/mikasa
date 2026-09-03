@@ -67,16 +67,16 @@ export function Outline({
   const { isMobile } = useSidebar();
 
   return (
-    <Sidebar
-      side="left"
-      collapsible="icon"
-      aria-label="Outline"
-      className="border-hair"
-    >
+    <Sidebar side="left" collapsible="icon" aria-label="Outline" className="border-hair">
       {/* Collapsed, the rail keeps the shell's left edge and the one number
           worth carrying at 44px wide. */}
       <div className="hidden flex-col items-center gap-1 py-3 group-data-[collapsible=icon]:flex">
-        <Button variant="icon-raised" onClick={onExpand} aria-label="Expand the Outline" className="p-2">
+        <Button
+          variant="icon-raised"
+          onClick={onExpand}
+          aria-label="Expand the Outline"
+          className="p-2"
+        >
           <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
         </Button>
         <span className="tnum mt-1 text-[0.75rem] text-fg-dim">
@@ -112,9 +112,7 @@ export function Outline({
         {/* The Goal, unlabelled: under a Course title it cannot read as
             anything else. Depth, Grounding and the done count were creation
             settings and a number the checks already tell you. */}
-        <p className="mt-2 text-[0.8125rem] leading-[1.5] text-fg-3">
-          {goal}
-        </p>
+        <p className="mt-2 text-[0.8125rem] leading-[1.5] text-fg-3">{goal}</p>
       </SidebarHeader>
 
       <SidebarContent className="scroll-thin gap-0 overflow-y-auto border-t border-hair px-2 py-2 group-data-[collapsible=icon]:hidden">
@@ -166,11 +164,7 @@ export function Outline({
                           <span
                             className={cn(
                               "tnum text-[0.75rem] tabular-nums",
-                              ghost
-                                ? "text-fg-dim"
-                                : isOpen
-                                  ? "text-fg-2"
-                                  : "text-fg-3",
+                              ghost ? "text-fg-dim" : isOpen ? "text-fg-2" : "text-fg-3",
                             )}
                           >
                             {l.n}
@@ -179,16 +173,11 @@ export function Outline({
                           <span
                             className={cn(
                               "truncate text-[0.8125rem] leading-5",
-                              ghost
-                                ? "text-fg-3"
-                                : isOpen
-                                  ? "font-medium text-fg"
-                                  : "text-fg-2",
+                              ghost ? "text-fg-3" : isOpen ? "font-medium text-fg" : "text-fg-2",
                             )}
                           >
                             {l.title}
                           </span>
-
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );

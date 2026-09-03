@@ -33,18 +33,23 @@ const buttonVariants = cva(
         compact:
           "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap bg-over px-2.5 py-1.5 text-[0.75rem] font-medium text-fg hover:bg-rule disabled:opacity-40",
         /** No ground at all. Undo, Cancel, Back. */
-        quiet: "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap px-1 text-[0.8125rem] text-fg-3 hover:text-fg",
+        quiet:
+          "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap px-1 text-[0.8125rem] text-fg-3 hover:text-fg",
         /** Quiet, but the word already says it is destructive. */
-        discard: "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap px-1 text-[0.8125rem] text-fg-3 hover:text-bad",
+        discard:
+          "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap px-1 text-[0.8125rem] text-fg-3 hover:text-bad",
         /** Chrome. Third ink on nothing, stepping up on hover. */
         icon: "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap p-1.5 text-fg-3 hover:bg-panel hover:text-fg",
         /** The same, on a surface that is already one step up. */
-        "icon-raised": "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap p-1.5 text-fg-3 hover:bg-raised hover:text-fg",
+        "icon-raised":
+          "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap p-1.5 text-fg-3 hover:bg-raised hover:text-fg",
         /* The two names the other vendored components ask for by hand —
            Dialog, Sheet and Sidebar all reach for a ghost close button. They
            are aliases onto this world's idiom, not a second vocabulary. */
-        ghost: "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap p-1.5 text-fg-3 hover:bg-raised hover:text-fg",
-        outline: "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap bg-raised px-4 py-2.5 text-[0.8125rem] font-medium text-fg hover:bg-over",
+        ghost:
+          "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap p-1.5 text-fg-3 hover:bg-raised hover:text-fg",
+        outline:
+          "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap bg-raised px-4 py-2.5 text-[0.8125rem] font-medium text-fg hover:bg-over",
         /** Its container is its shape: a rename trigger, a Next-Lesson row. */
         bare: "",
       },

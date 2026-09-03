@@ -98,7 +98,8 @@ export function Conversation({
         setThread((t) => {
           const copy = [...t];
           const last = copy[copy.length - 1];
-          if (last && last.from === replyFrom) copy[copy.length - 1] = { ...last, text: last.text + chunk };
+          if (last && last.from === replyFrom)
+            copy[copy.length - 1] = { ...last, text: last.text + chunk };
           return copy;
         });
       }
@@ -121,7 +122,11 @@ export function Conversation({
 
   return (
     <div className={scrollport ? "contents" : "flex flex-col"}>
-      <div className={scrollport ? "scroll-thin min-h-0 flex-1 overflow-y-auto px-3.5 py-4" : "px-3.5 py-4"}>
+      <div
+        className={
+          scrollport ? "scroll-thin min-h-0 flex-1 overflow-y-auto px-3.5 py-4" : "px-3.5 py-4"
+        }
+      >
         <div className="space-y-4">
           {thread.map((turn, i) =>
             turn.from === "learner" ? (
@@ -133,10 +138,7 @@ export function Conversation({
                 {turn.text}
               </p>
             ) : (
-              <p
-                key={i}
-                className="text-[0.8125rem] leading-[1.66] text-fg-2"
-              >
+              <p key={i} className="text-[0.8125rem] leading-[1.66] text-fg-2">
                 <Inline text={turn.text} />
               </p>
             ),
@@ -248,61 +250,58 @@ export function TailorConversation({
             <div className="mt-5">
               <p className="label text-fg-3">Change plan</p>
               <ul className="-mx-3.5 mt-2 border-t border-hair">
-              {open.map((operation) => (
-                <li
-                  key={operation.id}
-                  className="border-b border-hair px-3.5 py-3.5"
-                >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="label text-fg-3">{operation.verb}</span>
-                    <span className="tnum max-w-[10rem] truncate text-[0.6875rem] text-fg-dim">
-                      {operation.entry}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-[0.875rem] leading-[1.45] font-medium text-fg">
-                    {operation.detail}
-                  </p>
+                {open.map((operation) => (
+                  <li key={operation.id} className="border-b border-hair px-3.5 py-3.5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="label text-fg-3">{operation.verb}</span>
+                      <span className="tnum max-w-[10rem] truncate text-[0.6875rem] text-fg-dim">
+                        {operation.entry}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-[0.875rem] leading-[1.45] font-medium text-fg">
+                      {operation.detail}
+                    </p>
 
-                  <div className="mt-3 flex items-center gap-3">
-                    {operation.status === "accepted" ? (
-                      <>
-                        <span className="text-[0.75rem] text-fg-3">Accepted</span>
-                        <Button
-                          variant="quiet"
-                          onClick={() => onRestore(operation.id)}
-                          className="ml-auto"
-                        >
-                          Undo
-                        </Button>
-                      </>
-                    ) : operation.status === "discarded" ? (
-                      <>
-                        <span className="text-[0.75rem] text-fg-3">Discarded</span>
-                        <Button
-                          variant="quiet"
-                          onClick={() => onRestore(operation.id)}
-                          className="ml-auto"
-                        >
-                          Restore
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button variant="compact" onClick={() => onAccept(operation.id)}>
-                          Accept
-                        </Button>
-                        <Button
-                          variant="discard"
-                          onClick={() => onDiscard(operation.id)}
-                          className="ml-auto"
-                        >
-                          Discard
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </li>
-              ))}
+                    <div className="mt-3 flex items-center gap-3">
+                      {operation.status === "accepted" ? (
+                        <>
+                          <span className="text-[0.75rem] text-fg-3">Accepted</span>
+                          <Button
+                            variant="quiet"
+                            onClick={() => onRestore(operation.id)}
+                            className="ml-auto"
+                          >
+                            Undo
+                          </Button>
+                        </>
+                      ) : operation.status === "discarded" ? (
+                        <>
+                          <span className="text-[0.75rem] text-fg-3">Discarded</span>
+                          <Button
+                            variant="quiet"
+                            onClick={() => onRestore(operation.id)}
+                            className="ml-auto"
+                          >
+                            Restore
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button variant="compact" onClick={() => onAccept(operation.id)}>
+                            Accept
+                          </Button>
+                          <Button
+                            variant="discard"
+                            onClick={() => onDiscard(operation.id)}
+                            className="ml-auto"
+                          >
+                            Discard
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                ))}
               </ul>
               {applySlot && acceptedCount > 0 ? <div className="mt-4">{applySlot}</div> : null}
             </div>

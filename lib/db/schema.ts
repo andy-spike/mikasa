@@ -183,10 +183,7 @@ export const generationRuns = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("generation_runs_course_id_version_key").on(
-      table.courseId,
-      table.outlineVersion,
-    ),
+    uniqueIndex("generation_runs_course_id_version_key").on(table.courseId, table.outlineVersion),
     index("generation_runs_course_id_idx").on(table.courseId),
   ],
 );
@@ -478,10 +475,7 @@ export const tutorConversations = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("tutor_conversations_course_lesson_key").on(
-      table.courseId,
-      table.lessonRef,
-    ),
+    uniqueIndex("tutor_conversations_course_lesson_key").on(table.courseId, table.lessonRef),
     index("tutor_conversations_course_id_idx").on(table.courseId),
   ],
 );
@@ -507,10 +501,7 @@ export const tutorMessages = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("tutor_messages_conversation_seq_key").on(
-      table.conversationId,
-      table.seq,
-    ),
+    uniqueIndex("tutor_messages_conversation_seq_key").on(table.conversationId, table.seq),
     index("tutor_messages_conversation_id_idx").on(table.conversationId),
   ],
 );
@@ -579,10 +570,7 @@ export const tailorMessages = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("tailor_messages_conversation_seq_key").on(
-      table.conversationId,
-      table.seq,
-    ),
+    uniqueIndex("tailor_messages_conversation_seq_key").on(table.conversationId, table.seq),
   ],
 );
 
@@ -621,9 +609,8 @@ export const changePlans = pgTable(
     regeneratedLessons: jsonb("regenerated_lessons").$type<string[]>(),
     /** The Course's Completion state, taken the moment the revision
         published (#15): undo restores it for the touched identities. */
-    completionSnapshot: jsonb("completion_snapshot").$type<
-      { lessonRef: string; doneAt: string }[]
-    >(),
+    completionSnapshot:
+      jsonb("completion_snapshot").$type<{ lessonRef: string; doneAt: string }[]>(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

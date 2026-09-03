@@ -64,9 +64,7 @@ export function CourseDesignProgress({ courseId, topic, goal, status, step, erro
         <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
           {topic}
         </h1>
-        <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-          {goal}
-        </p>
+        <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">{goal}</p>
         <p className="mt-6 text-[0.9375rem] leading-[1.66] text-fg-2">
           {STEP_COPY[step] ?? "Designing the Course."}
         </p>
@@ -91,17 +89,15 @@ export function CourseDesignProgress({ courseId, topic, goal, status, step, erro
       <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
         {topic}
       </h1>
-      <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-        {goal}
-      </p>
+      <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">{goal}</p>
       <div className="mt-8 border-t border-hair pt-6">
         <p className="label text-fg-3">Design failed</p>
         <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
           {error ?? "The design did not finish."}
         </p>
         <p className="mt-2 max-w-(--measure) text-[0.75rem] leading-[1.5] text-fg-3">
-          Nothing was written. Designing again starts from the Topic, the Goal
-          and this Course&rsquo;s settings.
+          Nothing was written. Designing again starts from the Topic, the Goal and this
+          Course&rsquo;s settings.
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
           <Button onClick={retry} disabled={retrying}>

@@ -59,9 +59,7 @@ export function structuralFindings(input: StructuralInput): Finding[] {
   const findings: Finding[] = [];
   const planned = input.outline.modules.flatMap((m) => m.lessons);
   const byId = new Map(input.lessons.map((l) => [l.lessonId, l]));
-  const knownRefs = new Set(
-    input.spec.evidence.map((e) => e.sourceRef),
-  );
+  const knownRefs = new Set(input.spec.evidence.map((e) => e.sourceRef));
 
   for (const lesson of planned) {
     const content = byId.get(lesson.id);
@@ -256,9 +254,7 @@ export async function designFindings(
         m.lessons.map((l) => {
           const content = lessons.find((x) => x.lessonId === l.id);
           return `- ${l.id} "${l.title}" (teaches: ${byId.get(l.id) ?? "?"}): ${
-            content
-              ? content.body.map(renderBlockForReview).join(" ").slice(0, 600)
-              : "(missing)"
+            content ? content.body.map(renderBlockForReview).join(" ").slice(0, 600) : "(missing)"
           } | bridge: ${content?.bridge ?? "(none)"}`;
         }),
       ),
@@ -272,7 +268,13 @@ export async function designFindings(
 }
 
 function renderBlockForReview(block: unknown): string {
-  const b = block as { kind: string; text?: string; code?: string; language?: string; title?: string };
+  const b = block as {
+    kind: string;
+    text?: string;
+    code?: string;
+    language?: string;
+    title?: string;
+  };
   switch (b.kind) {
     case "p":
       return b.text ?? "";

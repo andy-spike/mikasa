@@ -74,9 +74,7 @@ async function stepDesignSources(
 ): Promise<GatheredSource[]> {
   "use step";
   const { db } = await import("@/lib/db");
-  const { collectSources, firecrawlSearcher } = await import(
-    "@/lib/course/design"
-  );
+  const { collectSources, firecrawlSearcher } = await import("@/lib/course/design");
   const { groundingModel } = await import("@/lib/model");
   const { listCourseSources } = await import("@/lib/db/design");
 
@@ -157,10 +155,7 @@ async function stepPersist(
 ): Promise<void> {
   "use step";
   const { db } = await import("@/lib/db");
-  const {
-    saveDesignSpecification,
-    completeDesignRun,
-  } = await import("@/lib/db/design");
+  const { saveDesignSpecification, completeDesignRun } = await import("@/lib/db/design");
   await saveDesignSpecification(db, courseId, outcome.specification, outlineVersion);
   await completeDesignRun(db, courseId, runId);
 }
@@ -194,26 +189,16 @@ export async function designCourseWorkflow(
   }
 
   const order: DesignStep[] = ["sources", "outline", "specification", "persist"];
-  const reached = (step: DesignStep) =>
-    order.indexOf(step) >= order.indexOf(resumeFrom);
+  const reached = (step: DesignStep) => order.indexOf(step) >= order.indexOf(resumeFrom);
 
   try {
     /* A resume past a step reuses what the failed run persisted; a fresh
        run (or a resume to its first unfinished step) runs the step. */
     await stepMarkStep(runId, "sources");
-    const sources = await stepDesignSources(
-      loaded.course,
-      courseId,
-      !reached("sources"),
-    );
+    const sources = await stepDesignSources(loaded.course, courseId, !reached("sources"));
 
     await stepMarkStep(runId, "outline");
-    const built = await stepDesignOutline(
-      loaded.course,
-      courseId,
-      sources,
-      !reached("outline"),
-    );
+    const built = await stepDesignOutline(loaded.course, courseId, sources, !reached("outline"));
 
     await stepMarkStep(runId, "specification");
     const specification = await stepDesignSpecification(

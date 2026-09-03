@@ -139,9 +139,11 @@ export function streamingModel(responses: StreamResponse[]) {
       const words = (response as string).split(/(?<= )/);
       const chunks: LanguageModelV4StreamPart[] = [
         { type: "text-start", id: "t1" } as LanguageModelV4StreamPart,
-        ...words.map(
-          (w): LanguageModelV4StreamPart => ({ type: "text-delta", id: "t1", delta: w }),
-        ),
+        ...words.map((w): LanguageModelV4StreamPart => ({
+          type: "text-delta",
+          id: "t1",
+          delta: w,
+        })),
         { type: "text-end", id: "t1" } as LanguageModelV4StreamPart,
         finish("stop"),
       ];
