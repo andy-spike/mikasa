@@ -6,8 +6,8 @@ import { defineConfig } from "drizzle-kit";
 loadEnv({ path: ".env.local", quiet: true });
 loadEnv({ quiet: true });
 
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL is not set. Add it to .env.local.");
+const url = process.env.DATABASE_URL_DEV ?? process.env.DATABASE_URL;
+if (!url) throw new Error("DATABASE_URL_DEV is not set. Add it to .env.local.");
 
 export default defineConfig({
   schema: "./lib/db/schema.ts",
