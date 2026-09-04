@@ -27,13 +27,11 @@ export type ModuleView = {
 };
 
 type Props = {
-  /** The Course's own header: the rail carries it, there is no other chrome. */
   topic: string;
   goal: string;
   modules: ModuleView[];
   openId: string;
   liveId: string | null;
-  /** true only just after a mark handed the accent to a new Lesson */
   handing: boolean;
   justDoneId: string | null;
   stampFor: (id: string) => string | undefined;
@@ -42,7 +40,6 @@ type Props = {
   onExpand: () => void;
   total: number;
   doneCount: number;
-  /** the drag strip on the rail's inner edge; the workspace owns the width */
   resizer?: ReactNode;
 };
 
@@ -62,14 +59,10 @@ export function Outline({
   doneCount,
   resizer,
 }: Props) {
-  /* On a phone the Sidebar is a sheet, and a row is something you hit with
-     a thumb rather than scan with an eye. */
   const { isMobile } = useSidebar();
 
   return (
     <Sidebar side="left" collapsible="icon" aria-label="Outline" className="border-hair">
-      {/* Collapsed, the rail keeps the shell's left edge and the one number
-          worth carrying at 44px wide. */}
       <div className="hidden flex-col items-center gap-1 py-3 group-data-[collapsible=icon]:flex">
         <Button
           variant="icon-raised"
@@ -85,8 +78,6 @@ export function Outline({
       </div>
 
       <SidebarHeader className="gap-0 px-4 pt-3 pb-3 group-data-[collapsible=icon]:hidden">
-        {/* The way back out of the shell. The workspace has no header row,
-            so the rail carries it. */}
         <Link
           href="/courses"
           className="mb-2 -ml-1 flex w-fit items-center gap-1 rounded-sm px-1 py-0.5 text-[0.75rem] text-fg-dim transition-colors hover:text-fg-2"
@@ -109,9 +100,6 @@ export function Outline({
           </Button>
         </div>
 
-        {/* The Goal, unlabelled: under a Course title it cannot read as
-            anything else. Depth, Grounding and the done count were creation
-            settings and a number the checks already tell you. */}
         <p className="mt-2 text-[0.8125rem] leading-[1.5] text-fg-3">{goal}</p>
       </SidebarHeader>
 
@@ -137,8 +125,6 @@ export function Outline({
                       <SidebarMenuItem key={l.id}>
                         <SidebarMenuButton
                           isActive={isOpen}
-                          /* An unset Lesson has nothing to open. It is not a
-                             disabled button, it is not a button at all. */
                           render={ghost ? <div /> : undefined}
                           aria-disabled={ghost || undefined}
                           aria-current={isOpen ? "true" : undefined}
@@ -189,7 +175,6 @@ export function Outline({
         })}
       </SidebarContent>
 
-      {/* Sits on the rail's inner edge, over the fixed container. */}
       {resizer}
     </Sidebar>
   );

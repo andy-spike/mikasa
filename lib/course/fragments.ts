@@ -1,19 +1,11 @@
 import "server-only";
 
-/**
- * Fragmentation (ticket #11): a published Lesson becomes searchable
- * fragments — one per content block, prefixed with the Lesson's title so
- * a hit reads with its context. Blocks are the natural unit: a paragraph,
- * a code block, a note, a table. The Exercise is a fragment of its own,
- * because "how does the exercise work" is exactly what a Learner asks.
- */
 import type { LessonRow } from "@/lib/db/schema";
 import type { Db } from "@/lib/db";
 import { replaceCourseFragments } from "@/lib/db/fragments";
 import type { ContentBlock } from "./content";
 import type { FragmentInput } from "@/lib/db/fragments";
 
-/** The subset of a Lesson row the fragments read. */
 type FragmentSource = Pick<
   LessonRow,
   | "lessonRef"
@@ -25,7 +17,6 @@ type FragmentSource = Pick<
   | "selfExplanationPrompt"
 >;
 
-/** One block's text, flattened for embedding. */
 function blockText(block: ContentBlock): string {
   switch (block.kind) {
     case "p":
@@ -41,7 +32,6 @@ function blockText(block: ContentBlock): string {
   }
 }
 
-/** The Lesson's content, as fragments in reading order. */
 export function buildLessonFragments(row: FragmentSource): FragmentInput[] {
   const blocks: ContentBlock[] = [...row.body, ...row.workedExample];
   const fragments: FragmentInput[] = [];
@@ -66,17 +56,10 @@ export function buildLessonFragments(row: FragmentSource): FragmentInput[] {
   return fragments;
 }
 
-/** Every fragment of a version's Lessons, in order. */
 export function buildCourseFragments(rows: FragmentSource[]): FragmentInput[] {
   return rows.flatMap((row) => buildLessonFragments(row));
 }
 
-/**
- * Embeds and stores the Course's fragments over the existing ones.
- * Called right after a revision is published, so search always answers
- * from what is currently published. The embedder is injected: production
- * passes the OpenRouter function, tests a controlled fake.
- */
 export async function embedCourseFragments(
   db: Db,
   embedTexts: (texts: string[]) => Promise<number[][]>,
@@ -92,13 +75,6 @@ export async function embedCourseFragments(
   return fragments.length;
 }
 
-/**
- * Embeds and stores exactly the named Lessons' fragments (ticket #14),
- * leaving every other Lesson's fragments untouched. A staged revision
- * calls this after publishing, with the Lessons whose content or title
- * changed; Lessons that left the Course are named too, so their
- * fragments are deleted without replacement.
- */
 export async function embedLessonFragments(
   db: Db,
   embedTexts: (texts: string[]) => Promise<number[][]>,

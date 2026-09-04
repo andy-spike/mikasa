@@ -29,11 +29,6 @@ import {
   type CourseInputErrors,
 } from "@/lib/course/limits";
 
-/**
- * Course creation. Validation is shared with the server action
- * (`lib/course/limits`), so the form can reject the same input before the
- * action would — the action stays the authority.
- */
 export function NewCourseForm() {
   const router = useRouter();
   const [values, setValues] = useState<CourseInput>({
@@ -44,8 +39,6 @@ export function NewCourseForm() {
     depth: "reach",
     grounding: true,
   });
-  /* A field shows its error once it has been left (or a submit failed),
-     so typing never yells at you mid-thought. */
   const [touched, setTouched] = useState<Partial<Record<keyof CourseInput, boolean>>>({});
   const [errors, setErrors] = useState<CourseInputErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -54,8 +47,6 @@ export function NewCourseForm() {
   function set<K extends keyof CourseInput>(key: K, value: CourseInput[K]) {
     const next = { ...values, [key]: value };
     setValues(next);
-    /* Re-validate what has been seen, so a fixed field stops complaining
-       the moment it is fixed. */
     const fresh = validateCourseInput(next);
     setErrors(() => {
       if (fresh.ok) return {};
@@ -98,8 +89,6 @@ export function NewCourseForm() {
   }
 
   if (submitting) {
-    /* The design now runs durably on the server; this screen is the
-       moment between handing it over and landing on the Course. */
     return (
       <div className="mx-auto w-full max-w-[38rem] px-5 pt-10 pb-24 sm:px-8" aria-live="polite">
         <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
@@ -188,8 +177,6 @@ export function NewCourseForm() {
           />
         </div>
 
-        {/* Not a fieldset: a legend cuts the hairline it sits on, and the
-            hairline is the only thing separating these groups. */}
         <div className="border-t border-hair py-6">
           <p id="depth-label" className="label text-fg-3">
             Depth
@@ -325,10 +312,6 @@ export function NewCourseForm() {
   );
 }
 
-/**
- * The one line under a field: its error when it has one, otherwise the
- * character count once the field gets long enough to need one.
- */
 function FieldNote({
   id,
   error,

@@ -26,13 +26,10 @@ export function fakeIdToken(
 }
 
 export type FakeGoogle = {
-  /** The profile the next sign-in will present. Change it between flows. */
   profile: FakeGoogleProfile;
-  /** Every fetch the flow attempted; asserts nothing else leaked out. */
   calls: string[];
 };
 
-/** Stubs global fetch to answer Google's token endpoint and nothing else. */
 export function fakeGoogle(profile: FakeGoogleProfile): FakeGoogle {
   const fake: FakeGoogle = { profile, calls: [] };
   const now = Math.floor(Date.now() / 1000);
@@ -69,7 +66,6 @@ export function fakeGoogle(profile: FakeGoogleProfile): FakeGoogle {
   return fake;
 }
 
-/** Every Set-Cookie flattened into one Cookie header for the next request. */
 export function cookieHeader(response: Response): string {
   return response.headers
     .getSetCookie()

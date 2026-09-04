@@ -1,11 +1,5 @@
 "use server";
 
-/**
- * Tailor actions (tickets #12–#14): reviewing a plan's operations,
- * applying a plan to a pre-generation Outline, and staging a published
- * Course's plan as a new revision. The review changes the plan, never
- * the Course; application and staging are the only doors that do.
- */
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 import { start } from "workflow/api";
@@ -43,7 +37,6 @@ const planSchema = z.object({
 
 export type OperationReviewResult = { ok: boolean; message?: string };
 
-/** The plan as the pane renders it: labels resolved, ids kept. */
 function toPlanView(row: ChangePlanRow): PlanView {
   return {
     id: row.id,
@@ -57,11 +50,6 @@ function toPlanView(row: ChangePlanRow): PlanView {
   };
 }
 
-/**
- * The plan under review, as the server has it right now. The pane calls
- * this after a turn (one may have been proposed) and whenever a review
- * did not land, so the server's state always wins.
- */
 export async function findProposedPlanAction(courseId: string): Promise<PlanView | null> {
   const { user } = await requireLearner();
   const plan = await findProposedPlan(db, user.id, courseId);
@@ -72,11 +60,9 @@ export type StagedPlanView = {
   plan: PlanView;
   failed: boolean;
   error: string | null;
-  /** The stage the failed run was in, in Learner words ("review"). */
   stage: string | null;
 };
 
-/** The active staged Course revision, including a failure the Learner can retry. */
 export async function findStagedPlanAction(courseId: string): Promise<StagedPlanView | null> {
   const { user } = await requireLearner();
   const plan = await findStagedPlan(db, user.id, courseId);
@@ -127,12 +113,6 @@ export type ApplyPlanResult =
   | { ok: true; outlineVersion: number; appliedCount: number }
   | { ok: false; reason: string; message: string };
 
-/**
- * Applies a plan's accepted operations to the Outline (#13). The Learner
- * is on the Outline checkpoint: the accepted structure operations go
- * through the manual editor's own change door, all together or not at
- * all, and the specification reads as stale until approval reconciles it.
- */
 export async function applyPlanToOutlineAction(
   courseId: string,
   planId: string,
@@ -153,12 +133,6 @@ export type UndoPlanResult =
   | { ok: true; revisionNumber: number }
   | { ok: false; reason: string; message: string };
 
-/**
- * Undoes a published plan (#15): the touched identities go back to what
- * the base revision had — shape, content, and Completion — and the Course
- * moves to a new revision carrying that restored state. Only possible
- * while no later published change has touched the same identities.
- */
 export async function undoPlanRevisionAction(
   courseId: string,
   planId: string,
@@ -171,19 +145,13 @@ export async function undoPlanRevisionAction(
   const result = await undoPlanRevision(db, user.id, courseId, parsed.data.planId);
   if (!result.ok) return result;
 
-  /* The Tutor's search index follows the undo (bug 9): restored Lessons
-     re-embed from their restored content, removed Lessons' fragments are
-     deleted. A dispatch failure changes nothing the undo changed — the
-     reading page's stale-search notice still catches the gap. */
   try {
     await start(repairFragmentsWorkflow, [
       courseId,
       result.outlineVersion,
       [...result.restoredLessons, ...result.removedLessons],
     ]);
-  } catch {
-    /* The undo itself landed; only the re-embed is missing. */
-  }
+  } catch {}
   return { ok: true, revisionNumber: result.revisionNumber };
 }
 
@@ -194,14 +162,8 @@ export type PublishedPlanRow = {
   blockedReason?: string;
 };
 
-/**
- * The Course's published plans, newest first, each with its undo
- * availability (#15) — the pane's Published changes section.
- */
 export async function listPublishedPlansAction(courseId: string): Promise<PublishedPlanRow[]> {
   const { user } = await requireLearner();
-  /* The plans belong to the Course, and the Course to the caller: an
-     unknown or foreign Course reads as no published changes. */
   const [course] = await db
     .select({ id: courses.id })
     .from(courses)
@@ -232,12 +194,7 @@ export async function listPublishedPlansAction(courseId: string): Promise<Publis
   });
 }
 
-/**
- * Stages a published Course's accepted plan as a new revision (#14) and
- * dispatches the durable workflow that regenerates the affected Lessons.
- * The current Course stays readable; publication swaps it atomically when
- * the staged candidate passes review.
- */
+// The current Course stays readable; publication swaps it atomically when the staged candidate passes review.
 export async function stagePlanRevisionAction(
   courseId: string,
   planId: string,
@@ -278,11 +235,6 @@ export async function stagePlanRevisionAction(
   }
 }
 
-/**
- * Re-runs a staged revision whose workflow failed (ticket #7's rules, on
- * a plan): written Lessons are kept, a passed review is kept, and the
- * current Course was never touched by the failure.
- */
 export async function retryPlanRevisionAction(
   courseId: string,
   planId: string,
@@ -323,11 +275,6 @@ export async function retryPlanRevisionAction(
   }
 }
 
-/**
- * Gives up on a staged revision that keeps failing (bug 10): the plan is
- * superseded and the Tailor can propose a fresh one. The published
- * Course and the current revision are untouched.
- */
 export type DiscardStagedRevisionResult =
   | { ok: true }
   | { ok: false; reason: "invalid" | "not-found" | "not-discardable"; message?: string };

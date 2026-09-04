@@ -1,13 +1,7 @@
-/**
- * The three states a Lesson can be in, drawn once.
- * Done and unset are neutral by design: the accent is spent on live alone.
- */
-
 export function DoneCheck({
   striking = false,
   className = "",
 }: {
-  /** true only on the Lesson just marked, so the stroke plays once */
   striking?: boolean;
   className?: string;
 }) {
@@ -24,13 +18,7 @@ export function DoneCheck({
   );
 }
 
-/** The one accent on the screen. It marks the Lesson you are up to. */
-export function LiveMark({
-  handing = false,
-}: {
-  /** true only just after a mark moved it here */
-  handing?: boolean;
-}) {
+export function LiveMark({ handing = false }: { handing?: boolean }) {
   return (
     <span
       aria-hidden
@@ -44,7 +32,6 @@ export function LiveMark({
   );
 }
 
-/** Nothing has been generated here yet. It stays in place; it does not fade out. */
 export function UnsetMark() {
   return (
     <svg

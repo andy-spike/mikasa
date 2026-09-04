@@ -60,9 +60,6 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
-    /* Adapted: the shipped input is an InputGroup with a leading search
-       glyph on a rule. Here it is a plain field over a hairline, at the
-       palette's own type step. */
     <div data-slot="command-input-wrapper" className="border-b border-hair">
       <CommandPrimitive.Input
         data-slot="command-input"
@@ -110,7 +107,6 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        /* Adapted: the group heading is the system's one label style. */
         "overflow-hidden py-1.5 text-fg **:[[cmdk-group-heading]]:px-4 **:[[cmdk-group-heading]]:pt-3 **:[[cmdk-group-heading]]:pb-1.5 **:[[cmdk-group-heading]]:text-[0.6875rem] **:[[cmdk-group-heading]]:font-semibold **:[[cmdk-group-heading]]:leading-none **:[[cmdk-group-heading]]:tracking-[0.06em] **:[[cmdk-group-heading]]:text-fg-dim **:[[cmdk-group-heading]]:uppercase",
         className,
       )}

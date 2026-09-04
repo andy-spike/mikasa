@@ -1,8 +1,3 @@
-/**
- * Specification reconciliation with a scripted model: carried-over parts
- * stay, the graph and alignment re-align to the current Outline, and a
- * model that skips a Lesson fails instead of poisoning generation.
- */
 import { describe, expect, it } from "vitest";
 import { reconcileSpecification } from "@/lib/course/reconcile";
 import type { CourseSpecification, OutlineData } from "@/lib/course/types";
@@ -91,7 +86,6 @@ describe("reconcileSpecification", () => {
     expect(reconciled.evidence).toEqual(PREVIOUS.evidence);
     expect(reconciled.learningGraph.map((n) => n.id)).toEqual(["g1", "g2"]);
     expect(reconciled.alignment.map((a) => a.lessonId)).toEqual(["l1", "l5"]);
-    /* The model was shown the previous spec and the current lesson ids. */
     expect(model.prompts[0]).toContain("l-gone");
     expect(model.prompts[0]).toContain("l5");
   });
@@ -152,7 +146,6 @@ describe("reconcileSpecification", () => {
       { lessonId: "l-gone", prose: "Dropped with its Lesson." },
     ]);
 
-    /* The demand rides verbatim; the dead one goes nowhere. */
     expect(reconciled.adjustments).toEqual([
       {
         lessonId: "l1",

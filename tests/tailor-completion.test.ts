@@ -1,15 +1,3 @@
-/**
- * Completion across Tailor revisions and the undo (ticket #15), end to
- * end: publishing a revision applies the Completion rules — rename,
- * move, and prose changes preserve; added Lessons start incomplete;
- * Exercise rewrites, splits, and merges reset; removed Lessons keep
- * their Completion with their content — and undo rebuilds the touched
- * identities' shape, content, and Completion from the base revision,
- * refusing while a candidate is in flight or a later change overlaps.
- * A staged revision reconciles the specification to its shape first, so
- * added and split Lessons generate and the Learner's accepted demands
- * reach the model (#17).
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import type { ChangePlanOp } from "@/lib/course/change-plan";
@@ -31,13 +19,10 @@ const navigation = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => navigation);
 
-/* The durable engine, stubbed: the revision runs in place. */
 vi.mock("workflow/api", () => ({
   start: async () => ({ runId: "wrun_test" }),
 }));
 
-/* The review's model-driven slices: nothing finds anything, so a
-   revision's review rounds pass without a model. */
 vi.mock("@/lib/course/review", () => ({
   structuralFindings: () => [],
   factualFindings: async () => [],
@@ -46,7 +31,6 @@ vi.mock("@/lib/course/review", () => ({
   MAX_CORRECTION_ROUNDS: 2,
 }));
 
-/* The generation model and the embedder, scripted per test. */
 const revisionModelState = vi.hoisted(() => ({
   current: undefined as ReturnType<typeof import("./helpers/fake-model").scriptedModel> | undefined,
 }));
@@ -191,7 +175,6 @@ async function signInWithGoogle(email: string): Promise<string> {
   return cookieHeader(callback);
 }
 
-/** A published two-Module Course with fragments, for the given owner. */
 async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
@@ -231,7 +214,6 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   const published = await publishRevision(db, course.id, 1, review.id);
   expect(published.ok).toBe(true);
 
-  /* The Tutor's search index, as ticket #11 left it. */
   await embedCourseFragments(
     db,
     async (texts) => texts.map(() => new Array<number>(1536).fill(0.01)),
@@ -259,7 +241,6 @@ async function userIdOf(email: string): Promise<string> {
   return user.id;
 }
 
-/** A plan with every operation accepted, as the pane's review leaves it. */
 async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<string> {
   const created = await createChangePlan(db, await userIdOf(OWNER), courseId, ops);
   expect(created.ok).toBe(true);
@@ -271,10 +252,6 @@ async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<
   return plan.id;
 }
 
-/**
- * One reconcile response for the staged Outline: an alignment entry per
- * Lesson, the way the reconciled specification must cover the shape.
- */
 function reconcileJson(outline: { modules: { lessons: { id: string }[] }[] }): string {
   return json({
     learningGraph: [],
@@ -291,10 +268,9 @@ function reconcileJson(outline: { modules: { lessons: { id: string }[] }[] }): s
 }
 
 /**
- * Stages the plan through the real staging transaction and runs the
- * durable revision in place. The scripted model answers the
- * reconciliation first when the staged shape needs it (ticket #17),
- * then each regenerated Lesson, in Outline order.
+ * Stages the plan and runs the revision in place. The scripted model answers
+ * reconciliation first when the staged shape needs it, then each
+ * regenerated Lesson, in Outline order.
  */
 async function stageAndPublish(
   courseId: string,
@@ -339,7 +315,6 @@ async function markDone(courseId: string, lessonRef: string): Promise<void> {
   expect(result.ok).toBe(true);
 }
 
-/** The Course's Completion rows, as [Lesson ref, done-at] pairs. */
 async function completionRows(): Promise<[string, string][]> {
   const rows = await db.select().from(completions);
   return rows
@@ -386,7 +361,6 @@ describe("publishing a revision", () => {
     const revisionNumber = await stageAndPublish(courseId, planId, [lessonJson("Lesson three")]);
     expect(revisionNumber).toBe(2);
 
-    /* The same three rows, down to the moment of completion. */
     expect(await completionRows()).toEqual(before);
 
     const outline = await currentOutlineData(courseId);
@@ -414,8 +388,6 @@ describe("publishing a revision", () => {
     ]);
     await stageAndPublish(courseId, planId, [lessonJson("Lesson one"), lessonJson("Lesson four")]);
 
-    /* The rewritten Exercise redefined "done" for its Lesson; the new
-       Lesson has never been done; the rest kept their moment. */
     expect(await completionRows()).toEqual(before.filter(([ref]) => ref !== "l1"));
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
     expect(course.completedAt).toBeNull();
@@ -427,10 +399,6 @@ describe("publishing a revision", () => {
       "Repainted: **Lesson four**",
     );
 
-    /* The staged revision reconciled the specification (#17): the added
-       Lesson has its alignment entry, the spec now matches the staged
-       version, and the Learner's Exercise demand rode into the
-       specification that generation read. */
     const [specRow] = await db
       .select()
       .from(courseSpecs)
@@ -470,7 +438,6 @@ describe("publishing a revision", () => {
       lessonJson("Lesson two, part two"),
     ]);
 
-    /* Both halves need their own Exercise done. */
     expect((await completionRows()).map(([ref]) => ref)).toEqual(["l1", "l3"]);
     const outline = await currentOutlineData(courseId);
     const half = outline.modules[0].lessons.find((l) => l.title === "Lesson two, part two")!;
@@ -480,9 +447,6 @@ describe("publishing a revision", () => {
     expect(refs).toHaveLength(4);
     expect(new Set(refs)).toEqual(new Set(["l1", "l2", "l3", half.id]));
 
-    /* Merging the halves back redefines "done" for the surviving
-       Lesson: its Completion resets. The absorbed half keeps its
-       Completion, like a removed Lesson's. */
     const mergeId = await proposeAndAccept(courseId, [
       { kind: "mergeLesson", lessonId: "l2", direction: "next" },
     ]);
@@ -498,8 +462,6 @@ describe("publishing a revision", () => {
       "Repainted: **Lesson two**",
     );
 
-    /* Undoing the merge brings the half back — shape, content, and the
-       Completion of both halves. */
     headerState.current = new Headers({ cookie: ownerCookie });
     const undone = await undoPlanRevisionAction(courseId, mergeId);
     expect(undone).toMatchObject({ ok: true, revisionNumber: 4 });
@@ -526,9 +488,6 @@ describe("publishing a revision", () => {
     const revisionNumber = await stageAndPublish(courseId, planId, []);
     expect(revisionNumber).toBe(2);
 
-    /* Nothing regenerated; the remove is structural, so the staged
-       specification was reconciled to the smaller shape with one model
-       call, and the version-2 spec row exists beside the untouched base. */
     expect(revisionModelState.current!.calls()).toBe(1);
     const [specV2] = await db
       .select()
@@ -536,14 +495,11 @@ describe("publishing a revision", () => {
       .where(and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, 2)));
     expect(specV2.spec.alignment.map((a) => a.lessonId)).toEqual(["l1", "l3"]);
 
-    /* The Completion survives, pointing at content the older revision
-       still holds. */
     expect(await completionRows()).toEqual([["l2", doneAt]]);
     expect((await lessonRows(courseId, 2)).map((r) => r.lessonRef)).toEqual(["l1", "l3"]);
     const v1 = await lessonRows(courseId, 1);
     expect(v1.map((r) => r.lessonRef)).toEqual(["l1", "l2", "l3"]);
 
-    /* Removed Completion does not count toward the current Course. */
     headerState.current = new Headers({ cookie: ownerCookie });
     const marked = await markLessonDoneAction(courseId, "l1");
     expect(marked).toMatchObject({ ok: true, doneCount: 1, total: 2, courseComplete: false });
@@ -561,8 +517,6 @@ describe("publishing a revision", () => {
       v1.find((r) => r.lessonRef === "l2")!.body,
     );
     expect(v3.find((r) => r.lessonRef === "l2")!.title).toBe("Lesson two");
-    /* l2's Completion is restored to its original moment; l1's, marked
-       after the removal on content the undo never touches, survives. */
     expect(await completionRows()).toEqual([
       ["l1", l1DoneAt],
       ["l2", doneAt],
@@ -599,22 +553,17 @@ describe("undoing a published change", () => {
     const l2DoneAt = before.find(([ref]) => ref === "l2")![1];
     const v1 = await lessonRows(courseId, 1);
 
-    /* Plan one rewrites Lesson one's prose. */
     const planA = await proposeAndAccept(courseId, [
       { kind: "lessonProse", lessonId: "l1", instruction: "Lead with the water-to-pigment ratio." },
     ]);
     await stageAndPublish(courseId, planA, [lessonJson("Lesson one")]);
     const v2 = await lessonRows(courseId, 2);
 
-    /* The Learner re-does Lesson one after the change published: a new
-       moment of completion, which the undo must roll back. */
     headerState.current = new Headers({ cookie: ownerCookie });
     expect((await markLessonUndoneAction(courseId, "l1")).ok).toBe(true);
     await markDone(courseId, "l1");
     expect((await completionRows()).find(([ref]) => ref === "l1")![1]).not.toBe(l1DoneAt);
 
-    /* Plan two moves Lesson two into Module two — an identity plan one
-       never touched, so the undo must leave it exactly where it is. */
     const planB = await proposeAndAccept(courseId, [
       { kind: "moveLesson", lessonId: "l2", toModuleId: "m2", toIndex: 0 },
     ]);
@@ -624,8 +573,6 @@ describe("undoing a published change", () => {
     const undone = await undoPlanRevisionAction(courseId, planA);
     expect(undone).toMatchObject({ ok: true, revisionNumber: 4 });
 
-    /* Lesson one is what revision one had, Completion included; Lesson
-       two keeps its own moment. */
     const v4 = await lessonRows(courseId, 4);
     const l1v4 = v4.find((r) => r.lessonRef === "l1")!;
     expect(l1v4.body).toEqual(v1.find((r) => r.lessonRef === "l1")!.body);
@@ -635,7 +582,6 @@ describe("undoing a published change", () => {
       ["l2", l2DoneAt],
     ]);
 
-    /* Lesson two stays moved; Module two keeps it. */
     const outline = await currentOutlineData(courseId);
     expect(outline.modules[0].lessons.map((l) => l.id)).toEqual(["l1"]);
     expect(outline.modules[1].lessons.map((l) => l.id)).toEqual(["l2", "l3"]);
@@ -643,7 +589,6 @@ describe("undoing a published change", () => {
     expect((await planRow(planA)).status).toBe("undone");
     expect((await planRow(planB)).status).toBe("published");
 
-    /* A second undo has nothing left to undo. */
     const again = await undoPlanRevisionAction(courseId, planA);
     expect(again).toMatchObject({ ok: false, reason: "not-undoable" });
     expect((await currentRevision(db, courseId))?.revisionNumber).toBe(4);
@@ -654,8 +599,6 @@ describe("undoing a published change", () => {
     await markDone(courseId, "l1");
     const doneAt = (await completionRows())[0][1];
 
-    /* Plan one renames Module one; plan two adds a Lesson to it. The
-       Module identity overlaps. */
     const planA = await proposeAndAccept(courseId, [
       { kind: "renameModule", moduleId: "m1", title: "Module one, retitled" },
     ]);
@@ -684,7 +627,6 @@ describe("undoing a published change", () => {
     ]);
     await stageAndPublish(courseId, planB, [lessonJson("Lesson four")]);
 
-    /* The pane offers the later change's undo only. */
     headerState.current = new Headers({ cookie: ownerCookie });
     const rows = await listPublishedPlansAction(courseId);
     const byId = new Map(rows.map((r) => [r.plan.id, r]));
@@ -696,9 +638,6 @@ describe("undoing a published change", () => {
     expect((await currentRevision(db, courseId))?.revisionNumber).toBe(3);
     expect((await planRow(planA)).status).toBe("published");
 
-    /* Undoing the later change is fine: the added Lesson leaves, and the
-       earlier rename stays — it was already in place when plan two was
-       drawn against the renamed Module. */
     const undoneB = await undoPlanRevisionAction(courseId, planB);
     expect(undoneB).toMatchObject({ ok: true, revisionNumber: 4 });
     const outline = await currentOutlineData(courseId);
@@ -706,7 +645,6 @@ describe("undoing a published change", () => {
     expect(outline.modules.flatMap((m) => m.lessons.map((l) => l.id))).toEqual(["l1", "l2", "l3"]);
     expect(await completionRows()).toEqual([["l1", doneAt]]);
 
-    /* With the overlap gone, the first change undoes too. */
     expect((await listPublishedPlansAction(courseId)).map((r) => r.canUndo)).toEqual([true]);
     const undoneA = await undoPlanRevisionAction(courseId, planA);
     expect(undoneA).toMatchObject({ ok: true, revisionNumber: 5 });
@@ -719,8 +657,6 @@ describe("undoing a published change", () => {
     await markDone(courseId, "l1");
     const doneAt = (await completionRows())[0][1];
 
-    /* Plan one rewrites Lesson one's prose; plan two rewrites its
-       Exercise, which resets the Completion the undo would restore. */
     const planA = await proposeAndAccept(courseId, [
       { kind: "lessonProse", lessonId: "l1", instruction: "Lead with the water-to-pigment ratio." },
     ]);
@@ -733,10 +669,8 @@ describe("undoing a published change", () => {
     expect(await completionRows()).toEqual([]);
 
     headerState.current = new Headers({ cookie: ownerCookie });
-    /* Newest revision first. */
     expect((await listPublishedPlansAction(courseId)).map((r) => r.canUndo)).toEqual([true, false]);
 
-    /* Another Learner reads no published changes for this Course. */
     const strangerCookie = await signInWithGoogle("stranger@example.com");
     headerState.current = new Headers({ cookie: strangerCookie });
     expect(await listPublishedPlansAction(courseId)).toEqual([]);
@@ -748,9 +682,6 @@ describe("undoing a published change", () => {
     expect(await completionRows()).toEqual([]);
     expect((await planRow(planA)).status).toBe("published");
 
-    /* Undoing the later change rolls Lesson one back to what plan
-       one's revision held — prose content and the Completion the
-       Exercise rewrite had reset. */
     const undoneB = await undoPlanRevisionAction(courseId, planB);
     expect(undoneB).toMatchObject({ ok: true, revisionNumber: 4 });
     const v4 = await lessonRows(courseId, 4);
@@ -772,8 +703,6 @@ describe("undoing a published change", () => {
     ]);
     await stageAndPublish(courseId, planA, [lessonJson("Lesson one")]);
 
-    /* A staged candidate is being built on top of the very revision
-       this undo would swap away. */
     const planB = await proposeAndAccept(courseId, [
       { kind: "lessonProse", lessonId: "l2", instruction: "Keep the wash wet." },
     ]);
@@ -784,14 +713,12 @@ describe("undoing a published change", () => {
     const blocked = await undoPlanRevisionAction(courseId, planA);
     expect(blocked).toMatchObject({ ok: false, reason: "blocked-inflight" });
 
-    /* A plan still under review has nothing to undo. */
     const planC = await proposeAndAccept(courseId, [
       { kind: "lessonProse", lessonId: "l3", instruction: "Slow down at the edges." },
     ]);
     const refused = await undoPlanRevisionAction(courseId, planC);
     expect(refused).toMatchObject({ ok: false, reason: "not-undoable" });
 
-    /* Both refusals left the Course exactly as it was. */
     const revision = await currentRevision(db, courseId);
     expect(revision?.revisionNumber).toBe(2);
     expect(revision?.outlineVersion).toBe(2);

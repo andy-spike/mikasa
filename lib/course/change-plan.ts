@@ -1,11 +1,3 @@
-/**
- * Change plans (ticket #12): the Tailor proposes operations, the Learner
- * accepts or discards each one, and accepted operations apply together
- * later (tickets #13/#14). Structure operations are the manual editor's
- * own grammar (`OutlineOp`) — a change is the same change however it
- * arrives. Content operations describe what should be rewritten inside a
- * Lesson's prose or Exercise.
- */
 import { z } from "zod";
 import {
   applyOutlineOps,
@@ -16,14 +8,12 @@ import {
 import type { OutlineOp } from "./structure";
 import type { OutlineData, OutlineLesson, OutlineModule } from "./types";
 
-/** A Lesson prose rewrite: an instruction the generator carries out. */
 export type LessonProseOp = {
   kind: "lessonProse";
   lessonId: string;
   instruction: string;
 };
 
-/** A rewritten Exercise: concrete task and check, not an instruction. */
 export type ExerciseOp = {
   kind: "exercise";
   lessonId: string;
@@ -110,21 +100,11 @@ const STRUCTURE_KINDS = new Set([
   "mergeLesson",
 ]);
 
-/** A plan operation that is a plain Outline operation. */
 export function isStructureOp(op: ChangePlanOp): op is OutlineOp {
   return STRUCTURE_KINDS.has(op.kind);
 }
 
-/**
- * Whether a plan would actually take: structure operations are applied to
- * a throwaway copy of the Outline in order (the manual editor's own
- * grammar, so the same refusals apply), a content change needs its
- * Lesson to still exist once the structure operations before it have
- * run, and the resulting shape must still be approvable — a plan that
- * adds a lessons-less Module is refused here, when the Tailor proposes
- * it, not after the Learner accepts it (bug 5's front door). Throws
- * `StructureError` on the first operation that does not fit.
- */
+// Validated against a throwaway copy before anything is stored, so a bad plan is refused up front.
 export function validatePlanOps(data: OutlineData, ops: ChangePlanOp[]): void {
   let current = data;
   let structure: OutlineOp[] = [];
@@ -155,7 +135,6 @@ export function validatePlanOps(data: OutlineData, ops: ChangePlanOp[]): void {
   }
 }
 
-/** The verb the pane's label row reads. */
 export function opVerb(op: ChangePlanOp): string {
   switch (op.kind) {
     case "addModule":
@@ -185,7 +164,6 @@ export function opVerb(op: ChangePlanOp): string {
   }
 }
 
-/** What the change names, as the pane's dim right-hand entry. */
 export function opEntry(op: ChangePlanOp): string {
   switch (op.kind) {
     case "addModule":
@@ -215,7 +193,6 @@ export function opEntry(op: ChangePlanOp): string {
   }
 }
 
-/** One sentence on what changes and why it reads the way it does. */
 export function opDetail(op: ChangePlanOp): string {
   switch (op.kind) {
     case "addModule":
@@ -245,10 +222,6 @@ export function opDetail(op: ChangePlanOp): string {
   }
 }
 
-/**
- * The Lesson ids an operation touches, used by the completion rules
- * (#15) and the undo-overlap check (#15).
- */
 export function opLessonIds(op: ChangePlanOp): string[] {
   switch (op.kind) {
     case "renameLesson":
@@ -268,7 +241,6 @@ export function opLessonIds(op: ChangePlanOp): string[] {
   }
 }
 
-/** The Module ids an operation touches. */
 export function opModuleIds(op: ChangePlanOp): string[] {
   switch (op.kind) {
     case "addModule":
@@ -287,21 +259,11 @@ export function opModuleIds(op: ChangePlanOp): string[] {
 }
 
 export type AffectedLessonSets = {
-  /** Lessons whose content must be regenerated: new or rewritten. */
   regenerate: string[];
-  /** Lessons to re-embed after publish: regenerated, retitled, or gone. */
   embed: string[];
-  /** Lessons that left the Outline; their fragments are deleted. */
   removed: string[];
 };
 
-/**
- * The affected sets between the Outline a plan was drawn against and the
- * staged one (ticket #14). New ids (added Lessons, split halves) and
- * Lessons with content demands regenerate; renamed Lessons copy with
- * their new title and only re-embed (the title prefixes their search
- * fragments); removed Lessons leave no row behind.
- */
 export function affectedLessonSets(
   base: OutlineData,
   next: OutlineData,
@@ -336,7 +298,6 @@ export function affectedLessonSets(
   };
 }
 
-/** Whether an operation changes only names or placement, not substance. */
 export function preservesCompletion(op: ChangePlanOp): boolean {
   return (
     op.kind === "renameModule" ||
@@ -347,12 +308,6 @@ export function preservesCompletion(op: ChangePlanOp): boolean {
   );
 }
 
-/**
- * The Lesson a merge absorbs, resolved against the Outline the plan was
- * drawn against: "next" takes the Lesson after the named one, "previous"
- * the one before it. Null when the plan does not apply — the grammar
- * refuses that before anything is stored.
- */
 function mergeAbsorbedId(
   op: Extract<ChangePlanOp, { kind: "mergeLesson" }>,
   base: OutlineData,
@@ -366,16 +321,6 @@ function mergeAbsorbedId(
   return null;
 }
 
-/**
- * The Lessons whose Completion the plan's accepted operations reset
- * (#15), resolved against the Outline the plan was drawn against: an
- * Exercise rewrite changes what "done" means, and split and merge
- * rearrange whole Lessons. A merge resets the surviving Lesson — it now
- * covers the absorbed Lesson's material, whichever side of it the
- * absorbed one came from; the absorbed Lesson's Completion is kept, like
- * a removed Lesson's, and undo restores it. Prose, renames, and moves
- * preserve; added Lessons start incomplete on their own.
- */
 export function completionResetRefs(accepted: ChangePlanOp[], base: OutlineData): string[] {
   const reset = new Set<string>();
   for (const op of accepted) {
@@ -389,7 +334,6 @@ export function completionResetRefs(accepted: ChangePlanOp[], base: OutlineData)
   return [...reset];
 }
 
-/** The identities a plan's accepted operations touch, for the undo rule. */
 export function touchedIdentities(
   accepted: ChangePlanOp[],
   base: OutlineData,
@@ -399,14 +343,12 @@ export function touchedIdentities(
   for (const op of accepted) {
     for (const id of opLessonIds(op)) lessons.add(id);
     for (const id of opModuleIds(op)) modules.add(id);
-    /* A merge takes the absorbed Lesson's identity with it: undo has to
-       bring that Lesson back, and the overlap rule has to guard it. */
+    // A merge takes the absorbed Lesson's identity with it: undo must bring it back.
     if (op.kind === "mergeLesson") {
       const absorbed = mergeAbsorbedId(op, base);
       if (absorbed) lessons.add(absorbed);
     }
   }
-  /* A removed Module takes its Lessons' identities with it. */
   for (const op of accepted) {
     if (op.kind !== "removeModule") continue;
     const removed = base.modules.find((m) => m.id === op.moduleId);
@@ -415,14 +357,6 @@ export function touchedIdentities(
   return { lessons: [...lessons], modules: [...modules] };
 }
 
-/**
- * The Outline as it should be after undoing a published plan (#15): the
- * current shape with every touched identity restored to what the base
- * revision had — touched Lessons back at their base place and name,
- * plan-added Lessons and Modules gone, plan-removed ones back where they
- * were. Untouched identities keep whatever later changes made of them;
- * that is exactly what the overlap rule guarantees is safe.
- */
 export function undoOutline(
   base: OutlineData,
   current: OutlineData,
@@ -439,10 +373,6 @@ export function undoOutline(
   }
   const baseModules = new Map(base.modules.map((m) => [m.id, m]));
 
-  /* Surgical pass over a copy of the current shape. Plan-added Lessons
-     and Modules leave; touched Lessons come out (they go back in at
-     their base place below). Untouched Lessons — including those inside
-     touched Modules — keep whatever later changes made of them. */
   let working: OutlineModule[] = current.modules
     .filter((m) => !(modules.has(m.id) && !baseModules.has(m.id)))
     .map((m) => ({
@@ -450,15 +380,12 @@ export function undoOutline(
       lessons: m.lessons.filter((l) => !lessons.has(l.id)),
     }));
 
-  /* Touched surviving Modules get their base name back. */
   working = working.map((m) => {
     if (!modules.has(m.id)) return m;
     const baseModule = baseModules.get(m.id);
     return baseModule ? { ...m, title: baseModule.title } : m;
   });
 
-  /* Touched Modules the plan removed come back where the base revision
-     had them, with the Lessons the base revision had in them. */
   for (const m of base.modules) {
     if (!modules.has(m.id) || working.some((w) => w.id === m.id)) continue;
     const baseIndex = base.modules.findIndex((b) => b.id === m.id);
@@ -468,8 +395,6 @@ export function undoOutline(
     });
   }
 
-  /* Every touched Lesson the base revision had goes back to its base
-     place, name, and size. */
   for (const [id, at] of baseLessons) {
     if (!lessons.has(id)) continue;
     const targetIndex = working.findIndex((m) => m.id === at.module);

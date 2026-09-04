@@ -1,10 +1,3 @@
-/**
- * Repositories for design state: the versioned Outline, the private
- * specification, gathered Sources, and design runs. Every function takes
- * the Drizzle instance first, so tests run these against PGlite. The
- * caller authorizes: pages reach these through an owned Course lookup,
- * and the Workflow passes the server-side Course id.
- */
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "./index";
 import {
@@ -27,17 +20,12 @@ import type {
 } from "../course/types";
 import type { OutlineDraft } from "../course/design";
 
-/**
- * Server-side Course lookup for the Workflow, which runs without a
- * Learner request context. Entry points that do take a Learner must go
- * through `findOwnedCourse`, which filters by owner.
- */
+/** Workflow-only: no owner check; learner paths must use `findOwnedCourse`. */
 export async function findCourseForDesign(db: Db, courseId: string): Promise<Course | undefined> {
   const [course] = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
   return course;
 }
 
-/** Opens a design run: the course shows "designing" while this is running. */
 export async function startDesignRun(
   db: Db,
   courseId: string,
@@ -54,7 +42,6 @@ export async function startDesignRun(
   return run;
 }
 
-/** Marks which step a run is in, for the progress interface. */
 export async function recordDesignStep(db: Db, runId: string, currentStep: string): Promise<void> {
   await db
     .update(designRuns)
@@ -62,11 +49,6 @@ export async function recordDesignStep(db: Db, runId: string, currentStep: strin
     .where(eq(designRuns.id, runId));
 }
 
-/**
- * Persists the gathered Sources right away: a design that fails later
- * keeps them, and its retry reuses them instead of fetching again
- * (ticket #7). Like the earlier behaviour, a new run replaces the rows.
- */
 export async function saveDesignSources(
   db: Db,
   courseId: string,
@@ -89,7 +71,6 @@ export async function saveDesignSources(
   });
 }
 
-/** Persists a drafted, bounds-checked Outline as the next version. */
 export async function saveDesignOutline(
   db: Db,
   courseId: string,
@@ -116,7 +97,6 @@ export async function saveDesignOutline(
   });
 }
 
-/** Persists the private specification, aligned to the given Outline version. */
 export async function saveDesignSpecification(
   db: Db,
   courseId: string,
@@ -132,12 +112,6 @@ export async function saveDesignSpecification(
     });
 }
 
-/**
- * Lands the whole outcome of a design pass in order: Sources, Outline
- * version, specification, and the Course's move to the Outline checkpoint.
- * The Workflow calls the pieces; tests and retry paths compose the same
- * pieces so there is one behaviour.
- */
 export async function saveDesignResult(
   db: Db,
   courseId: string,
@@ -152,7 +126,6 @@ export async function saveDesignResult(
   return outline;
 }
 
-/** The final design step: the Course reaches the Outline checkpoint. */
 export async function completeDesignRun(db: Db, courseId: string, runId: string): Promise<void> {
   await db.transaction(async (tx) => {
     await tx
@@ -166,10 +139,6 @@ export async function completeDesignRun(db: Db, courseId: string, runId: string)
   });
 }
 
-/**
- * Records a failed design: the run keeps the message, the Course reads as
- * "failed", and both stay in place for retry (ticket #7).
- */
 export async function failDesignRun(
   db: Db,
   courseId: string,
@@ -188,7 +157,6 @@ export async function failDesignRun(
   });
 }
 
-/** The most recent design run for a Course, if any. */
 export async function latestDesignRun(db: Db, courseId: string): Promise<DesignRun | undefined> {
   const [run] = await db
     .select()
@@ -199,7 +167,6 @@ export async function latestDesignRun(db: Db, courseId: string): Promise<DesignR
   return run;
 }
 
-/** The current Outline: the highest version for the Course. */
 export async function latestOutline(db: Db, courseId: string): Promise<Outline | undefined> {
   const [outline] = await db
     .select()
@@ -232,7 +199,6 @@ export async function listCourseSources(db: Db, courseId: string): Promise<Sourc
   return db.select().from(sources).where(eq(sources.courseId, courseId)).orderBy(sources.ref);
 }
 
-/** Moves an owned Course to a new status; the only status door there is. */
 export async function setCourseStatus(
   db: Db,
   ownerId: string,

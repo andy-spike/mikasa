@@ -5,10 +5,6 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
-/**
- * Ends the Better Auth session and returns to the sign-in experience
- * (the landing). Takes the shell's icon shape or the settings' quiet one.
- */
 export function SignOutButton({ variant = "icon" }: { variant?: "icon" | "quiet" }) {
   const router = useRouter();
 

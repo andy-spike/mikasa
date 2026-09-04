@@ -1,12 +1,3 @@
-/**
- * The learner's Depth choices, as the creation screen offers them.
- *
- * The rest of this file was mockup scaffolding — a synthetic library and a
- * fake Tailor plan for the Outline demonstration. The Tailor's plans are
- * real since ticket #12; the scaffolding went with them.
- */
-
-/** The three Depth choices, in the order they are offered at creation. */
 export const depths = [
   {
     id: "reach",

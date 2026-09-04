@@ -1,8 +1,3 @@
-/**
- * Completion (ticket #8), end to end: the real server action against
- * PGlite with a real session — mark, unmark, whole-Course completion,
- * persistence across sessions, and ownership isolation.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
@@ -100,7 +95,6 @@ async function signInWithGoogle(email: string): Promise<string> {
   return cookieHeader(callback);
 }
 
-/** A published two-Lesson Course for the given owner email. */
 async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
@@ -262,7 +256,6 @@ describe("persistence across sessions", () => {
     const courseId = await seedPublishedCourse(OWNER);
     await markLessonDoneAction(courseId, "l1");
 
-    /* A fresh session: sign in again as the same Learner. */
     headerState.current = new Headers();
     ownerCookie = await signInWithGoogle(OWNER);
     asOwner();
@@ -287,7 +280,6 @@ describe("persistence across sessions", () => {
     expect(l1?.stampedOn).toMatch(/\d+ [A-Z]{3} \d{4}/);
     expect(l2).toMatchObject({ status: "set" });
 
-    /* Another Learner's restored read has nothing done. */
     const otherUser = (await db.select().from(users).where(eq(users.email, OTHER)))[0];
     const otherRead = await findOwnedPublishedCourse(db, otherUser.id, courseId);
     expect(otherRead).toBeUndefined();

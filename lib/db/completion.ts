@@ -1,16 +1,9 @@
-/**
- * Completion (ticket #8): marking a Lesson's Exercise done, and the
- * Course's own completion when every Lesson of the current published
- * revision is done. Every write goes through the owned, published Course,
- * so Completion belongs to exactly one Learner by construction.
- */
 import { and, eq } from "drizzle-orm";
 import type { Db } from "./index";
 import { completions, courses, outlines } from "./schema";
 import { currentRevision } from "./review";
 import { formatDayStamp } from "@/lib/utils";
 
-/** The Lesson's day of completion, as the stamp reads it ("28 AUG"). */
 function stampOf(date: Date): string {
   return formatDayStamp(date);
 }
@@ -18,11 +11,9 @@ function stampOf(date: Date): string {
 export type MarkResult =
   | {
       ok: true;
-      /** The day stamped on the Lesson ("28 AUG"). */
       stamp: string;
       doneCount: number;
       total: number;
-      /** True when this mark completed the whole Course. */
       courseComplete: boolean;
     }
   | { ok: false; reason: "not-found" | "not-published" | "unknown-lesson"; message: string };
@@ -40,7 +31,6 @@ async function currentLessonRefs(db: Db, courseId: string): Promise<string[]> {
 
 export type CourseCompletion = { done: number; total: number; complete: boolean };
 
-/** Counts only Lessons in the current published Course revision. */
 export async function currentCourseCompletion(db: Db, courseId: string): Promise<CourseCompletion> {
   const lessonRefs = await currentLessonRefs(db, courseId);
   const completed = await db
@@ -56,7 +46,6 @@ export async function currentCourseCompletion(db: Db, courseId: string): Promise
   };
 }
 
-/** Recomputes the Course Completion after its current revision changes. */
 export async function recomputeCourseCompletion(
   db: Db,
   courseId: string,
@@ -113,7 +102,6 @@ async function ownedPublishedLesson(
   return { ok: true, total: lessonRefs.length };
 }
 
-/** Marks one Exercise done; the Lesson is complete from that moment on. */
 export async function markLessonDone(
   db: Db,
   ownerId: string,
@@ -150,7 +138,6 @@ export async function markLessonDone(
   });
 }
 
-/** Undoes one Exercise's completion; the Course stops being complete. */
 export async function markLessonUndone(
   db: Db,
   ownerId: string,
@@ -177,7 +164,6 @@ export async function markLessonUndone(
   });
 }
 
-/** Every completion of the Course, keyed by its Outline Lesson id. */
 export async function listCompletions(db: Db, courseId: string): Promise<Map<string, Date>> {
   const lessonRefs = new Set(await currentLessonRefs(db, courseId));
   const rows = await db.select().from(completions).where(eq(completions.courseId, courseId));

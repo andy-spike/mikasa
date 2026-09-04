@@ -7,13 +7,6 @@ import { listOwnedCoursesWithCompletion } from "@/lib/db/courses";
 import { db } from "@/lib/db";
 import { requireLearner } from "@/lib/session";
 
-/**
- * The one fact a library row adds: where the Course is in its life. A
- * Course with a published revision reads in the workspace, whatever the
- * status string says — the list is the one screen that must never hide a
- * readable Course (bug 1's defensive guard); everything else happens on
- * the Outline — designing, failed, or waiting for approval.
- */
 function rowFor(course: { id: string; status: string; published: boolean }): {
   href: string;
   label: string;
@@ -31,8 +24,6 @@ function rowFor(course: { id: string; status: string; published: boolean }): {
   if (course.status === "failed") {
     return { href: `/courses/${course.id}/outline`, label: "Failed", reading: false };
   }
-  // Generating and reviewing are distinct documented states with their
-  // own screens; the list names each one honestly.
   if (course.status === "reviewing") {
     return { href: `/courses/${course.id}/outline`, label: "Reviewing", reading: false };
   }
@@ -70,12 +61,9 @@ export default async function CoursesPage() {
             </Button>
           </div>
         ) : (
-          /* Hairline-divided rows on the canvas. Not a grid of cards. */
           <ul className="mt-8 border-t border-hair">
             {owned.map((c) => {
               const { href, label, reading } = rowFor(c);
-              /* The accent marks where you are up to: a readable Course
-                 with every Exercise done carries the neutral check. */
               const complete = reading && c.completion && c.completion.done >= c.completion.total;
               return (
                 <li key={c.id} className="border-b border-hair">
@@ -84,7 +72,6 @@ export default async function CoursesPage() {
                     className="row grid grid-cols-[0.75rem_1fr_auto] items-start gap-x-4 px-2 py-5 hover:bg-panel"
                   >
                     <span className="flex h-5 w-3 items-center justify-center">
-                      {/* The accent still means one thing: where you are up to. */}
                       {reading ? (
                         complete ? (
                           <span className="text-fg-3">
@@ -107,9 +94,6 @@ export default async function CoursesPage() {
                       </span>
                     </span>
 
-                    {/* A published Course shows Completion; earlier Course work
-                        keeps its lifecycle text. A published Course always
-                        has a revision, so the label never shows here. */}
                     <span className="tnum shrink-0 text-[0.8125rem] text-fg-3">
                       {reading && c.completion
                         ? `${c.completion.done} / ${c.completion.total}`

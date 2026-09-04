@@ -1,27 +1,10 @@
-/**
- * The Outline's structure grammar: the one set of operations the manual
- * editor (ticket #4) and the Tailor's Change plans (ticket #13) both use,
- * so a change is the same change however it arrives.
- *
- * Identity rules, which everything downstream (generation, Completion,
- * revisions) depends on:
- * - rename and move never change an id;
- * - split keeps the first half's Lesson id and gives the second half a new
- *   one;
- * - merge keeps the surviving Lesson's id (the one merged INTO) and drops
- *   the other.
- *
- * Every function is pure, renumbers ordinals, and throws `StructureError`
- * on an operation that does not apply. Numbers across the Course are
- * derived from position at render time; the stored ordinals exist so the
- * JSON document reads correctly on its own.
- */
+// Identity rules downstream depends on: rename/move keep ids; split keeps the first half's id;
+// merge keeps the surviving Lesson's id and drops the other.
 import { nanoid } from "nanoid";
 import type { OutlineData, OutlineLesson, OutlineModule } from "./types";
 
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
-/** An operation the Outline does not accept, as opposed to a bug. */
 export class StructureError extends Error {
   name = "StructureError";
 }
@@ -87,7 +70,6 @@ function findLesson(
   throw new StructureError("That Lesson does not exist.");
 }
 
-/** Recomputes positions and numerals from order; the source of truth. */
 function renumber(modules: OutlineModule[]): OutlineData {
   let lessonOrdinal = 0;
   return {
@@ -100,7 +82,6 @@ function renumber(modules: OutlineModule[]): OutlineData {
   };
 }
 
-/** Re-derives ordinals and numerals after surgery on the shape (#15). */
 export function renumberOutline(modules: OutlineModule[]): OutlineData {
   return renumber(modules);
 }
@@ -109,11 +90,6 @@ function clone(data: OutlineData): OutlineModule[] {
   return data.modules.map((m) => ({ ...m, lessons: m.lessons.map((l) => ({ ...l })) }));
 }
 
-/**
- * Applies one operation to a copy of the Outline and returns the new
- * document. `newId` is injectable so tests get predictable ids; production
- * uses nanoid.
- */
 export function applyOutlineOp(
   data: OutlineData,
   op: OutlineOp,
@@ -243,7 +219,6 @@ export function applyOutlineOp(
   }
 }
 
-/** Applies operations in order; the first failure fails the whole batch. */
 export function applyOutlineOps(
   data: OutlineData,
   ops: OutlineOp[],
@@ -254,11 +229,6 @@ export function applyOutlineOps(
   return current;
 }
 
-/**
- * Approval's sanity rule: generation writes one Lesson per Outline Lesson,
- * so an Outline with no Lessons, or a Module with none, is not approvable.
- * This is not a Depth bound — manual shapes may be any size above zero.
- */
 export function outlineApprovalProblems(data: OutlineData): string[] {
   const problems: string[] = [];
   if (data.modules.length === 0) problems.push("The Outline has no Modules.");

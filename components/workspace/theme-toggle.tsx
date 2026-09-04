@@ -4,11 +4,6 @@ import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { setTheme } from "@/lib/theme";
 
-/**
- * Two grounds, one switch. The class on <html> is the only state, so this
- * renders the same on the server and the client and needs no mounted flag:
- * which icon shows is a CSS question, not a React one.
- */
 export function ThemeToggle() {
   return (
     <Button

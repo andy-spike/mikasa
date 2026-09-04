@@ -1,10 +1,3 @@
-/**
- * Resume of failed Course work (ticket #7), stage by stage, with every
- * provider scripted: a design retry reuses persisted Sources and a
- * persisted Outline; a generation retry keeps written Lessons; a retry
- * whose review already passed goes straight to publication; and repeated
- * retries never duplicate content.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
@@ -180,7 +173,6 @@ describe("retrying a failed design", () => {
     headerState.current = new Headers({ cookie });
     const courseId = await seedFailedCourse("design");
 
-    /* The failed run had already gathered and persisted Sources. */
     await saveDesignSources(db, courseId, [
       {
         ref: "src-1",
@@ -196,7 +188,6 @@ describe("retrying a failed design", () => {
     expect(result.ok).toBe(true);
     expect(workflowStarts.calls).toEqual([[courseId, expect.any(String), "specification"]]);
 
-    /* Sources survived the failure untouched. */
     const rows = await db.select().from(sources).where(eq(sources.courseId, courseId));
     expect(rows.map((r) => r.ref)).toEqual(["src-1"]);
     void failedRun;
@@ -269,7 +260,6 @@ describe("retrying a failed generation", () => {
     const loaded = await context;
     expect(loaded?.written).toEqual([]);
 
-    /* Writing the Lesson, then resetting the run: the next pass sees it. */
     await saveLessonContent(
       db,
       courseId,
@@ -296,14 +286,11 @@ describe("retrying a failed generation", () => {
       .from(generationRuns)
       .where(eq(generationRuns.courseId, courseId));
 
-    /* The candidate is whole and its review passed; publication itself
-       was what failed. */
     await saveLessonContent(db, courseId, 1, run.id, await contentFor("l1"));
     await finishGenerationToSucceeded(db, courseId, run.id);
     const review = await openReviewRun(db, courseId, 1);
     await finishReviewRun(db, review.id, "succeeded");
 
-    /* Repeated retries: the first publishes, the rest are no-ops. */
     await resetGenerationRun(db, courseId, run.id);
     const published = await publishRevision(db, courseId, 1, review.id);
     expect(published.ok).toBe(true);

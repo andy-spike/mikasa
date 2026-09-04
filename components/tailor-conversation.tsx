@@ -6,10 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Inline } from "@/components/workspace/prose";
 
-/** One side of a pane conversation, as the panes render it. */
 export type Turn = { from: "learner" | "tutor" | "tailor"; text: string };
 
-/** One operation of a Change plan under review (ticket #12). */
 export type PlanOperation = {
   id: string;
   verb: string;
@@ -20,13 +18,6 @@ export type PlanOperation = {
 
 export type PlanView = { id: string; operations: PlanOperation[] };
 
-/**
- * The conversation the Tutor and Tailor panes share: a scrolling thread,
- * a pending marker until the first word arrives, and the composer. The
- * answer grows in place, in the turn that was opened for it. `below`
- * renders inside the scroll area under the thread — the Tailor's plan
- * lives there.
- */
 export function Conversation({
   turns,
   onAsk,
@@ -37,9 +28,6 @@ export function Conversation({
   sendLabel,
   pendingText,
   failedText,
-  /* False on the Outline screen: the thread grows with the page instead of
-     owning a scrollport beside it. True in the workspace panel, which owns
-     its own overflow. */
   scrollport = true,
 }: {
   turns: Turn[];
@@ -71,8 +59,6 @@ export function Conversation({
   }
 
   useEffect(() => {
-    /* In a scrollport the thread follows itself; on the page, yanking the
-       whole Outline on every streamed chunk would fight the reader. */
     if (!scrollport) return;
     foot.current?.scrollIntoView({ block: "end", behavior: "smooth" });
   }, [thread.length, tail, pending, streaming, scrollport]);
@@ -94,7 +80,6 @@ export function Conversation({
           setPending(false);
           setStreaming(true);
         }
-        /* The answer grows in place, in the turn that was opened for it. */
         setThread((t) => {
           const copy = [...t];
           const last = copy[copy.length - 1];
@@ -108,8 +93,6 @@ export function Conversation({
     setPending(false);
     setStreaming(false);
     if (!ok) {
-      /* The turn never completed: nothing was stored. Drop the empty
-         reply and say so, rather than leaving a hole in the thread. */
       setThread((t) => {
         const copy = [...t];
         const last = copy[copy.length - 1];
@@ -130,7 +113,6 @@ export function Conversation({
         <div className="space-y-4">
           {thread.map((turn, i) =>
             turn.from === "learner" ? (
-              /* The learner's own words sit one step up, right-shouldered. */
               <p
                 key={i}
                 className="ml-6 rounded-md bg-raised px-3 py-2 text-[0.8125rem] leading-[1.55] text-fg"
@@ -198,13 +180,6 @@ export function Conversation({
   );
 }
 
-/**
- * The Tailor: the shared conversation, with the Change plan under review
- * below the thread. Each operation is decided on its own — accepting or
- * discarding one never touches the others, and nothing reaches the
- * Course until the accepted operations are applied. `applySlot` (the
- * Outline checkpoint's Apply action, #13) renders under the plan.
- */
 export function TailorConversation({
   turns,
   onAsk,
@@ -224,11 +199,8 @@ export function TailorConversation({
   onDiscard: (operationId: string) => void;
   onRestore: (operationId: string) => void;
   applySlot?: ReactNode;
-  /** The revision's published changes and their undo affordances (#15). */
   publishedSlot?: ReactNode;
   scrollport?: boolean;
-  /** A failed staged revision's retry and discard, which live outside any
-      proposed plan: there may be no plan under review at all. */
   stagedFailedSlot?: ReactNode;
 }) {
   const open = plan?.operations ?? [];

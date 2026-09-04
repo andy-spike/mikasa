@@ -1,17 +1,8 @@
-/**
- * The documented limits for creating a Course. This module is shared by the
- * form (instant feedback) and the server action (the authority), so both
- * reject exactly the same input.
- */
-
 export const TOPIC_MAX_LENGTH = 200;
 export const GOAL_MAX_LENGTH = 500;
 export const BACKGROUND_MAX_LENGTH = 2000;
 
-/**
- * The supported Course Languages. The Learner's choice is immutable after
- * creation: no update path exists for it anywhere in the app.
- */
+// The Learner's choice is immutable after creation: no update path exists for it.
 export const COURSE_LANGUAGES = [
   { code: "en", label: "English" },
   { code: "es", label: "Spanish" },
@@ -28,10 +19,6 @@ export function courseLanguageLabel(code: string): string {
   return COURSE_LANGUAGES.find((l) => l.code === code)?.label ?? code;
 }
 
-/**
- * The three Depth choices, in the order the form offers them, with the same
- * wording the library has always shown.
- */
 export const DEPTH_CHOICES = [
   {
     id: "reach",
@@ -55,14 +42,6 @@ export type DepthId = (typeof DEPTH_CHOICES)[number]["id"];
 
 export const DEPTH_IDS = DEPTH_CHOICES.map((d) => d.id);
 
-/**
- * How much structure each Depth allows before the Learner reshapes it. The
- * Outline a Course is born with must land inside these bounds; design fails
- * and can be retried when a model draft misses them. Bounds are per Module.
- * A reach Course is a short
- * line to one outcome; working adds the ground to keep using the skill;
- * mastery walks the edges, so it earns the most Modules and Lessons.
- */
 export const DEPTH_BOUNDS: Record<
   DepthId,
   {
@@ -81,7 +60,6 @@ export function depthBounds(depth: string) {
   return DEPTH_BOUNDS[depth as DepthId];
 }
 
-/** The raw shape the form sends and the action receives. */
 export type CourseInput = {
   topic: string;
   goal: string;
@@ -95,11 +73,6 @@ export type CourseInputErrors = Partial<Record<keyof CourseInput | "form", strin
 
 const trim = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
-/**
- * Validates one Course creation. Returns every field error at once, so the
- * form can show them together. Empty Background is fine (it is optional);
- * everything else has to be inside its documented limit.
- */
 export function validateCourseInput(
   raw: Partial<Record<keyof CourseInput, unknown>>,
 ): { ok: true; value: CourseInput } | { ok: false; errors: CourseInputErrors } {

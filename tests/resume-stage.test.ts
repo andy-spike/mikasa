@@ -1,12 +1,3 @@
-/**
- * Resuming at the exact failed stage (bug 2). Three rules, all about
- * never repeating finished work: a retry does not re-run reconciliation
- * it already got through (the written Lessons were generated against
- * that spec); a staged retry whose review already passed goes straight
- * to publication; and a publish failure fails the generation run only,
- * leaving the passed review standing so a retry re-publishes instead of
- * re-reviewing.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import type { ChangePlanOp } from "@/lib/course/change-plan";
@@ -32,8 +23,6 @@ vi.mock("workflow/api", () => ({
   start: async () => ({ runId: "wrun_test" }),
 }));
 
-/* The review's model-driven slices, per test: the factual slice can be
-   made to throw (a review-stage failure) or pass. */
 const reviewState = vi.hoisted(() => ({
   throwFactual: false,
 }));
@@ -48,7 +37,6 @@ vi.mock("@/lib/course/review", () => ({
   MAX_CORRECTION_ROUNDS: 2,
 }));
 
-/* Publication is real unless a test installs a refusal. */
 const publishRefusal = vi.hoisted(() => ({
   current: null as null | { ok: false; reason: string },
 }));
@@ -61,7 +49,6 @@ vi.mock("@/lib/db/review", async (importOriginal) => {
   };
 });
 
-/* The generation model, scripted per attempt; the embedder is a fake. */
 const modelState = vi.hoisted(() => ({
   current: undefined as ReturnType<typeof import("./helpers/fake-model").scriptedModel> | undefined,
 }));
@@ -223,7 +210,6 @@ async function userIdOf(email: string): Promise<string> {
   return user.id;
 }
 
-/** A Course at its generation checkpoint: Outline approved, nothing written. */
 async function seedGeneratingCourse(
   ownerEmail: string,
 ): Promise<{ courseId: string; runId: string }> {
@@ -277,7 +263,6 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   return courseId;
 }
 
-/** A plan with every operation accepted, as the pane's review leaves it. */
 async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<string> {
   const created = await createChangePlan(db, await userIdOf(OWNER), courseId, ops);
   expect(created.ok).toBe(true);
@@ -330,15 +315,12 @@ describe("a generation whose review fails", () => {
     const [failedCourse] = await db.select().from(courses).where(eq(courses.id, courseId));
     expect(failedCourse.status).toBe("failed");
 
-    /* The retry: written Lessons are kept, review is opened again. */
     reviewState.throwFactual = false;
     headerState.current = new Headers({ cookie: ownerCookie });
     expect(await retryCourseAction(courseId)).toMatchObject({ ok: true });
     const [reopened] = await db.select().from(generationRuns).where(eq(generationRuns.id, runId));
     expect(reopened.status).toBe("running");
 
-    /* Any lesson prompt reaching the model would rewrite a Lesson with
-       this response. */
     modelState.current = scriptedModel([
       json({ body: [{ kind: "p", text: "REGENERATED" }], exercise: { task: "x", check: "y" } }),
     ]);
@@ -368,7 +350,6 @@ describe("a staged revision whose review fails", () => {
     ]);
     const staged = await stageForReal(courseId, planId);
 
-    /* First attempt: reconcile, write l1, then the review explodes. */
     reviewState.throwFactual = true;
     modelState.current = scriptedModel([reconcileJson(OUTLINE), lessonJson("Lesson one")]);
     const first = await stageRevisionWorkflow(
@@ -462,7 +443,6 @@ describe("a staged revision whose publication fails", () => {
     );
     expect(first).toMatchObject({ ok: false, reason: "publish-failed" });
 
-    /* The review run that just passed is still passed. */
     const reviews = await db
       .select()
       .from(reviewRuns)

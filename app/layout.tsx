@@ -30,8 +30,7 @@ FORM: Graphite Workspace, direction roll 21608bd1, re-roll 1, safer register, us
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 -->`;
 
-/* Runs before first paint, so the shell is never briefly the wrong ground.
-   A stored choice wins; with none, the operating system decides. */
+/* Runs before first paint, so the shell is never briefly the wrong ground. */
 const THEME_SCRIPT = `try{var t=localStorage.getItem("mk-theme");if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

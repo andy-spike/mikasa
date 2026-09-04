@@ -1,10 +1,3 @@
-/**
- * Course creation end to end, minus the network: the real server action
- * runs against PGlite with a real Better Auth session (fake Google, as in
- * `protected-route.test.ts`), and the Workflow engine is a stub that
- * records the start — the durable run itself is proven in
- * `course-design.test.ts`, where the same step functions run for real.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
@@ -25,7 +18,7 @@ const navigation = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => navigation);
 
-/* The durable engine, stubbed: `start` records what it was handed. */
+/* The durable run itself is proven in course-design.test.ts; here the engine is a stub. */
 const workflowStarts = vi.hoisted(() => ({ calls: [] as { courseId: string; runId: string }[] }));
 vi.mock("workflow/api", () => ({
   start: async (_workflow: unknown, args: unknown[]) => {
@@ -207,7 +200,6 @@ describe("retryCourseAction", () => {
     if (!created.ok) return;
     const courseId = created.courseId;
 
-    /* The first run failed on the engine side. */
     await db.update(courses).set({ status: "failed" }).where(eq(courses.id, courseId));
 
     const before = workflowStarts.calls.length;

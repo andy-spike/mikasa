@@ -1,9 +1,3 @@
-/**
- * Repositories for review and publication (ticket #6). Findings, review
- * rounds, and the published revision ledger live here; the Workflow calls
- * these from its steps, and the reading path (tickets #6/#8) reads only
- * through the current revision.
- */
 import { and, desc, eq, max } from "drizzle-orm";
 import type { Db } from "./index";
 import {
@@ -26,7 +20,6 @@ import type { Finding, FindingKind } from "../course/review";
 import { outlineApprovalProblems } from "@/lib/course/structure";
 import { recomputeCourseCompletion } from "./completion";
 
-/** Opens the review run for a generated candidate. */
 export async function openReviewRun(
   db: Db,
   courseId: string,
@@ -34,8 +27,6 @@ export async function openReviewRun(
   options?: { touchCourse?: boolean },
 ): Promise<ReviewRun> {
   const [run] = await db.insert(reviewRuns).values({ courseId, outlineVersion }).returning();
-  /* A staged revision (ticket #14) reviews without moving the Course:
-     the published Course reads as itself the whole time. */
   if (options?.touchCourse === false) return run;
   await db
     .update(courses)
@@ -48,7 +39,6 @@ export async function recordReviewStep(db: Db, runId: string, round: number): Pr
   await db.update(reviewRuns).set({ round, updatedAt: new Date() }).where(eq(reviewRuns.id, runId));
 }
 
-/** Replaces the round's findings (a re-run of a round overwrites, not appends). */
 export async function saveFindings(
   db: Db,
   runId: string,
@@ -80,7 +70,6 @@ export async function saveFindings(
   });
 }
 
-/** The round's findings, oldest first. */
 export async function getFindings(
   db: Db,
   runId: string,
@@ -92,7 +81,6 @@ export async function getFindings(
     .where(and(eq(reviewFindings.reviewRunId, runId), eq(reviewFindings.round, round)));
 }
 
-/** Marks a round's findings corrected by the corrections that just ran. */
 export async function markFindingsCorrected(db: Db, runId: string, round: number): Promise<void> {
   await db
     .update(reviewFindings)
@@ -115,10 +103,8 @@ export async function finishReviewRun(
 export type PublishResult = { ok: true; revision: Revision } | { ok: false; reason: string };
 
 /**
- * Publication: one transaction that verifies the candidate is whole, the
- * review passed with no open findings, and then writes the revision row
- * and flips the Course to "ready". A stale outlineVersion (a newer
- * revision exists) refuses to publish over it (ticket #14 reuses this).
+ * Publication is one atomic transaction and idempotent per outline version:
+ * a repeated retry reuses the existing revision instead of minting a second.
  */
 export async function publishRevision(
   db: Db,
@@ -166,8 +152,7 @@ export async function publishRevision(
       return { ok: false as const, reason: "Refusing to publish with open review findings." };
     }
 
-    /* Executable claims (ticket #9): the newest Sandbox pass for this
-       Outline version must not be a failure. */
+    /* A failed Sandbox pass blocks publication until a later round passes. */
     const verification = await tx
       .select()
       .from(codeVerifications)
@@ -192,8 +177,6 @@ export async function publishRevision(
       .where(eq(revisions.courseId, courseId));
     const nextNumber = (current?.revisionNumber ?? 0) + 1;
 
-    /* A revision of this Outline version already exists: publication is
-       idempotent, and a repeated retry cannot mint a second one. */
     const [existing] = await tx
       .select()
       .from(revisions)
@@ -216,12 +199,7 @@ export async function publishRevision(
   });
 }
 
-/**
- * Saves a Sandbox verification pass for a round. A row for the same
- * (course, version, round) already existing means a Workflow retry
- * re-entered this step: the row is reused, and the Sandbox does not run
- * twice for the same round.
- */
+/** A retry reuses the existing row for the round instead of re-running the Sandbox. */
 export async function saveCodeVerification(
   db: Db,
   courseId: string,
@@ -252,7 +230,6 @@ export async function saveCodeVerification(
   return { created: true };
 }
 
-/** The verification pass recorded for a round, if any. */
 export async function findCodeVerification(
   db: Db,
   courseId: string,
@@ -273,7 +250,6 @@ export async function findCodeVerification(
   return row;
 }
 
-/** The newest verification pass for an Outline version. */
 export async function latestCodeVerification(
   db: Db,
   courseId: string,
@@ -293,7 +269,6 @@ export async function latestCodeVerification(
   return row;
 }
 
-/** A failed review leaves the candidate retryable. */
 export async function failReview(
   db: Db,
   courseId: string,
@@ -327,7 +302,6 @@ export async function failReview(
   });
 }
 
-/** The current published revision, if the Course has one. */
 export async function currentRevision(db: Db, courseId: string): Promise<Revision | undefined> {
   const [revision] = await db
     .select()
@@ -338,7 +312,6 @@ export async function currentRevision(db: Db, courseId: string): Promise<Revisio
   return revision;
 }
 
-/** The Course's newest review run, if any. */
 export async function latestReviewRun(db: Db, courseId: string): Promise<ReviewRun | undefined> {
   const [run] = await db
     .select()
@@ -349,11 +322,6 @@ export async function latestReviewRun(db: Db, courseId: string): Promise<ReviewR
   return run;
 }
 
-/**
- * Reopens a failed generation run for retry (ticket #7): running again
- * with the error cleared, same id and Outline version, so the Lessons it
- * already wrote are the ones a retry skips.
- */
 export async function resetGenerationRun(
   db: Db,
   courseId: string,
@@ -386,12 +354,6 @@ export async function resetGenerationRun(
   });
 }
 
-/**
- * The one Learner-facing read of a Course: ownership in the query, the
- * current revision only. An unpublished candidate — generating, reviewing,
- * failed — reads as not-found here, which is exactly the privacy the
- * product promises between generation and publication.
- */
 export type PublishedCourse = {
   course: Course;
   revision: Revision;
@@ -433,11 +395,6 @@ export async function findOwnedPublishedCourse(
   return { course, revision, outline, lessonRows, sourceRows };
 }
 
-/**
- * The generation run for a version that reached "reviewing" but has no
- * review run yet — the handoff point between tickets #5 and #6. Kept as a
- * query because the review workflow starts from the Course state.
- */
 export async function findGenerationRunFor(
   db: Db,
   courseId: string,

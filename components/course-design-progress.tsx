@@ -7,14 +7,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { retryCourseAction } from "@/lib/actions/courses";
 
-/**
- * The Course before its Outline exists: design runs durably on the server
- * (ADR 0005), so this screen only has to be a live-region line and a way
- * back — leave and return, and the page refreshes into the Outline when it
- * is ready. A failed design keeps its message here and stays retryable.
- */
-
-/** The workflow's steps, as the Learner would name them. */
 const STEP_COPY: Record<string, string> = {
   sources: "Gathering sources.",
   outline: "Drafting the Modules and the Lesson titles.",
@@ -26,11 +18,8 @@ type Props = {
   courseId: string;
   topic: string;
   goal: string;
-  /** "designing" or "failed" — the two pre-Outline states. */
   status: "designing" | "failed";
-  /** The step the design run is in, while it is designing. */
   step: string;
-  /** Why the run failed, when it failed. */
   error: string | null;
 };
 
@@ -41,8 +30,6 @@ export function CourseDesignProgress({ courseId, topic, goal, status, step, erro
 
   const designing = status === "designing" && !retrying;
 
-  /* Design survives this page closing, so polling is a courtesy, not a
-     connection: refresh every few seconds while the run is going. */
   useEffect(() => {
     if (!designing) return;
     const timer = setInterval(() => router.refresh(), 4000);

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@/components/sign-out-button";
 import { readTheme, serverTheme, setTheme, subscribeTheme, type ThemeChoice } from "@/lib/theme";
 
-/** A settings row: name, value, and whatever changes it. No boxes. */
 function Row({ name, hint, children }: { name: string; hint?: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-hair py-5">
@@ -23,10 +22,6 @@ function Row({ name, hint, children }: { name: string; hint?: string; children: 
 }
 
 export function SettingsView({ email, courseCount }: { email: string; courseCount: number }) {
-  /* The class on <html> is the theme's only state, and "system" is the
-     absence of a stored choice, so this reads the store rather than React.
-     The server snapshot is "system", which is also what the header switch
-     assumes before it has looked. */
   const theme = useSyncExternalStore(subscribeTheme, readTheme, serverTheme);
 
   return (

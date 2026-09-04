@@ -6,12 +6,6 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { retryCourseAction } from "@/lib/actions/courses";
 
-/**
- * A Course that failed after its Outline existed: Lessons, review, or
- * publication did not finish. The screen says what failed and offers the
- * retry — which resumes only the unfinished work (ticket #7) — while
- * everything the run already produced stays in place.
- */
 export function CourseFailed({
   courseId,
   topic,

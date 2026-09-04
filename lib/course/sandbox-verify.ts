@@ -1,17 +1,4 @@
-/**
- * Executable-claim verification (ticket #9): for a coding Course, the
- * candidate's code is written into an isolated Sandbox, the claims' own
- * commands are run there, and what happened — commands, output, the files
- * present — is kept as review evidence. A failed claim is a review
- * finding like any other: corrections rewrite the code, the next round
- * verifies again, and publication stays blocked while anything is still
- * failing.
- *
- * The Sandbox is injected, so tests substitute it entirely. The real
- * provider (`lib/sandbox`) creates a Vercel Sandbox with no environment
- * variables at all: nothing from the deployment — no secrets, no keys —
- * reaches the machine the candidate's code runs on.
- */
+// Candidate code runs in an isolated Sandbox with no environment: secrets never reach that machine.
 import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
 import { z } from "zod";
@@ -20,7 +7,6 @@ import { GenerationError } from "./generate";
 import type { LessonContent } from "./content";
 import type { CourseSpecification } from "./types";
 
-/** Words that, in a Topic or Goal, mean the Course teaches writing code. */
 const CODING_MARKERS = [
   "code",
   "coding",
@@ -41,12 +27,6 @@ const CODING_MARKERS = [
   "write a",
 ];
 
-/**
- * Whether this Course's claims are executable. Two signals, either
- * suffices: the candidate itself carries code blocks, or the promised
- * work is coding by its own contract. A prose-only Course (a history of
- * typography, say) never creates Sandbox work.
- */
 export function needsCodeVerification(
   contract: { topic: string; goal: string },
   lessons: LessonContent[],
@@ -60,11 +40,8 @@ const planSchema = z.object({
   files: z
     .array(
       z.object({
-        /** Where the file lands inside the Sandbox, e.g. "src/index.js". */
         path: z.string().min(1),
-        /** The exact file contents, taken from the candidate's code. */
         content: z.string(),
-        /** The Lesson the code came from, for targeted findings. */
         lessonRef: z.string(),
       }),
     )
@@ -72,10 +49,8 @@ const planSchema = z.object({
   commands: z
     .array(
       z.object({
-        /** A single shell line, e.g. "node src/index.js". */
         run: z.string().min(1),
         lessonRef: z.string(),
-        /** What a clean exit proves about the Lesson's claim. */
         proves: z.string().min(1),
       }),
     )
@@ -84,11 +59,6 @@ const planSchema = z.object({
 
 export type VerificationPlan = z.infer<typeof planSchema>;
 
-/**
- * Step: turn the candidate's code into a concrete Sandbox plan — the
- * files to write and the commands whose clean exit proves the Lessons'
- * claims. Only code that exists in the candidate may appear.
- */
 export async function planVerification(
   model: LanguageModel,
   course: { topic: string; goal: string },
@@ -136,7 +106,6 @@ export async function planVerification(
   return output;
 }
 
-/** One command's outcome, kept verbatim as evidence. */
 export type CommandEvidence = {
   run: string;
   lessonRef: string;
@@ -147,9 +116,7 @@ export type CommandEvidence = {
 };
 
 export type VerificationEvidence = {
-  /** The files written before the commands ran. */
   written: { path: string; lessonRef: string }[];
-  /** Every file present after the commands ran (created or changed). */
   files: string[];
   commands: CommandEvidence[];
 };
@@ -157,32 +124,19 @@ export type VerificationEvidence = {
 export type VerificationResult = {
   passed: boolean;
   evidence: VerificationEvidence;
-  /** The Lesson ids whose claims failed, for targeted findings. */
   failedLessonRefs: string[];
 };
 
-/**
- * The seam the real Sandbox provider and the test fake both implement:
- * create an isolated machine, write a file, run one command, list files,
- * and dispose. `create` receives no environment — the contract that keeps
- * production secrets out of the verification machine.
- */
 export type SandboxProvider = {
   create: () => Promise<{
     writeFile: (path: string, content: string) => Promise<void>;
     run: (command: string) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
     listFiles: () => Promise<string[]>;
     dispose: () => Promise<void>;
-    /** What the provider was created with; the tests assert on it. */
     createdWith?: unknown;
   }>;
 };
 
-/**
- * Runs the plan in the Sandbox and keeps the evidence. One failed command
- * does not stop the pass: every claim gets its verdict, so corrections
- * can target everything that failed at once.
- */
 export async function runVerification(
   provider: SandboxProvider,
   plan: VerificationPlan,
@@ -225,7 +179,6 @@ export async function runVerification(
   }
 }
 
-/** How a failed command reads as a review finding. */
 export function verificationFindings(result: VerificationResult): {
   lessonRef: string;
   detail: string;

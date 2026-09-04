@@ -5,19 +5,11 @@ import { Button } from "./ui/button";
 import { ThemeToggle } from "./workspace/theme-toggle";
 import { SignOutButton } from "./sign-out-button";
 
-/**
- * The chrome every screen outside the workspace wears.
- *
- * The workspace has no header — its rail is the navigation — so this is not
- * a wrapper around it. It is the same system at a smaller scale: canvas
- * ground, one hairline dividing the chrome from the content, nothing boxed.
- */
 export function AppShell({
   section,
   actions,
   children,
 }: {
-  /** Where you are, shown after the wordmark. */
   section?: string;
   actions?: ReactNode;
   children: ReactNode;

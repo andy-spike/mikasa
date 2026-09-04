@@ -1,11 +1,3 @@
-/**
- * The staged Course revision (ticket #14), end to end: staging a
- * published Course's plan leaves the current Course readable and copies
- * the unaffected Lessons; running the revision regenerates only the
- * affected content, reviews only its scope, and swaps the revision
- * atomically; a failed run preserves the current Course and retries; a
- * plan drawn against an older revision is refused.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { desc, eq } from "drizzle-orm";
 
@@ -26,7 +18,6 @@ const navigation = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => navigation);
 
-/* The durable engine, stubbed: `start` records what it was handed. */
 const workflowStarts = vi.hoisted(() => ({
   calls: [] as unknown[][],
 }));
@@ -37,9 +28,8 @@ vi.mock("workflow/api", () => ({
   },
 }));
 
-/* The review's model-driven slices, captured: the point of #14 is that a
-   staged revision reruns them only for the regenerated Lessons. The
-   structural slice is exercised for real elsewhere. */
+/* Staged revisions rerun review slices only for regenerated Lessons; the
+   structural slice is proven elsewhere. */
 const reviewSlices = vi.hoisted(() => ({
   factualScope: [] as string[][],
   designScope: [] as string[][],
@@ -70,7 +60,6 @@ vi.mock("@/lib/course/review", () => ({
   MAX_CORRECTION_ROUNDS: 2,
 }));
 
-/* The generation model and the embedder, scripted per test. */
 const revisionModelState = vi.hoisted(() => ({
   current: undefined as ReturnType<typeof import("./helpers/fake-model").scriptedModel> | undefined,
 }));
@@ -192,7 +181,6 @@ function lessonJson(title: string): string {
   });
 }
 
-/** One reconcile response (#17): an alignment entry per staged Lesson. */
 function reconcileJson(lessonIds: string[]): string {
   return json({
     learningGraph: [],
@@ -225,7 +213,6 @@ async function signInWithGoogle(email: string): Promise<string> {
   return cookieHeader(callback);
 }
 
-/** A published three-Lesson Course with fragments, for the given owner. */
 async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
@@ -263,7 +250,6 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   const published = await publishRevision(db, course.id, 1, review.id);
   expect(published.ok).toBe(true);
 
-  /* The Tutor's search index, as ticket #11 left it. */
   await embedCourseFragments(
     db,
     async (texts) => texts.map(() => new Array<number>(1536).fill(0.01)),
@@ -290,11 +276,6 @@ afterEach(async () => {
   headerState.current = new Headers();
 });
 
-/**
- * Accepts a three-operation plan: rewrite Lesson one's prose, remove
- * Lesson two, rename Lesson three. One regenerated, one removed, one
- * merely retitled — the three fates #14 has to keep straight.
- */
 async function proposeAndAccept(courseId: string): Promise<string> {
   const userId = (await db.select().from(users).where(eq(users.email, OWNER)))[0].id;
   const created = await createChangePlan(db, userId, courseId, [
@@ -319,12 +300,10 @@ describe("stagePlanRevisionAction", () => {
     const result = await stagePlanRevisionAction(courseId, planId);
     expect(result).toMatchObject({ ok: true, stagedOutlineVersion: 2 });
 
-    /* The current revision is still revision 1 over version 1. */
     const revision = await currentRevision(db, courseId);
     expect(revision?.revisionNumber).toBe(1);
     expect(revision?.outlineVersion).toBe(1);
 
-    /* The staged Outline: Lesson two gone, Lesson three renamed. */
     const [staged] = await db
       .select()
       .from(outlines)
@@ -334,8 +313,6 @@ describe("stagePlanRevisionAction", () => {
     const stagedLessons = staged.data.modules[0].lessons.map((l) => l.id);
     expect(stagedLessons).toEqual(["l1", "l3"]);
 
-    /* Only the retitled Lesson was copied, under its new name; the
-       regenerated one is the workflow's job. */
     const rows = await db.select().from(lessons).where(eq(lessons.outlineVersion, 2));
     expect(rows.map((r) => [r.lessonRef, r.title])).toEqual([["l3", "Lesson three, Repainted"]]);
 
@@ -355,7 +332,6 @@ describe("stagePlanRevisionAction", () => {
     ]);
     expect(created.ok).toBe(true);
 
-    /* A newer revision exists by the time the plan is staged. */
     await db.insert(revisions).values({ courseId, revisionNumber: 2, outlineVersion: 1 });
     const current = await currentRevision(db, courseId);
     expect(current?.revisionNumber).toBe(2);
@@ -378,8 +354,6 @@ describe("stageRevisionWorkflow", () => {
     expect(staged).toMatchObject({ ok: true, stagedOutlineVersion: 2 });
     embedCalls.count = 0;
 
-    /* The regenerated Lesson's new content, scripted; the reconcile
-       call (#17) comes first and covers the staged Lessons l1 and l3. */
     revisionModelState.current = scriptedModel([
       reconcileJson(["l1", "l3"]),
       lessonJson("Lesson one"),
@@ -400,16 +374,12 @@ describe("stageRevisionWorkflow", () => {
     );
     expect(result).toEqual({ ok: true, revisionNumber: 2 });
 
-    /* The revision swapped: current is now revision 2 over version 2. */
     const revision = await currentRevision(db, courseId);
     expect(revision?.revisionNumber).toBe(2);
     expect(revision?.outlineVersion).toBe(2);
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
     expect(course.status).toBe("ready");
 
-    /* The affected Lesson reran (scripted content), the retitled Lesson
-       was retained byte-for-byte under its new name, and the removed one
-       left no row. */
     const v2 = await db.select().from(lessons).where(eq(lessons.outlineVersion, 2));
     expect(v2.map((r) => r.lessonRef)).toEqual(["l1", "l3"]);
     const l1v2 = v2.find((r) => r.lessonRef === "l1")!;
@@ -420,13 +390,9 @@ describe("stageRevisionWorkflow", () => {
     expect(l3v2.body).toEqual(l3v1.body);
     expect(l3v2.title).toBe("Lesson three, Repainted");
 
-    /* Only the affected Lessons' review work reran: the factual and
-       design slices saw exactly the regenerated Lesson. */
     expect(reviewSlices.factualScope).toEqual([["l1"]]);
     expect(reviewSlices.designScope).toEqual([["l1"]]);
 
-    /* Embeddings reran, and the search index now answers from the
-       published revision: Lesson two's fragments are gone. */
     expect(embedCalls.count).toBeGreaterThan(0);
     const fragmentRefs = (await db.select().from(lessonFragments)).map((f) => f.lessonRef);
     expect(fragmentRefs).not.toContain("l2");
@@ -444,8 +410,6 @@ describe("stageRevisionWorkflow", () => {
     const staged = await stagePlanRevisionAction(courseId, planId);
     expect(staged).toMatchObject({ ok: true, stagedOutlineVersion: 2 });
 
-    /* The regeneration model answers with nonsense: the run fails, and
-       nothing published moves. The reconcile call comes first. */
     revisionModelState.current = scriptedModel([
       reconcileJson(["l1", "l3"]),
       "this is not the JSON you are looking for",
@@ -473,15 +437,9 @@ describe("stageRevisionWorkflow", () => {
     expect(plan.status).toBe("staged");
     expect((await db.select().from(revisions)).map((r) => r.revisionNumber)).toEqual([1]);
 
-    /* The retry — ticket #7's rules on a plan: the failed run reopens and
-       the same affected sets ride again. */
     const retried = await retryPlanRevisionAction(courseId, planId);
     expect(retried).toMatchObject({ ok: true, stagedOutlineVersion: 2 });
 
-    /* This time the model cooperates, and the resumed run publishes.
-       The failed run's reconcile step already saved the reconciled
-       specification, so the retry skips that model call entirely and
-       spends its one scripted response on the Lesson (#17). */
     revisionModelState.current = scriptedModel([lessonJson("Lesson one")]);
     const [reopened] = await db
       .select()

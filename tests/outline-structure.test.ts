@@ -1,8 +1,3 @@
-/**
- * The Outline's structure grammar, pure: identity rules for split and
- * merge, renumbering, and the guards. These are the exact functions the
- * editor's server actions and (later) the Tailor's Change plans run.
- */
 import { describe, expect, it } from "vitest";
 import {
   applyOutlineOp,
@@ -13,7 +8,6 @@ import {
 } from "@/lib/course/structure";
 import type { OutlineData } from "@/lib/course/types";
 
-/** Two Modules of two Lessons each, with ids a reader can follow. */
 function fixture(): OutlineData {
   return {
     modules: [
@@ -75,7 +69,6 @@ describe("rename and move preserve identity", () => {
     });
     expect(next.modules[0].lessons.map((l) => l.id)).toEqual(["l2", "l1"]);
     expect(next.modules[0].lessons.map((l) => l.ordinal)).toEqual([1, 2]);
-    /* The rest of the Course keeps counting from where it is. */
     expect(next.modules[1].lessons.map((l) => l.ordinal)).toEqual([3, 4]);
   });
 
@@ -107,7 +100,6 @@ describe("split and merge identity rules", () => {
     const mod = next.modules[0];
     expect(mod.lessons.map((l) => l.id)).toEqual(["l1", "new1", "l2"]);
     expect(mod.lessons[1].title).toBe("Lesson one, later");
-    /* The original twenty minutes split between the halves. */
     expect(mod.lessons[0].minutes).toBe(10);
     expect(mod.lessons[1].minutes).toBe(10);
   });
@@ -187,7 +179,6 @@ describe("guards", () => {
 describe("approval sanity", () => {
   it("flags empty Modules and an empty Outline, which are not Depth bounds", () => {
     const withEmptyModule = apply(fixture(), { kind: "removeLesson", lessonId: "l1" });
-    /* Removing one lesson leaves three, so that shape is fine... */
     expect(outlineApprovalProblems(withEmptyModule)).toEqual([]);
 
     const emptied = apply(withEmptyModule, { kind: "removeLesson", lessonId: "l2" });

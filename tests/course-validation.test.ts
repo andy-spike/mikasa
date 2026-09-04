@@ -1,7 +1,3 @@
-/**
- * The documented creation limits. `validateCourseInput` is the single
- * authority — the form shows the same errors the action would reject with.
- */
 import { describe, expect, it } from "vitest";
 import {
   BACKGROUND_MAX_LENGTH,

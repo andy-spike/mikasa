@@ -1,7 +1,4 @@
-/**
- * The startup auth check (bug 15): the error names each missing
- * variable, names nothing that is present, and never prints a value.
- */
+// The startup auth check: errors name each missing variable, never a value.
 import { describe, expect, it } from "vitest";
 
 const { assertAuthConfig } = await import("@/lib/auth");
@@ -41,7 +38,6 @@ describe("assertAuthConfig", () => {
       expect(message).not.toContain("BETTER_AUTH_URL");
       expect(message).not.toContain("BETTER_AUTH_SECRET");
       expect(message).not.toContain("GOOGLE_CLIENT_SECRET");
-      /* Neither the env values nor anything secret-like appears. */
       expect(message).not.toContain("courses.example.com");
       expect(message).not.toContain(SECRET_LIKE);
     }

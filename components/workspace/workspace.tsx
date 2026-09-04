@@ -38,41 +38,23 @@ import { Resizer } from "./resizer";
 import { CommandPalette, type Command } from "./palette";
 import { ThemeToggle } from "./theme-toggle";
 
-/** Real completions carry the day the learner marked one; the server returns it. */
-
-/* The two rails. The Outline opens at 20rem and leaves a 2.75rem stub behind;
-   the panel opens at 21rem. Both are learner-resizable within the bounds
-   below, and the widths ride CSS variables, so the classes stay literal. */
-
 const RAIL_MIN = 16;
 const RAIL_MAX = 28;
 const PANEL_MIN = 18;
 const PANEL_MAX = 30;
 
-/* useLayoutEffect runs before paint on the client and warns on the server;
-   read the width where it lives instead. */
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 type Props = {
-  /** The published Course, in reading order (lib/course/reading). */
   course: ReadingCourse;
-  /** The Course's Sources, for the Lesson's inline links. */
   sources?: Map<string, SourceLink>;
-  /** Marks a Lesson's Exercise done on the server; returns the stamp. */
   onMark: (lessonId: string) => Promise<CompletionActionResult>;
-  /** Undoes one Exercise's completion on the server. */
   onUnmark: (lessonId: string) => Promise<CompletionActionResult>;
-  /** The Tutor's restored conversations, keyed by the Lesson id (#10). */
   tutorHistory?: Record<string, Turn[]>;
-  /** The Tailor's restored conversation (#12). */
   tailorTurns?: Turn[];
-  /** The Change plan under review, as the server has it. */
   tailorPlan?: PlanView | null;
-  /** The one staged Course revision, if the Tailor has one. */
   stagedPlan?: StagedPlanView | null;
-  /** Whether the Tutor's search index lags the published Course (bug 9). */
   searchStale?: boolean;
-  /** The plan as the server has it now, after a turn may have proposed one. */
   onRefreshPlan: () => Promise<PlanView | null>;
 };
 
@@ -95,33 +77,24 @@ export function Workspace({
     return seed;
   });
   const [openId, setOpenId] = useState<string | null>(null);
-  /* null until the learner collapses or expands; the width decides until then. */
   const [railChoice, setRailChoice] = useState<boolean | null>(null);
   const [panel, setPanel] = useState<PanelMode | null>(null);
   const [lastMode, setLastMode] = useState<PanelMode>("tutor");
-  /* The rails' widths, in rem. Held here so the resizer and the reading
-     column's reserves read the same numbers. */
   const [railWidth, setRailWidth] = useState(20);
   const [panelWidth, setPanelWidth] = useState(21);
-  /* A drag wins over the spec default below. */
   const railCustom = useRef(false);
-  /* The rail opens at 20rem, 23rem from xl up. Before paint on the client,
-     so an xl load never flashes the narrow rail. */
   useIsoLayoutEffect(() => {
     if (!railCustom.current && window.matchMedia("(min-width: 1280px)").matches) {
       setRailWidth(23);
     }
   }, []);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  /* transient: the handoff plays on the mark, never on a revisit */
   const [justDone, setJustDone] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const router = useRouter();
   const narrow = useIsMobile();
   const railOpen = railChoice ?? !narrow;
-  /* The keyboard and viewport listeners outlive a render, so they read
-     the rails through refs instead of closing over stale state. */
   const railOpenRef = useRef(railOpen);
   railOpenRef.current = railOpen;
   const panelRef = useRef(panel);
@@ -151,16 +124,10 @@ export function Workspace({
   const open = flat.find((l) => l.id === openId) ?? flat[0];
   const set = flat.filter((l) => l.status !== "unset");
   const doneCount = flat.filter((l) => doneAt[l.id]).length;
-  /* The accent means one thing: the Lesson you are up to. Which Lesson is
-     open is carried by a raised ground in the rail, never by colour. */
   const live = set.find((l) => !doneAt[l.id]) ?? null;
   const openIndex = flat.findIndex((l) => l.id === open.id);
   const next = flat.slice(openIndex + 1).find((l) => l.status !== "unset") ?? null;
 
-  /* Below 1280 the shell shows two regions at most: opening the panel
-     collapses the rail, and expanding the rail closes the panel. The
-     most recent action wins. Crossing the breakpoint with both open
-     collapses the rail — the panel was the deliberate action. */
   const below1279 = () => window.matchMedia("(max-width: 1279px)").matches;
 
   function showPanel(mode: PanelMode) {
@@ -174,9 +141,6 @@ export function Workspace({
     if (open && below1279() && panelRef.current !== null) setPanel(null);
   }
 
-  /* Crossing the breakpoint enforces the same invariant: shrunk below
-     1280 with both open, the rail gives way (the panel was the
-     deliberate action). Growing changes nothing. */
   useEffect(() => {
     const query = window.matchMedia("(max-width: 1279px)");
     const onChange = (e: MediaQueryListEvent) => {
@@ -201,8 +165,6 @@ export function Workspace({
       if (result.ok) {
         setDoneAt((d) => ({ ...d, [open.id]: result.stamp }));
       } else {
-        /* The mark did not land (stale revision, lost session): drop the
-           handoff so the Lesson reads exactly as the server has it. */
         setJustDone(null);
         router.refresh();
       }
@@ -225,10 +187,6 @@ export function Workspace({
     });
   }
 
-  /* The Tutor's turn (#10): the client posts only the Lesson it is
-     reading and the message; the server owns the conversation, the
-     history, and the authorization. The answer streams back as plain
-     text and grows in the pane's open turn. */
   async function askTutor(
     lessonId: string,
     text: string,
@@ -249,22 +207,15 @@ export function Workspace({
         if (value) onDelta(value);
       }
     } catch {
-      /* Network dropped mid-stream: the turn is not stored server-side,
-         and the pane says so. */
       return false;
     }
   }
 
-  /* The open Lesson's restored conversation, identity-stable between
-     renders so the pane's live thread survives a re-render mid-stream. */
   const tutorTurnsFor = useMemo<Turn[]>(
     () => tutorHistory?.[open.id] ?? [],
     [tutorHistory, open.id],
   );
 
-  /* The Tailor's turn (#12): one conversation for the whole Course, the
-     server owns its history. When a turn completes, the server may have
-     proposed a plan, so the review refreshes from it. */
   async function askTailor(text: string, onDelta: (chunk: string) => void): Promise<boolean> {
     try {
       const response = await fetch(`/api/courses/${course.id}/tailor`, {
@@ -285,14 +236,10 @@ export function Workspace({
         if (value) onDelta(value);
       }
     } catch {
-      /* Network dropped mid-stream: the turn is not stored server-side,
-         and the pane says so. */
       return false;
     }
   }
 
-  /* The plan under review: server-restored, then locally amended by the
-     review actions. A router refresh delivers the server's truth again. */
   const [plan, setPlan] = useState<PlanView | null | undefined>(tailorPlan);
   const [restoredPlan, setRestoredPlan] = useState(tailorPlan);
   if (tailorPlan !== restoredPlan) {
@@ -300,8 +247,6 @@ export function Workspace({
     setPlan(tailorPlan);
   }
 
-  /* Staging a revision (#14): the accepted operations become a candidate
-     the durable engine regenerates; the current Course stays readable. */
   const [staged, setStaged] = useState(false);
   const [stagedRevision, setStagedRevision] = useState(stagedPlan);
   const [restoredStagedRevision, setRestoredStagedRevision] = useState(stagedPlan);
@@ -311,9 +256,6 @@ export function Workspace({
   }
   const [, startStaging] = useTransition();
 
-  /* The Tutor's search index (bug 9): the server's staleness verdict,
-     locally amended while a rebuild runs. The strip clears itself when
-     the repair's re-embed lands. */
   const [searchStaleNow, setSearchStaleNow] = useState(searchStale ?? false);
   const [restoredStale, setRestoredStale] = useState(searchStale);
   if (searchStale !== restoredStale) {
@@ -342,13 +284,12 @@ export function Workspace({
           router.refresh();
         }
       } catch {
-        /* A failed poll changes nothing; the next one re-checks. */
+        void 0;
       }
     }, 3000);
     return () => clearInterval(timer);
   }, [rebuilding, course.id, router]);
 
-  /* The published changes, with their undo availability (#15). */
   const [published, setPublished] = useState<PublishedPlanRow[]>([]);
   const [publishedFailed, setPublishedFailed] = useState(false);
   const [publishedKey, setPublishedKey] = useState(0);
@@ -384,9 +325,6 @@ export function Workspace({
     });
   }
 
-  /* A failed staged revision can be given up on (bug 10): the plan is
-     superseded, the staged view clears, and the Tailor can propose a
-     fresh plan. Nothing published changes. */
   function discardStaged() {
     if (!stagedRevision) return;
     startStaging(async () => {
@@ -415,15 +353,10 @@ export function Workspace({
           : p,
       );
     } else {
-      /* The review did not land (plan applied elsewhere, lost session):
-         the server's state wins. */
       setPlan(await onRefreshPlan());
     }
   }
 
-  /* The failed stage, in Learner words: the line names where the
-     revision died, so a retry's promise ("keeps the finished work") is
-     legible (bug 2). */
   const stageWords = (stage: string | null): string | null => {
     if (!stage || stage === "queued") return null;
     if (stage === "lessons") return "writing the Lessons";
@@ -458,7 +391,6 @@ export function Workspace({
 
   const tailorTurnsStable = useMemo<Turn[]>(() => tailorTurns ?? [], [tailorTurns]);
 
-  /* Two keys, and both are navigation: the palette, and the Outline. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
@@ -576,44 +508,24 @@ export function Workspace({
         }
       />
 
-      {/* The panel is a rail of its own, so it gets its own provider: one
-          open state each, and neither can close the other by accident. */}
       <SidebarProvider
         open={panel !== null}
         onOpenChange={(o) => (o ? showPanel(lastMode) : setPanel(null))}
-        /* min-w-0: without it this wrapper's own min-content floor (the
-           capped blocks plus the panel gap) overflows the row, and the
-           fixed-position panel lands on top of the content. */
         className="min-h-0 min-w-0 flex-1"
         style={{ "--sidebar-width": `${panelWidth}rem` } as CSSProperties}
       >
-        {/* Standard behaviour: the reading column sits centred in whatever
-            room the open rails leave, at its default width, and only
-            narrows when a rail actually crowds it. min-w-0 lets it give
-            up ground all the way, instead of overflowing under the
-            fixed-positioned rails. */}
         <SidebarInset
           className={cn(
-            /* From 2xl up the closed panel keeps its width in reserve as a
-               right pad; open, the offcanvas gap already holds that space,
-               so the sentence never moves either way. */
             !panel && "mk-panel-reserve",
             "min-h-0 min-w-0 bg-canvas transition-[padding-right,padding-left] duration-200 ease-linear",
           )}
           style={
             {
-              /* Collapsed, the rail keeps a 2.75rem stub: the region takes
-                 the rest of the rail back as a left pad, so the sentence
-                 holds still. A sheet has no stub, so this stays a desktop
-                 rule. */
               ...(!railOpen && !narrow ? { paddingLeft: `${railWidth - 2.75}rem` } : null),
               ...(!panel ? { "--mk-panel-reserve": `${panelWidth}rem` } : null),
             } as CSSProperties
           }
         >
-          {/* the only chrome: what opens the palette, the panel, and the ground.
-              It spans the region, not the reading column: the search sits
-              centred over the sentence, the actions pin to the right edge. */}
           <div className="relative flex w-full shrink-0 items-center gap-2 px-5 py-3 sm:px-8 lg:px-10">
             <Button
               variant="icon"
@@ -624,9 +536,6 @@ export function Workspace({
               <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
             </Button>
 
-            {/* A real input, but a doorway: focusing it hands off to the
-                palette, which owns the typing. Centred over the column on
-                desktop, in the flow beside the buttons on a phone. */}
             <div className="relative min-w-0 flex-1 md:absolute md:left-1/2 md:top-1/2 md:w-80 md:max-w-[calc(100%-9rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:flex-none">
               <Search
                 className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-fg-3"

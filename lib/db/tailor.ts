@@ -1,13 +1,5 @@
 import "server-only";
 
-/**
- * The Tailor's server side (ticket #12): a per-Course conversation with
- * its own canonical history, and the Change plans its turns propose. A
- * plan pins itself to the Outline version (and, for a published Course,
- * the revision) it was drawn against; applying it later is rejected if
- * the Course has moved past that. Reviewing — accepting or discarding
- * operations — writes nothing to the Course itself.
- */
 import { and, asc, desc, eq, inArray, max } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { Db } from "./index";
@@ -61,20 +53,15 @@ export type ChangePlanRow = {
   status: string;
   baseOutlineVersion: number;
   baseRevisionNumber: number | null;
-  /** Set once the plan has become a staged revision (#14). */
   stagedOutlineVersion: number | null;
-  /** Set when the staged revision publishes (#14/#15). */
   publishedRevisionNumber: number | null;
-  /** The identities the accepted operations touch (#15). */
   touchedLessons: string[] | null;
   touchedModules: string[] | null;
-  /** Lessons whose content the plan regenerated (#15). */
   regeneratedLessons: string[] | null;
   operations: ChangeOperationRow[];
   createdAt: Date;
 };
 
-/** The conversation, if a turn has ever completed; none is born early. */
 export async function findTailorConversation(
   db: Db,
   ownerId: string,
@@ -89,10 +76,6 @@ export async function findTailorConversation(
   return row?.id;
 }
 
-/**
- * The Course's conversation, found or born. The Tailor talks about one
- * Course, not one Lesson, so the identity is the Course alone.
- */
 export async function getOrCreateTailorConversation(
   db: Db,
   ownerId: string,
@@ -127,7 +110,6 @@ export async function getOrCreateTailorConversation(
   return winner?.id;
 }
 
-/** The conversation's completed turns, in order. */
 export async function listTailorMessages(db: Db, conversationId: string): Promise<TailorTurnRow[]> {
   const rows = await db
     .select()
@@ -143,7 +125,6 @@ export async function listTailorMessages(db: Db, conversationId: string): Promis
   }));
 }
 
-/** The whole conversation, for restoring the pane on load. */
 export async function loadTailorHistory(
   db: Db,
   ownerId: string,
@@ -159,10 +140,6 @@ export async function loadTailorHistory(
   return listTailorMessages(db, conversation.id);
 }
 
-/**
- * One completed Tailor turn, both sides. The conversation is born here,
- * on the first completed turn — an interrupted stream leaves nothing.
- */
 export async function appendTailorTurn(
   db: Db,
   ownerId: string,
@@ -184,11 +161,6 @@ export async function appendTailorTurn(
   });
 }
 
-/**
- * Stores a proposed plan. The operations are validated by applying them
- * to a throwaway copy of the pinned Outline: a plan the Course could not
- * accept is refused at the door, before the Learner reviews anything.
- */
 export async function createChangePlan(
   db: Db,
   ownerId: string,
@@ -231,7 +203,6 @@ export async function createChangePlan(
   const baseRevisionNumber = revision ? revision.revisionNumber : null;
 
   const plan = await db.transaction(async (tx) => {
-    /* One review at a time: a fresh proposal closes the previous one. */
     await tx
       .update(changePlans)
       .set({ status: "superseded", updatedAt: new Date() })
@@ -289,7 +260,6 @@ function toOperationRow(row: typeof changeOperations.$inferSelect): ChangeOperat
   };
 }
 
-/** The newest plan still under review, if any. */
 export async function findProposedPlan(
   db: Db,
   ownerId: string,
@@ -329,12 +299,6 @@ export async function findProposedPlan(
   };
 }
 
-/**
- * Sets one operation's review status. Only a plan still under review
- * accepts changes, and only from "proposed": an accepted operation goes
- * back to proposed on request, a discarded one can be brought back, but
- * a plan already applied is frozen.
- */
 export async function setOperationStatus(
   db: Db,
   ownerId: string,
@@ -362,7 +326,6 @@ export async function setOperationStatus(
   return { ok: true };
 }
 
-/** The plan with its operations, for the apply paths (#13/#14). */
 export async function findPlan(
   db: Db,
   ownerId: string,
@@ -395,7 +358,6 @@ export async function findPlan(
   };
 }
 
-/** Every plan of the Course, for the undo-overlap check (#15). */
 export async function listPlansWithOperations(db: Db, courseId: string): Promise<ChangePlanRow[]> {
   const plans = await db
     .select()
@@ -426,16 +388,6 @@ export async function listPlansWithOperations(db: Db, courseId: string): Promise
   return all;
 }
 
-/**
- * Applies a plan's accepted operations to the Outline (ticket #13). All
- * accepted operations land in one transaction — the Outline's own change
- * door, so a conflict or a refused operation rejects the whole plan
- * without partial application. Applying always produces a new Outline
- * version (a content-only plan bumps the version with unchanged data), so
- * the Course specification reads as stale and approval reconciles it.
- *
- * Discarded operations are simply not in the list; they change nothing.
- */
 export async function applyPlanToOutline(
   db: Db,
   ownerId: string,
@@ -496,10 +448,6 @@ export async function applyPlanToOutline(
 
     const structureOps = accepted.filter(isStructureOp);
 
-    /* The Outline's own door does the conflict check (base version),
-       applies the grammar, and inserts the next version — all inside
-       this transaction. Zero structure ops still bumps the version, so
-       a content-only plan marks the specification stale. */
     const applied = await applyOutlineChange(
       tx,
       ownerId,
@@ -515,8 +463,6 @@ export async function applyPlanToOutline(
       };
     }
 
-    /* The content demands ride in the plan until approval reconciles the
-       specification; applying freezes the plan as their record. */
     await tx
       .update(changePlans)
       .set({ status: "applied", updatedAt: new Date() })
@@ -530,12 +476,6 @@ export async function applyPlanToOutline(
   });
 }
 
-/**
- * The content demands still in force (ticket #13): every applied plan's
- * accepted prose/Exercise operations, the latest demand per Lesson winning,
- * filtered to Lessons the Outline still has. Approval feeds these to the
- * reconciliation, which bakes them into the specification.
- */
 export async function activeContentAdjustments(
   db: Db,
   courseId: string,
@@ -564,12 +504,6 @@ export async function activeContentAdjustments(
   return [...byLesson.values()].filter((a) => live.has(a.lessonId));
 }
 
-/**
- * One plan's accepted content demands, as LessonAdjustments: the prose
- * instruction or the exact Exercise, per Lesson. The staged revision's
- * reconciliation (#17) bakes these into the specification, so generation
- * honors what the Learner accepted for the Lessons it regenerates.
- */
 export async function planContentAdjustments(db: Db, planId: string): Promise<LessonAdjustment[]> {
   const operations = await db
     .select()
@@ -594,7 +528,6 @@ export async function planContentAdjustments(db: Db, planId: string): Promise<Le
   return [...byLesson.values()];
 }
 
-/** Any accepted structural operation changes the Course shape or sequence. */
 export async function planHasStructuralChanges(db: Db, planId: string): Promise<boolean> {
   const operations = await db
     .select({ payload: changeOperations.payload, status: changeOperations.status })
@@ -612,11 +545,8 @@ export type StageRevisionResult =
       runId: string;
       baseRevisionNumber: number;
       stagedOutlineVersion: number;
-      /** Lessons whose content must be regenerated (new or rewritten). */
       regenerateLessonRefs: string[];
-      /** Lessons to re-embed after publish: regenerated, retitled, or gone. */
       embedLessonRefs: string[];
-      /** Lessons that left the Course; their fragments are deleted. */
       removedLessonRefs: string[];
     }
   | {
@@ -632,16 +562,9 @@ export type StageRevisionResult =
     };
 
 /**
- * Stages a plan as a candidate Course revision (ticket #14), in one
- * transaction: the accepted structure operations produce a NEW Outline
- * version, the unaffected Lessons are copied into it (with their new
- * titles, so renames ride along), and the plan records the staged
- * version. Nothing here touches the current revision — the published
- * Course stays readable until the staged candidate publishes.
- *
- * The affected sets ride back to the workflow: only regenerated Lessons
- * rerun generation, review, and Sandbox work; only regenerated,
- * retitled, or removed Lessons re-embed.
+ * Stages a plan as a new outline version without touching the published
+ * revision. A newer revision or outline version rejects the whole plan,
+ * and only one staged candidate exists at a time.
  */
 export async function stagePlanRevision(
   db: Db,
@@ -678,8 +601,6 @@ export async function stagePlanRevision(
       };
     }
 
-    /* The Course the Learner reviewed is the Course that must still be
-       current: a newer revision (or Outline) rejects the whole plan. */
     const revision = await currentRevision(tx, courseId);
     if (!revision || plan.baseRevisionNumber !== revision.revisionNumber) {
       return {
@@ -704,7 +625,6 @@ export async function stagePlanRevision(
       };
     }
 
-    /* One staged candidate at a time, so two plans cannot interleave. */
     const [staged] = await tx
       .select({ id: changePlans.id })
       .from(changePlans)
@@ -749,10 +669,6 @@ export async function stagePlanRevision(
       return { ok: false, reason: "invalid", message: problems.join(" ") };
     }
 
-    /* The affected sets, from the Outline the plan was drawn against and
-       the staged one. New ids (added Lessons, split halves) and Lessons
-       with content demands regenerate; renamed Lessons copy with their
-       new title and only re-embed; removed Lessons leave no row. */
     const affected = affectedLessonSets(baseOutline.data, nextData, accepted);
     const stagedVersion = baseOutline.version + 1;
     await tx.insert(outlines).values({
@@ -783,12 +699,6 @@ export async function stagePlanRevision(
       spec: baseSpec.spec,
     });
 
-    /* Copy the untouched Lessons into the staged version. The workflow's
-       resume machinery then sees them as written and regenerates only
-       the affected ones. A plan staged after a discarded staged revision
-       (bug 10) draws against a base version whose regenerated Lessons
-       were never written; their content comes from the published
-       revision instead. */
     const rows = await tx
       .select()
       .from(lessons)
@@ -840,9 +750,6 @@ export async function stagePlanRevision(
       .values({ courseId, outlineVersion: stagedVersion })
       .returning();
 
-    /* The identities the accepted operations touch, for the undo rule
-       (#15): the operations' own ids, the Lessons of removed Modules,
-       and the Lessons the plan adds. */
     const touched = touchedIdentities(accepted, baseOutline.data);
     for (const m of nextData.modules)
       for (const l of m.lessons)
@@ -875,7 +782,6 @@ export async function stagePlanRevision(
   });
 }
 
-/** The plan's staged candidate, if it has one (#14). */
 export async function findStagedPlan(
   db: Db,
   ownerId: string,
@@ -926,13 +832,6 @@ export type ResumeStagedRevision =
     }
   | { ok: false; reason: "not-found" | "not-retryable"; message: string };
 
-/**
- * Re-arms a staged revision whose workflow failed (ticket #14): the
- * affected sets are recomputed from the plan's own accepted operations
- * against the staged Outline, and the failed run is reopened so the
- * engine's memoization resumes past every step that succeeded. The
- * current Course was never touched by the failure.
- */
 export async function resumeStagedRevision(
   db: Db,
   ownerId: string,
@@ -1007,14 +906,7 @@ export type DiscardStagedRevision =
   | { ok: true }
   | { ok: false; reason: "not-found" | "not-discardable"; message: string };
 
-/**
- * Gives up on a staged revision (bug 10): a plan whose run failed — or
- * crashed between publication and the plan mark — can be discarded, so
- * the Tailor can propose a fresh one. Only the plan moves, to
- * superseded, the terminal status for dead plans. The published Course,
- * the staged Outline rows, and the run stay exactly as they are:
- * versions are append-only, and an unread version harms nothing.
- */
+/** Discards a settled staged revision. Refuses while work is still running: a discard could kill a revision about to publish. */
 export async function discardStagedRevision(
   db: Db,
   ownerId: string,
@@ -1038,10 +930,6 @@ export async function discardStagedRevision(
     };
   }
 
-  /* The run must have settled: failed, or succeeded without publishing
-     the staged version (the crash-between-publish-and-mark edge). While
-     work is still going, the Learner waits or retries — a discard could
-     kill a revision about to publish. */
   const [run] = await db
     .select({ status: generationRuns.status })
     .from(generationRuns)
@@ -1086,15 +974,6 @@ export async function discardStagedRevision(
   return { ok: true };
 }
 
-/**
- * Records a staged revision's publication and applies the Completion
- * rules (#15), in the transaction: the Course's Completion state is
- * snapshotted exactly as the revision swaps (undo restores it), and the
- * operations that redefine "done" — Exercise rewrites, splits, merges —
- * reset the Lessons they touched. Prose, renames, and moves preserve;
- * added Lessons start incomplete; removed Lessons keep their Completion
- * with their content, orphaned but retained.
- */
 export async function markRevisionPublished(
   db: Db,
   planId: string,
@@ -1113,8 +992,6 @@ export async function markRevisionPublished(
       .filter((o) => o.status === "accepted")
       .map((o) => o.payload as ChangePlanOp);
 
-    /* The resets resolve against the Outline the plan was drawn against:
-       a merge's survivor depends on the direction and the shape then. */
     const [baseOutline] = await tx
       .select()
       .from(outlines)
@@ -1156,10 +1033,8 @@ export type UndoResult =
   | {
       ok: true;
       revisionNumber: number;
-      /** The Outline version the undo wrote (the new current revision's). */
       outlineVersion: number;
       restoredLessons: string[];
-      /** Lessons the undo removed from the Course, whose fragments must go. */
       removedLessons: string[];
     }
   | {
@@ -1169,14 +1044,9 @@ export type UndoResult =
     };
 
 /**
- * Undoes a published plan (#15), in one transaction: a new current
- * revision whose Outline is the current shape with the plan's touched
- * identities restored to what the base revision had — later, independent
- * changes keep their place, which is exactly what the overlap rule
- * guarantees is safe. Content comes back from the base revision for
- * everything the plan regenerated or removed; Completion comes back from
- * the plan's snapshot for the touched identities. Any refusal leaves the
- * current revision and Completion untouched.
+ * Undoes a published plan in one transaction. The overlap rule is the
+ * safety: a later published plan that touched the same Lesson or Module
+ * identities blocks the undo; independent later changes keep their place.
  */
 export async function undoPlanRevision(
   db: Db,
@@ -1212,8 +1082,6 @@ export async function undoPlanRevision(
       };
     }
 
-    /* Nothing may be in flight: a staged candidate is being built on top
-       of the very revision this undo would swap away. */
     const [inflight] = await tx
       .select({ id: changePlans.id })
       .from(changePlans)
@@ -1227,8 +1095,6 @@ export async function undoPlanRevision(
       };
     }
 
-    /* The overlap rule: a later published plan that touched the same
-       Module or Lesson identities blocks the undo. */
     const later = await tx
       .select()
       .from(changePlans)
@@ -1260,10 +1126,6 @@ export async function undoPlanRevision(
       };
     }
 
-    /* The overlap rule above is the staleness guard, so an older plan
-       undoes fine once nothing overlapping stands after it: the undo
-       rebuilds only the touched identities and leaves independent later
-       changes exactly where they are. */
     const revision = await currentRevision(tx, courseId);
     if (!revision) {
       return { ok: false, reason: "invalid", message: "The Course has no current revision." };
@@ -1298,12 +1160,6 @@ export async function undoPlanRevision(
       throw error;
     }
 
-    /* Content: everything the plan regenerated or removed comes back
-       from the base revision; every other Lesson keeps the content the
-       current revision has. The base REVISION's version is the faithful
-       source: a plan drawn after a discarded staged revision (bug 10)
-       has a base Outline version whose regenerated Lessons were never
-       written. */
     const restored = new Set([...(plan.regeneratedLessons ?? []), ...plan.touchedLessons]);
     const [baseRevisionRow] = await tx
       .select({ outlineVersion: revisions.outlineVersion })
@@ -1336,8 +1192,6 @@ export async function undoPlanRevision(
     const undoVersion = currentOutline.version + 1;
     await tx.insert(outlines).values({ courseId, version: undoVersion, data: inverted });
 
-    /* Lessons the undo removes (an added Lesson leaving): their fragments
-       must be deleted, not just left behind. */
     const undoRefs = new Set(inverted.modules.flatMap((m) => m.lessons.map((l) => l.id)));
     const removedLessons = [...currentByRef.values()]
       .map((r) => r.lessonRef)
@@ -1372,7 +1226,6 @@ export async function undoPlanRevision(
     }
     if (rows.length > 0) await tx.insert(lessons).values(rows);
 
-    /* The swap: a new revision number over the undo version. */
     const [newest] = await tx
       .select({ n: max(revisions.revisionNumber) })
       .from(revisions)
@@ -1382,8 +1235,6 @@ export async function undoPlanRevision(
       .insert(revisions)
       .values({ courseId, revisionNumber: nextNumber, outlineVersion: undoVersion });
 
-    /* Completion: the touched identities go back to the moment before
-       the plan published. */
     await tx
       .delete(completions)
       .where(

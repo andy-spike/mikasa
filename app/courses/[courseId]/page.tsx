@@ -12,13 +12,6 @@ import { findProposedPlanAction, findStagedPlanAction } from "@/lib/actions/tail
 import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
 import { requireLearner } from "@/lib/session";
 
-/**
- * The reading workspace, over the current published revision, with the
- * Learner's own Completion restored (ticket #8). A Course still on its way
- * (designing, at the Outline, generating, reviewing, failed) opens at its
- * Outline route, which renders the right stage; only a published Course
- * reads here, and only through its newest revision.
- */
 export default async function CoursePage({ params }: PageProps<"/courses/[courseId]">) {
   const { user } = await requireLearner();
   const { courseId } = await params;
@@ -37,26 +30,18 @@ export default async function CoursePage({ params }: PageProps<"/courses/[course
   );
   const sources = toSourceLinks(published.sourceRows);
 
-  /* The Tutor's conversations, restored turn by turn (#10): the server's
-     history is what the threads show on arrival. */
   const stored = await loadTutorHistory(db, user.id, courseId);
   const tutorHistory: Record<string, { from: "learner" | "tutor"; text: string }[]> = {};
   for (const [lessonRef, turns] of stored) {
     tutorHistory[lessonRef] = turns.map((t) => ({ from: t.role, text: t.content }));
   }
 
-  /* The Tailor's conversation and the plan under review, if one is
-     proposed (#12). Separate tables, separate thread, same rule: the
-     server's history is what the pane shows on arrival. */
   const tailorTurns = (await loadTailorHistory(db, user.id, courseId)).map((t) => ({
     from: t.role,
     text: t.content,
   }));
   const proposedPlan = await findProposedPlanAction(courseId);
 
-  /* The Tutor's search index can lag the published Course (bug 9): an
-     embedding failure, or an undo whose re-embed has not finished. The
-     pane then offers the rebuild. */
   const searchStale = await searchIsIncomplete(db, courseId);
 
   return (

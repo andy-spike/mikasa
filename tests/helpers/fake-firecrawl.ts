@@ -1,8 +1,3 @@
-/**
- * A fake Firecrawl. `SourceSearcher` is the only shape design needs, so
- * the fake is a function returning fixed pages; it records the queries it
- * was asked, and tests assert nothing reached the network.
- */
 import type { FetchedPage, SourceSearcher } from "@/lib/course/design";
 
 export function fakeFirecrawl(pages: FetchedPage[]) {

@@ -1,17 +1,3 @@
-/**
- * Course design: the durable work that turns one Course row into a private
- * specification and a visible Outline.
- *
- * Every step is a plain function with explicit inputs and outputs and its
- * external providers (`model`, `searcher`) injected, so tests script them
- * and never touch a network. `workflows/course-design.ts` wraps these in
- * Workflow steps; nothing here knows about Workflow.
- *
- * The order follows docs/research/cohesive-course-generation.md: gather
- * Sources when Grounding is on, draft the Outline (the visible artifact,
- * bounded by Depth), then materialize the private specification against the
- * Outline's stable Lesson ids.
- */
 import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
 import { nanoid } from "nanoid";
@@ -20,42 +6,29 @@ import { designProviderOptions, groundingProviderOptions } from "@/lib/model";
 import { depthBounds, type CourseInput, type DepthId } from "./limits";
 import type { CourseSpecification, GatheredSource, OutlineData, OutlineModule } from "./types";
 
-/** A design failure worth recording on the Course, not a bug to crash on. */
 export class DesignError extends Error {
   name = "DesignError";
 }
 
-/** What design needs to know about the Course being designed. */
 export type DesignCourse = Pick<
   CourseInput,
   "topic" | "goal" | "background" | "language" | "depth" | "grounding"
 >;
 
-/** One fetched page, before an excerpt is chosen for it. */
 export type FetchedPage = {
   title: string;
   url: string;
-  /** ISO timestamp of the fetch. */
   fetchedAt: string;
   content: string;
 };
 
-/**
- * The slice of Firecrawl design needs: search the web, scrape every hit's
- * markdown, return pages. `firecrawlSearcher` builds the real one; tests
- * hand a fake.
- */
 export type SourceSearcher = (query: string, limit: number) => Promise<FetchedPage[]>;
 
-/** How many Sources one design run gathers. */
 export const SOURCE_LIMIT = 6;
 
-/** Rough ceiling on an excerpt, so Lessons cite passages, not pages. */
 export const EXCERPT_MAX_CHARS = 600;
 
 function courseLanguageName(language: string): string {
-  // Mirrors the fixed set in limits.ts; kept textual so prompts read as
-  // prose without importing UI labels into the domain.
   const names: Record<string, string> = {
     en: "English",
     es: "Spanish",
@@ -70,7 +43,6 @@ function searchQuery(course: DesignCourse): string {
   return [course.topic, course.goal].filter(Boolean).join(" — ");
 }
 
-/** The real Firecrawl-backed searcher; the only place Firecrawl is named. */
 export function firecrawlSearcher(): SourceSearcher {
   return async (query, limit) => {
     const { Firecrawl } = await import("firecrawl");
@@ -103,18 +75,12 @@ export function firecrawlSearcher(): SourceSearcher {
   };
 }
 
-/**
- * Step: gather Sources. With Grounding off this is a no-op that returns an
- * empty list — the Course is built on the model's built-in knowledge alone
- * and the specification's evidence ledger stays empty.
- */
 export async function gatherSources(
   searcher: SourceSearcher,
   course: DesignCourse,
 ): Promise<FetchedPage[]> {
   if (!course.grounding) return [];
   const pages = await searcher(searchQuery(course), SOURCE_LIMIT);
-  // Drop pages with nothing to excerpt; an empty page is not a Source.
   return pages.filter((p) => p.content.trim().length > 0);
 }
 
@@ -127,12 +93,6 @@ const excerptsSchema = z.object({
   ),
 });
 
-/**
- * Step: pick the relevant excerpt for each fetched page. The model reads
- * every page against the Topic and Goal; a page the model skips (or a
- * failed parse) falls back to the page's opening lines, so a Source is
- * never lost to a formatting hiccup.
- */
 export async function selectExcerpts(
   model: LanguageModel,
   course: DesignCourse,
@@ -180,7 +140,6 @@ export async function selectExcerpts(
   return result;
 }
 
-/** Fetched pages plus their chosen excerpts, with stable refs assigned. */
 export async function collectSources(
   searcher: SourceSearcher,
   excerptModel: LanguageModel,
@@ -198,10 +157,8 @@ export async function collectSources(
   }));
 }
 
-/** What the Outline call returns before stable ids are assigned. */
 export type OutlineDraft = {
   modules: { title: string; lessons: { title: string; summary: string; minutes: number }[] }[];
-  /** Parts of the contract the specification call reuses. */
   terminalPerformances: string[];
   exclusions: string[];
   learnerAssumptions: string[];
@@ -216,8 +173,7 @@ const outlineSchema = z.object({
         z.object({
           title: z.string().min(1),
           summary: z.string().min(1),
-          // Models return real numbers ("45") and occasionally "45.5";
-          // rounding here beats failing a whole outline over it.
+          // Models sometimes return fractional minutes; rounding beats failing the outline.
           minutes: z.number().positive(),
         }),
       ),
@@ -251,11 +207,6 @@ function depthIntent(depth: string): string {
   }
 }
 
-/**
- * Step: draft the Outline (and the contract parts the specification needs).
- * Returns the raw draft; `buildOutline` is what checks Depth bounds and
- * assigns the stable ids.
- */
 export async function draftOutline(
   model: LanguageModel,
   course: DesignCourse,
@@ -304,12 +255,6 @@ export async function draftOutline(
   return output;
 }
 
-/**
- * Step: validate a draft against the Depth bounds and freeze it into an
- * Outline with stable ids. Out-of-bounds drafts fail the design (retryable,
- * ticket #7) rather than silently trimming the Course. `newId` defaults to
- * nanoid; tests inject a counter so ids are predictable.
- */
 export function buildOutline(
   draft: OutlineDraft,
   depth: string,
@@ -384,12 +329,6 @@ const specificationSchema = z.object({
   ),
 });
 
-/**
- * Step: materialize the private Course specification against the frozen
- * Outline. The model references real Lesson ids and Source refs, so the
- * spec stays joinable to the Outline the learner can see; unknown
- * references are dropped, and a Lesson the model ignored fails the design.
- */
 export async function designSpecification(
   model: LanguageModel,
   course: DesignCourse,

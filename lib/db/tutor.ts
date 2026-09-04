@@ -1,15 +1,6 @@
 import "server-only";
 
-/**
- * The Tutor's canonical history (ticket #10). One conversation per
- * Lesson; only completed turns are stored — the Learner's message and the
- * Tutor's answer land together, after the stream has finished cleanly, so
- * an interrupted turn leaves nothing a retry would duplicate.
- *
- * Every entry point re-checks that the Course belongs to the caller and
- * the Lesson exists in the published revision: the history belongs to
- * exactly one Learner by construction.
- */
+/** Only completed turns are stored; an interrupted turn leaves nothing a retry would duplicate. */
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "./index";
 import { courses, outlines, tutorConversations, tutorMessages } from "./schema";
@@ -27,11 +18,6 @@ export type ConversationResolution =
   | { ok: true; conversationId: string | undefined }
   | { ok: false; reason: "not-found" | "not-published" | "unknown-lesson"; message: string };
 
-/**
- * Finds the conversation for a Lesson of an owned, published Course, if
- * one exists yet. Reading it never creates anything: an interrupted
- * turn's thread simply does not exist until a turn completes.
- */
 export async function findTutorConversation(
   db: Db,
   ownerId: string,
@@ -80,7 +66,6 @@ export async function findTutorConversation(
   return { ok: true, conversationId: existing?.id };
 }
 
-/** The conversation's completed turns, in order. */
 export async function listTutorMessages(db: Db, conversationId: string): Promise<TutorTurnRow[]> {
   const rows = await db
     .select()
@@ -96,10 +81,6 @@ export async function listTutorMessages(db: Db, conversationId: string): Promise
   }));
 }
 
-/**
- * Every conversation of a Course with its turns, keyed by the Lesson id —
- * what the reading page needs to restore all threads at once.
- */
 export async function loadTutorHistory(
   db: Db,
   ownerId: string,
@@ -140,14 +121,7 @@ export async function loadTutorHistory(
   return byLesson;
 }
 
-/**
- * Writes one completed turn — the Learner's message and the Tutor's
- * answer, together, in one transaction, creating the conversation if this
- * is its first completed turn. Nothing else ever writes here, so an
- * interrupted stream leaves no trace: no conversation, no message, no
- * hole a retry could duplicate. If a concurrent writer claimed the
- * sequence numbers, the append retries once against the new head.
- */
+/** Both sides land together in one transaction; a concurrent sequence claim retries once against the new head. */
 export async function appendTutorTurn(
   db: Db,
   ownerId: string,
@@ -158,7 +132,6 @@ export async function appendTutorTurn(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       return await db.transaction(async (tx) => {
-        /* The conversation is born with its first completed turn. */
         await tx.insert(tutorConversations).values({ courseId, lessonRef }).onConflictDoNothing();
         const [conversation] = await tx
           .select()

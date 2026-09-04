@@ -1,9 +1,3 @@
-/**
- * Course generation, end to end minus the network: the declared dependency
- * order, the per-Lesson Source lookup rules, the whole candidate written
- * through the same functions the Workflow steps call, and the candidate's
- * unreadability while unpublished.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { desc, eq } from "drizzle-orm";
 
@@ -167,8 +161,6 @@ describe("generationOrder", () => {
   });
 
   it("corrects an Outline whose positions contradict the dependency graph", () => {
-    /* Same four Lessons, but l3 (which requires g1 from l1) is placed
-       before l1. */
     const wrong = {
       modules: [
         {
@@ -239,7 +231,6 @@ describe("generateLesson", () => {
     expect(content.recallPrompt).toContain("Lesson one");
     expect(content.exercise.task).toContain("Lesson one");
     expect(content.bridge).toBeTruthy();
-    /* src-9 is invented; src-1 survives. */
     expect((content.body[1] as { sourceRefs?: string[] }).sourceRefs).toEqual(["src-1"]);
   });
 
@@ -383,10 +374,9 @@ describe("a full candidate", () => {
   });
 
   it("leaves an unpublished candidate without any reading path", async () => {
-    /* The guarantee is structural: rows exist only under (courseId,
-       outlineVersion), and every Learner-facing read (tickets #6/#8) goes
-       through a published revision pointer that does not exist yet. What
-       the test pins is that nothing here flips the Course to "ready". */
+    /* Rows exist only under (courseId, outlineVersion); Learner reads go
+       through a published revision pointer that does not exist yet, so
+       nothing here flips the Course to "ready". */
     const courseId = await seedCourse();
     const [run] = await db
       .insert(generationRuns)

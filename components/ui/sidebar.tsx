@@ -22,8 +22,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { PanelLeftIcon } from "lucide-react";
 
 const SIDEBAR_WIDTH = "16rem";
-/* Mikasa: a sheet on a phone gives the Outline as much of the screen as it
-   can take and still read as a layer over the Lesson. */
 const SIDEBAR_WIDTH_MOBILE = "min(22rem, 88vw)";
 const SIDEBAR_WIDTH_ICON = "3rem";
 
@@ -61,11 +59,6 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile();
 
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
-  // Mikasa: one open state across both widths, no cookie. Two of these
-  // providers are on screen at once, so the sheet cannot keep a second
-  // truth and the caller owns the only one. The workspace persists nothing.
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
   const setOpen = React.useCallback(
@@ -80,14 +73,8 @@ function SidebarProvider({
     [setOpenProp, open],
   );
 
-  // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => setOpen(!open), [open, setOpen]);
 
-  // Mikasa: no global toggle key here. Two providers would both answer it;
-  // the workspace binds one, for the Outline, beside its palette key.
-
-  // We add a state so that we can do data-state="expanded" or "collapsed".
-  // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? "expanded" : "collapsed";
 
   const contextValue = React.useMemo<SidebarContextProps>(
@@ -183,7 +170,6 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
     >
-      {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
         className={cn(
@@ -198,12 +184,9 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         data-side={side}
-        /* Mikasa: a sidebar parked off the canvas is out of the document, not
-           merely out of sight. The icon rail keeps its stub, so it stays. */
         inert={collapsible === "offcanvas" && state === "collapsed" ? true : undefined}
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
-          // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
@@ -559,7 +542,6 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean;
 }) {
-  // Random width between 50 to 90%.
   const [width] = React.useState(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`;
   });

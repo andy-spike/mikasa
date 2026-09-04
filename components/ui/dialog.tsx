@@ -28,9 +28,6 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        /* Adapted: no blur. DESIGN.md gives the blurred scrim to the mobile
-           sheet; the palette sits on the plain scrim, and the two are not
-           the same layer. */
         "fixed inset-0 isolate z-50 bg-scrim duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className,
       )}

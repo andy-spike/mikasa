@@ -1,10 +1,3 @@
-/**
- * Course design, step by step, with every provider scripted: the model
- * answers from `tests/helpers/fake-model`, Firecrawl from
- * `tests/helpers/fake-firecrawl`, and Postgres is PGlite. The Workflow
- * wrapper calls exactly these functions, so proving them here is proving
- * the design; the wrapper itself stays directives and glue.
- */
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import {
@@ -62,7 +55,6 @@ function draftOf(modules: number, lessons: number): OutlineDraft {
   };
 }
 
-/** Three Modules of two Lessons: inside the reach bounds. */
 const REACH_DRAFT = draftOf(3, 2);
 
 const fetched = [
@@ -139,7 +131,6 @@ describe("selectExcerpts", () => {
     const excerpts = await selectExcerpts(broken.model, course, found);
 
     expect(excerpts.size).toBe(2);
-    /* Every page falls back to its own opening lines. */
     for (const p of found) {
       expect(excerpts.get(p.url)).toBe(p.content.slice(0, 600).trim());
     }
@@ -204,7 +195,6 @@ describe("draftOutline and buildOutline", () => {
     expect(outline.modules[0].lessons.map((l) => l.ordinal)).toEqual([1, 2]);
     expect(outline.modules[1].lessons.map((l) => l.ordinal)).toEqual([3, 4]);
     expect(outline.modules[2].lessons.map((l) => l.ordinal)).toEqual([5, 6]);
-    /* Ids are unique, stable strings: module first, then its lessons. */
     const ids = [
       outline.modules[0].id,
       ...outline.modules[0].lessons.map((l) => l.id),
@@ -311,11 +301,6 @@ describe("designSpecification", () => {
   });
 });
 
-/**
- * The whole design, as the Workflow steps run it, against real tables:
- * Sources stored with the required fields, the Outline versioned, the
- * specification private, and the Course left at the Outline checkpoint.
- */
 describe("design persistence", () => {
   let counter = 0;
 
@@ -406,7 +391,6 @@ describe("design persistence", () => {
     const outline = await latestOutline(db, courseRow.id);
     expect(outline?.version).toBe(1);
     expect(outline?.data.modules).toHaveLength(3);
-    /* Module ids and lesson ids come from the same stable string space. */
     expect(outline?.data.modules[0].id).toBe("l1");
     expect(outline?.data.modules[0].lessons[0].id).toBe("l2");
 
@@ -459,7 +443,6 @@ describe("design persistence", () => {
     const failed = await latestDesignRun(db, courseRow.id);
     expect(failed?.status).toBe("failed");
     expect(failed?.error).toBe("The model returned no outline.");
-    /* Nothing to approve yet: no outline rows exist. */
     expect(await latestOutline(db, courseRow.id)).toBeUndefined();
   });
 
@@ -473,7 +456,6 @@ describe("design persistence", () => {
 
     const retry = await startDesignRun(db, courseRow.id);
     expect(retry.id).not.toBe(first.id);
-    /* A retried Course is designing again, not stuck at its checkpoint. */
     const designing = await db.select().from(courses).where(eq(courses.id, courseRow.id)).limit(1);
     expect(designing[0].status).toBe("designing");
 

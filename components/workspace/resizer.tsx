@@ -5,31 +5,25 @@ import { useSidebar } from "@/components/ui/sidebar";
 
 type Props = {
   side: "left" | "right";
-  /** current rail width, in rem */
   width: number;
   min: number;
   max: number;
   onResize: (width: number) => void;
 };
 
-/* A drag strip on the rail's inner edge. The rail width itself lives in the
-   workspace's state; this only turns pointer movement into new values. */
 export function Resizer({ side, width, min, max, onResize }: Props) {
   const { state, isMobile } = useSidebar();
   const drag = useRef<{ x: number; start: number } | null>(null);
 
-  /* The collapsed stub is its own affordance, and a sheet cannot be dragged. */
   if (isMobile || state === "collapsed") return null;
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     drag.current = { x: e.clientX, start: width };
-    /* Capture keeps the drag alive when the pointer leaves the strip. */
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
-      /* a synthetic pointer has nothing to capture; the handlers still run */
+      void 0;
     }
-    /* The rails settle with a 200ms animation; mid-drag that reads as lag. */
     document.documentElement.setAttribute("data-resizing", "");
   }
 

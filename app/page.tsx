@@ -6,19 +6,10 @@ import { GoogleMark } from "@/components/google-mark";
 import { ThemeToggle } from "@/components/workspace/theme-toggle";
 import { authClient } from "@/lib/auth-client";
 
-/**
- * The door, not a pitch.
- *
- * There is one provider and one action, so there is one control. This is
- * also the sign-in page — /sign-in and /sign-up both land here rather than
- * repeating the same button under a different heading.
- */
 export default function Landing() {
   const [signingIn, setSigningIn] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  /* Better Auth answers with the Google consent screen; the callback comes
-     back through /api/auth/callback/google and lands on /courses. */
   function signIn() {
     if (signingIn) return;
     setSigningIn(true);

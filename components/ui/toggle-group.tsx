@@ -42,8 +42,6 @@ function ToggleGroup({
       data-orientation={orientation}
       style={{ "--gap": spacing } as React.CSSProperties}
       className={cn(
-        /* Adapted: the group is the switch's track — one canvas-inset
-           ground with the chosen segment raised on top of it. */
         "group/toggle-group flex w-fit flex-row items-center gap-0.5 bg-panel p-0.5 data-vertical:flex-col data-vertical:items-stretch",
         className,
       )}

@@ -1,11 +1,3 @@
-/**
- * Discarding a failed staged revision (bug 10): a plan whose staged run
- * failed used to be retryable only — a Learner whose revision kept
- * failing was stuck, because staging refuses a second plan while one is
- * staged. Discard supersedes the dead plan and nothing else: the
- * published Course, the current revision, and the unread staged Outline
- * stay as they are, and a fresh plan can stage.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import type { ChangePlanOp } from "@/lib/course/change-plan";
@@ -86,7 +78,6 @@ async function signInWithGoogle(email: string): Promise<string> {
   return cookieHeader(callback);
 }
 
-/** A published Course, with a generation run and written Lessons for version 1. */
 async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
@@ -181,7 +172,6 @@ async function userIdOf(email: string): Promise<string> {
   return user.id;
 }
 
-/** A plan with every operation accepted, as the pane's review leaves it. */
 async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<string> {
   const created = await createChangePlan(db, await userIdOf(OWNER), courseId, ops);
   expect(created.ok).toBe(true);
@@ -193,7 +183,6 @@ async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<
   return plan.id;
 }
 
-/** Stages a plan for real, so the staged run and Outline version exist. */
 async function stage(courseId: string, planId: string): Promise<string> {
   const staged = await stagePlanRevision(db, await userIdOf(OWNER), courseId, planId);
   expect(staged.ok).toBe(true);
@@ -208,7 +197,6 @@ describe("discarding a staged revision", () => {
     ]);
     const runId = await stage(courseId, planId);
 
-    /* The staged run fails; the published Course is never touched. */
     await failGenerationRun(db, courseId, runId, "The model refused.", {
       touchCourse: false,
     });
@@ -224,8 +212,6 @@ describe("discarding a staged revision", () => {
     expect(course.status).toBe("ready");
     expect((await currentRevision(db, courseId))?.revisionNumber).toBe(1);
 
-    /* A fresh plan can stage now: nothing is staged any more, and the
-       Course has not moved since the new plan was drawn. */
     const freshPlanId = await proposeAndAccept(courseId, [
       { kind: "lessonProse", lessonId: "l2", instruction: "Lead with the pigment." },
     ]);
@@ -240,7 +226,6 @@ describe("discarding a staged revision", () => {
     ]);
     const runId = await stage(courseId, planId);
 
-    /* The run is going: no discard. */
     headerState.current = new Headers({ cookie: ownerCookie });
     const refused = await discardStagedRevisionAction(courseId, planId);
     expect(refused).toMatchObject({ ok: false, reason: "not-discardable" });

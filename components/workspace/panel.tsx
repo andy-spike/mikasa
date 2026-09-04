@@ -17,36 +17,21 @@ export type { PlanView, Turn } from "@/components/tailor-conversation";
 
 type Props = {
   mode: PanelMode;
-  /** The restored conversation for the open Lesson; server-owned history. */
   tutorTurns?: Turn[];
-  /**
-   * Sends one Learner message and streams the Tutor's answer through
-   * `onDelta`; resolves true when the answer completed. Absent until the
-   * Tutor is wired: the composer then stands down.
-   */
   onAsk?: (text: string, onDelta: (chunk: string) => void) => Promise<boolean>;
-  /** The Tailor's conversation, restored from the server (#12). */
   tailorTurns?: Turn[];
-  /** Streams one Tailor turn; resolves true when it completed. */
   onTailorAsk?: (text: string, onDelta: (chunk: string) => void) => Promise<boolean>;
-  /** The Change plan under review, if one is proposed. */
   tailorPlan?: PlanView;
   onAccept: (operationId: string) => void;
   onDiscard: (operationId: string) => void;
   onRestore: (operationId: string) => void;
-  /** Staging a revision (#14): the reading page's apply action. */
   tailorApply?: ReactNode;
-  /** A failed staged revision's retry and discard, outside any plan. */
   stagedFailedSlot?: ReactNode;
-  /** One line of pane-level status, e.g. that a revision is staging. */
   tailorStatus?: string;
-  /** A fixed strip above the Tutor's thread (bug 9): the stale-search notice. */
   tutorNotice?: ReactNode;
-  /** The published changes and their undo affordances (#15). */
   publishedSlot?: ReactNode;
   onMode: (mode: PanelMode) => void;
   onClose: () => void;
-  /** the drag strip on the panel's inner edge; the workspace owns the width */
   resizer?: ReactNode;
 };
 
@@ -78,8 +63,6 @@ export function Panel({
     >
       <SidebarHeader className="gap-0 border-b border-hair px-3 pt-3 pb-3">
         <div className="flex items-center justify-between gap-3">
-          {/* The panel sits on --panel, so its switch track insets to the
-              canvas rather than to --panel. */}
           <ToggleGroup
             multiple={false}
             value={[mode]}
@@ -131,7 +114,6 @@ export function Panel({
         )}
       </SidebarContent>
 
-      {/* Sits on the panel's inner edge, over the fixed container. */}
       {resizer}
     </Sidebar>
   );

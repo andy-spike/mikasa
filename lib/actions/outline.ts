@@ -1,12 +1,5 @@
 "use server";
 
-/**
- * Outline checkpoint actions: structure changes (one op per call, from the
- * editor) and approval. Thin on purpose — authorize, validate the op
- * shape, delegate to `lib/db/outline`; the model call for reconciliation
- * is the one substantive piece, and it runs before any state changes so a
- * failed reconciliation leaves the Course exactly as it was.
- */
 import { start } from "workflow/api";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -66,7 +59,6 @@ const opSchema = z.discriminatedUnion("kind", [
 
 export type OutlineActionResult = OutlineChangeResult;
 
-/** Applies one editor operation as a new Outline version. */
 export async function applyOutlineOpAction(
   courseId: string,
   baseVersion: number,
@@ -88,12 +80,6 @@ export type ApprovalResult =
   | { ok: true; duplicate: boolean }
   | { ok: false; reason: OutlineRejection; message: string };
 
-/**
- * Approves the Outline the Learner sees: reconciles a stale specification
- * against it, then opens the generation run pinned to that Outline
- * version. Re-approving an already-approved version does nothing (the run
- * exists); approving a stale version is a conflict.
- */
 export async function approveOutlineAction(
   courseId: string,
   baseVersion: number,
@@ -128,18 +114,14 @@ export async function approveOutlineAction(
     };
   }
 
-  // A re-approval of the version a run is already pinned to is a no-op;
-  // this also covers double clicks while the first approval is in flight.
+  // A re-approval of the version a run is already pinned to is a no-op (covers double clicks in flight).
   if (course.status !== "awaiting-outline-approval") {
     const opened = await openGenerationRun(db, user.id, courseId, baseVersion);
     if (opened.ok) return { ok: true, duplicate: true };
     return opened;
   }
 
-  // Reconcile BEFORE anything changes: a failed model call leaves the
-  // Course awaiting approval, editable, with the old spec intact. The
-  // Learner's accepted content demands (#13) ride into the reconciled
-  // specification, so generation honors them.
+  // Reconcile before anything changes: a failed model call leaves the Course as it was.
   const adjustments = await activeContentAdjustments(db, courseId, outline.data);
   if (specRow && specIsStale(specRow, outline.version)) {
     try {
@@ -170,8 +152,6 @@ export async function approveOutlineAction(
     await start(generateCourseWorkflow, [courseId, opened.run.id, outline.version]);
     return { ok: true, duplicate: false };
   } catch {
-    // Mirror design: if the engine cannot take the run, the Course fails
-    // visibly and stays retryable instead of pretending to generate.
     await failGenerationRun(
       db,
       courseId,

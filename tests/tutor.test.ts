@@ -1,9 +1,3 @@
-/**
- * The Tutor's conversation (ticket #10), end to end: the real route
- * handler against PGlite with a real session and a streaming model —
- * streamed success, persistence with stable identities, a failed stream
- * leaving no trace, retry, history restoration, and ownership rejection.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
@@ -17,7 +11,6 @@ vi.mock("@/lib/db", async () => {
 const headerState = vi.hoisted(() => ({ current: new Headers() }));
 vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
 
-/* The Tutor's model is the streaming fake; its prompts are recorded. */
 const tutorModelState = vi.hoisted(() => ({
   current: undefined as
     | ReturnType<typeof import("./helpers/fake-model").streamingModel>
@@ -115,7 +108,6 @@ async function signInWithGoogle(email: string): Promise<string> {
   return cookieHeader(callback);
 }
 
-/** A published two-Lesson Course with one Source, for the given owner. */
 async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
@@ -168,7 +160,6 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   return course.id;
 }
 
-/** One Tutor turn through the real route; returns the streamed text. */
 async function turn(
   cookie: string,
   courseId: string,
@@ -233,7 +224,6 @@ describe("a completed turn", () => {
     expect(rows[0].content).toBe("Is PARTITION BY just GROUP BY?");
     expect(rows[1].content).toContain("PARTITION BY keeps every row");
 
-    /* A second turn continues the same conversation, after the first. */
     const second = await turn(ownerCookie, courseId, "l1", "And WHERE?");
     expect(second.text).toContain("PARTITION BY keeps every row");
     const again = await db
@@ -260,7 +250,6 @@ describe("a completed turn", () => {
     expect(prompt).toContain("window functions in SQL");
     expect(prompt).toContain("Postgres window docs");
     expect(prompt).toContain("Is PARTITION BY just GROUP BY?");
-    /* The second turn's prompt carries the first exchange as history. */
     await turn(ownerCookie, courseId, "l1", "And WHERE?");
     const secondPrompt = tutorModelState.current!.prompts[1];
     expect(secondPrompt).toContain("PARTITION BY keeps every row");
@@ -297,7 +286,6 @@ describe("an interrupted turn", () => {
   it("persists nothing, and a retry starts a clean turn", async () => {
     const courseId = await seedPublishedCourse(OWNER);
 
-    /* The model fails mid-stream: no answer arrives, nothing is stored. */
     tutorModelState.current = streamingModel([{ error: true }]);
     const failed = await turn(ownerCookie, courseId, "l1", "Why did my totals change?");
     expect(failed.text).toBe("");
@@ -307,8 +295,6 @@ describe("an interrupted turn", () => {
     ).toBe(0);
     expect((await db.select().from(tutorMessages)).length).toBe(0);
 
-    /* The retry — the same question, on a model that answers — completes
-       and lands once. */
     tutorModelState.current = streamingModel([
       "WHERE runs before the window does; PARTITION BY keeps every row.",
     ]);
@@ -325,7 +311,6 @@ describe("history restoration", () => {
     await turn(ownerCookie, courseId, "l1", "First question?");
     await turn(ownerCookie, courseId, "l2", "Second Lesson question?");
 
-    /* A fresh session for the same Learner. */
     headerState.current = new Headers();
     ownerCookie = await signInWithGoogle(OWNER);
     headerState.current = new Headers({ cookie: ownerCookie });

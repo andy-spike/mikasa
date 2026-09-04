@@ -1,12 +1,3 @@
-/**
- * Google's G, unaltered.
- *
- * The one graphic in this product that does not follow the theme and does
- * not obey the One Accent Rule. It is a third-party identity mark, not an
- * interface icon: Google's brand terms require it in its own four colours,
- * so the hexes are hardcoded here on purpose and are answered in neither
- * ground. Everything the workspace draws itself still follows the tokens.
- */
 export function GoogleMark({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg viewBox="0 0 48 48" aria-hidden className={className}>

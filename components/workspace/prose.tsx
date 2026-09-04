@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { ReadingBlock, SourceLink } from "@/lib/course/reading";
 
-/** Where a cited claim comes from: the Source's title, at its URL. */
 export function SourceLinks({ sources }: { sources: SourceLink[] }) {
   return (
     <p className="flex max-w-(--measure) flex-wrap items-center gap-x-3 gap-y-1">
@@ -21,7 +20,6 @@ export function SourceLinks({ sources }: { sources: SourceLink[] }) {
   );
 }
 
-/** `code`, **emphasis**, and [Source](url) links inside a Lesson paragraph. */
 export function Inline({ text }: { text: string }) {
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g);
   return (
@@ -44,7 +42,6 @@ export function Inline({ text }: { text: string }) {
             </code>
           );
         }
-        /* A cited Source, in the Lesson's own link dress. */
         const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
         if (link) {
           return (
@@ -68,11 +65,6 @@ export function Inline({ text }: { text: string }) {
 const SQL_TOKEN =
   /(--[^\n]*)|('(?:[^']|'')*')|\b(select|from|where|group|order|by|partition|over|as|with|sum|avg|count|min|max|rows|range|between|unbounded|preceding|following|current|row|and|or|not|null|nulls|first|last|interval|on|join|left|inner|case|when|then|else|end|distinct|having|limit|desc|asc|insert|into|values|delete|update|set|create|table)\b/gi;
 
-/**
- * Weight carries the keywords; one dim step, italicised for strings, carries
- * the rest. No colour of any kind in code: the accent means the Lesson you
- * are up to, and code is never that.
- */
 function highlightSql(code: string): ReactNode[] {
   const out: ReactNode[] = [];
   let last = 0;
@@ -112,7 +104,6 @@ export function LessonBlock({
   sourceFor,
 }: {
   block: ReadingBlock;
-  /** Resolves a Source ref to its link; absent, citations render as text only. */
   sourceFor?: (ref: string) => SourceLink | undefined;
 }) {
   const sources =
@@ -160,7 +151,6 @@ export function LessonBlock({
   }
 
   if (block.kind === "note") {
-    /* Set into the flow at one step up, with a hairline. Not a callout card. */
     return (
       <>
         <aside className="max-w-(--measure) border-l border-rule py-1 pl-4">

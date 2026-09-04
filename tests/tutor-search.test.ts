@@ -1,10 +1,3 @@
-/**
- * The Tutor's retrieval (ticket #11), end to end against real pgvector
- * (PGlite with the vector extension): fragments embedded at 1536
- * dimensions at publication, exact cosine Course search scoped to the
- * owned Course, Firecrawl web substitution, read-only tools, inline
- * Source links in the answer, and the four-step agent ceiling.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
@@ -18,7 +11,6 @@ vi.mock("@/lib/db", async () => {
 const headerState = vi.hoisted(() => ({ current: new Headers() }));
 vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
 
-/* The Tutor's model and embedder are fakes; web search is stubbed. */
 const tutorModelState = vi.hoisted(() => ({
   current: undefined as
     | ReturnType<typeof import("./helpers/fake-model").streamingModel>
@@ -154,7 +146,6 @@ const WINDOW_LESSON = {
   bridge: "Next, joins.",
 };
 
-/** A published Course about windows, with fragments embedded. */
 async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
@@ -245,7 +236,6 @@ describe("fragments", () => {
       },
     ]);
 
-    /* Intro + 2 body blocks + worked example + exercise + recall. */
     expect(fragments).toHaveLength(6);
     expect(fragments.map((f) => f.ordinal)).toEqual([0, 1, 2, 3, 4, 5]);
     expect(fragments[1].content).toContain("window function sees every row");
@@ -261,8 +251,6 @@ describe("exact Course retrieval", () => {
     const stored = await listFragments(db, courseId);
     expect(stored.length).toBeGreaterThanOrEqual(6);
 
-    /* The query shares a keyword with the window fragments; the exact
-       cosine order puts a window fragment first. */
     const hits = await searchFragments(db, courseId, keywordEmbed("windows over rows"), 3);
     expect(hits).toHaveLength(3);
     expect(hits[0].content.toLowerCase()).toContain("window");
@@ -273,7 +261,6 @@ describe("exact Course retrieval", () => {
   it("never returns another Course's fragments", async () => {
     const courseId = await seedPublishedCourse(OWNER);
 
-    /* A second owner and Course, with its own fragments. */
     await db.insert(users).values({
       id: "u2",
       name: "Other",
@@ -350,7 +337,6 @@ describe("the Tutor's tools", () => {
     expect(result.hits[0].text.toLowerCase()).toContain("window");
     expect(embedState.queries).toEqual([]);
 
-    /* Read-only: the Course's rows are exactly as they were. */
     expect(await listFragments(db, courseId)).toHaveLength(
       (await listFragments(db, courseId)).length,
     );
@@ -393,13 +379,10 @@ describe("a turn with retrieval", () => {
     expect(answer.status).toBe(200);
     expect(answer.text).toContain("Postgres window docs");
 
-    /* The tool really ran: the query was embedded, and the model saw the
-       retrieved fragments before answering. */
     expect(embedState.queries).toContain("how do window functions work");
     const secondPrompt = tutorModelState.current!.prompts[1];
     expect(secondPrompt).toContain("searchCourse");
 
-    /* The completed turn is stored once, as history. */
     expect((await db.select().from(tutorMessages)).length).toBe(2);
   });
 
@@ -420,7 +403,6 @@ describe("a turn with retrieval", () => {
 
   it("stops after at most four agent steps even when the model keeps calling tools", async () => {
     const courseId = await seedPublishedCourse(OWNER);
-    /* Every step demands another search; the ceiling must end it. */
     tutorModelState.current = streamingModel([
       { toolCall: { name: "searchCourse", input: { query: "windows" } } },
       { toolCall: { name: "searchCourse", input: { query: "joins" } } },

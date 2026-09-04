@@ -52,16 +52,6 @@ export function json(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/**
- * A scripted streaming model. Each `streamText` call consumes the next
- * response in order (the last repeats); the prompt it saw is recorded, so
- * tests can assert the Tutor was given the real context. A response may
- * be:
- *   - a plain string — streamed in word chunks;
- *   - `{ error: true }` — fails the stream mid-way (an interrupted turn);
- *   - `{ toolCall: { name, input } }` — one tool call, then finish, so
- *     the SDK executes the tool and steps again.
- */
 import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
 
 export type StreamResponse =

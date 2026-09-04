@@ -20,11 +20,7 @@ const MONTHS = [
   "DEC",
 ] as const;
 
-/**
- * The day, as the interface stamps it ("1 SEP 2026"). A fixed month table,
- * not the locale: ICU hands back "SEPT" for September in en-GB, and the
- * three-letter rhythm does not bend for one month.
- */
+// Fixed month table, not the locale: ICU hands back "SEPT" for September in en-GB.
 export function formatDayStamp(date: Date): string {
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }

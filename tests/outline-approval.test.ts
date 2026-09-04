@@ -1,10 +1,3 @@
-/**
- * The Outline checkpoint end to end, minus the network: the real server
- * actions run against PGlite with a real Better Auth session, the Workflow
- * engine is a stub that records what approval handed it, and the
- * reconciliation model is a fake that re-aligns alignment rows to the
- * Outline it is given.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -25,7 +18,6 @@ const navigation = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => navigation);
 
-/* The durable engine, stubbed: `start` records what it was handed. */
 const workflowStarts = vi.hoisted(() => ({
   calls: [] as { courseId: string; runId: string; outlineVersion: number }[],
 }));
@@ -95,7 +87,6 @@ async function signInWithGoogle(email: string): Promise<string> {
 const OWNER_EMAIL = "owner@example.com";
 const OTHER_EMAIL = "other@example.com";
 
-/** The shape the tests start from: two Modules of two Lessons. */
 const OUTLINE = {
   modules: [
     {
@@ -275,7 +266,6 @@ describe("approveOutlineAction", () => {
     asOwner();
     const courseId = await seedAwaitingApproval(OWNER_EMAIL);
 
-    /* A manual change made the spec stale. */
     const changed = await applyOutlineOpAction(courseId, 1, {
       kind: "renameLesson",
       lessonId: "l1",

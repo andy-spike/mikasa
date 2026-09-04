@@ -1,18 +1,3 @@
-/**
- * Durable staged revisions (ticket #14). A published Course's accepted
- * Change plan stages a candidate: the Outline version exists, the
- * unaffected Lessons are copied into it, and this workflow regenerates
- * only the affected Lessons, reviews only their content, and publishes
- * the whole candidate atomically — the current Course stays readable
- * until that swap.
- *
- * The shape is the main generation workflow's, deliberately: same steps,
- * same correction budget, same failure and resume rules (ticket #7).
- * Three differences: finishing the run never moves the Course's status
- * (it is "ready" and stays so), the review's model-driven scope is the
- * regenerated Lessons only, and publication refuses if a newer revision
- * exists — a stale candidate can never replace a newer Course.
- */
 import type { PromptSource } from "@/lib/course/generate";
 import type { GenerationContext } from "@/lib/db/lessons";
 import type { OutlineLesson } from "@/lib/course/types";
@@ -57,16 +42,6 @@ async function stepOrder(context: GenerationContext): Promise<OutlineLesson[]> {
   return generationOrder(context.spec, context.outline.data);
 }
 
-/**
- * Brings the specification to the staged shape (#17): the plan's accepted
- * prose/Exercise demands and every Lesson the staged Outline has —
- * including the ids its adds and splits invented at staging — reconciled
- * by the model and saved, so generation reads a specification that joins
- * to the Outline it writes. Skipped when the specification already
- * covers the shape and carries exactly the plan's demands: a rename-only
- * plan spends no model call. A failed reconciliation fails the run like
- * any other step; the retry runs it again.
- */
 async function stepReconcileSpec(
   planId: string,
   context: GenerationContext,
@@ -88,12 +63,7 @@ async function stepReconcileSpec(
     .from(generationRuns)
     .where(eq(generationRuns.id, runId))
     .limit(1);
-  /* Any step past the queue means a previous attempt got through here:
-     the specification it reconciled is the one the written Lessons were
-     generated against, and re-running it would rewrite the spec under
-     them. "queued" is the staged run's only pre-lesson value, and a
-     failure during reconciliation itself leaves it, so a retry
-     re-runs exactly the unfinished step. */
+  // Past "queued" a previous attempt already reconciled; re-running would rewrite the spec under written Lessons.
   if (run && run.currentStep !== "queued") return context;
   if (
     !(await planHasStructuralChanges(db, planId)) &&
@@ -112,9 +82,6 @@ async function stepReconcileSpec(
   return { ...context, spec: reconciled };
 }
 
-/* One affected Lesson: the main workflow's own step. The copied Lessons
-   are already written for this version, so the resume check in the
-   workflow body skips them — "only affected Lessons rerun". */
 async function stepGenerateLesson(
   context: GenerationContext,
   runId: string,
@@ -173,7 +140,6 @@ async function stepGenerateLesson(
   return { newSource };
 }
 
-/** Completeness only: the Course is published and stays that way. */
 async function stepFinishStaged(
   courseId: string,
   outlineVersion: number,
@@ -271,7 +237,6 @@ async function stepReviewRound(
   return { runId, round, findings: found };
 }
 
-/** Rewrites one affected Lesson against its findings and saves it. */
 async function stepCorrectLesson(
   courseId: string,
   outlineVersion: number,
@@ -327,7 +292,6 @@ async function stepOpenReviewRun(courseId: string, outlineVersion: number): Prom
   "use step";
   const { openReviewRun } = await import("@/lib/db/review");
   const { db } = await import("@/lib/db");
-  /* The Course is published: a staged review never moves its status. */
   const run = await openReviewRun(db, courseId, outlineVersion, {
     touchCourse: false,
   });
@@ -341,10 +305,7 @@ async function stepFailReview(courseId: string, runId: string, message: string):
   await failReview(db, courseId, runId, message, { touchCourse: false });
 }
 
-/**
- * The stale guard, the last step before publication: if a newer revision
- * exists, this candidate is obsolete and must never replace it.
- */
+// Stale guard: a candidate must never replace a newer revision.
 async function stepCheckStillCurrent(
   courseId: string,
   baseRevisionNumber: number,
@@ -373,13 +334,6 @@ async function stepPublish(
     : { ok: false, reason: result.reason };
 }
 
-/**
- * Re-embeds exactly the affected Lessons (ticket #14): regenerated and
- * retitled Lessons get fresh fragments, removed Lessons' fragments are
- * deleted, and every other Lesson's fragments stay as they are. An
- * embedding failure is recorded on the run alone (bug 9): the revision
- * stays published and the repair workflow can finish the job later.
- */
 async function stepEmbedAffected(
   courseId: string,
   outlineVersion: number,
@@ -410,7 +364,6 @@ async function stepEmbedAffected(
   }
 }
 
-/** The plan's terminal states, written from the workflow. */
 async function stepMarkPlan(
   planId: string,
   status: "published" | "failed",
@@ -418,9 +371,6 @@ async function stepMarkPlan(
 ): Promise<void> {
   "use step";
   if (status === "published") {
-    /* Publication and the Completion rules land together (#15): the
-       snapshot is taken exactly as the swap lands, and the operations
-       that redefine "done" reset their Lessons. */
     const { markRevisionPublished } = await import("@/lib/db/tailor");
     const { db } = await import("@/lib/db");
     await markRevisionPublished(db, planId, revisionNumber!);
@@ -439,11 +389,9 @@ async function stepFailRun(courseId: string, runId: string, message: string): Pr
   "use step";
   const { failGeneration } = await import("@/lib/db/lessons");
   const { db } = await import("@/lib/db");
-  /* The Course is published and stays on duty; only the run fails. */
   await failGeneration(db, courseId, runId, message, { touchCourse: false });
 }
 
-/** Marks a passed review as passed, so publication may look at it. */
 async function stepFinishReviewRun(runId: string): Promise<void> {
   "use step";
   const { finishReviewRun } = await import("@/lib/db/review");
@@ -451,12 +399,6 @@ async function stepFinishReviewRun(runId: string): Promise<void> {
   await finishReviewRun(db, runId, "succeeded");
 }
 
-/**
- * Where a retry re-enters (ticket #7's rules, on a staged candidate).
- * A revision for the staged version means the publication landed and
- * only the bookkeeping is left; a succeeded review with no open
- * findings goes straight back to publication; otherwise review.
- */
 async function stepReviewResumePoint(
   courseId: string,
   outlineVersion: number,
@@ -470,8 +412,7 @@ async function stepReviewResumePoint(
   const { revisions, reviewRuns, reviewFindings } = await import("@/lib/db/schema");
   const { and, desc, eq } = await import("drizzle-orm");
 
-  /* The staged version already published (a crash between publication
-     and the plan mark): the candidate's work is complete. */
+  // A crash between publication and the plan mark still counts as done.
   const [revision] = await db
     .select({ revisionNumber: revisions.revisionNumber })
     .from(revisions)
@@ -498,15 +439,6 @@ async function stepReviewResumePoint(
   return { action: "review" };
 }
 
-/**
- * One durable pass over a staged revision: regenerate the affected
- * Lessons (the copied ones are already written for this version), review
- * the whole candidate's structure and the affected content, correct at
- * most twice, refuse if the Course moved on, and publish atomically.
- * A failure leaves the current revision on duty and the plan staged —
- * a retry resumes from the first unwritten step, exactly like a new
- * Course's retry (ticket #7).
- */
 export async function stageRevisionWorkflow(
   courseId: string,
   planId: string,
@@ -526,10 +458,6 @@ export async function stageRevisionWorkflow(
   }
 
   try {
-    /* The staged shape must join to the specification before anything
-       reads it: Lessons the plan added or split have no alignment yet,
-       removed ones may still sit in the graph, and the plan's accepted
-       prose/Exercise demands must ride into generation (#17). */
     const prepared = await stepReconcileSpec(planId, context, runId);
     const order = await stepOrder(prepared);
     await stepMarkStep(runId, "lessons");
@@ -539,8 +467,6 @@ export async function stageRevisionWorkflow(
     const already = new Set(prepared.written);
 
     for (let i = 0; i < order.length; i++) {
-      /* Copied Lessons are written for this version: they are kept, not
-         regenerated. Only the affected ones rerun. */
       if (already.has(order[i].id)) {
         priorLessons.push({ title: order[i].title, summary: order[i].summary });
         continue;
@@ -567,9 +493,6 @@ export async function stageRevisionWorkflow(
       };
     }
 
-    /* Review and publication, resuming at the exact failed stage: a
-       review that already passed goes straight back to publication, and
-       a publication that already landed finishes the bookkeeping. */
     const resume = await stepReviewResumePoint(courseId, outlineVersion);
     if (resume.action === "done") {
       await stepEmbedAffected(courseId, outlineVersion, embedLessonRefs, runId);
@@ -628,9 +551,6 @@ export async function stageRevisionWorkflow(
 
     await stepFinishReviewRun(reviewRunId);
 
-    /* The stale guard: a candidate drawn against revision N must never
-       replace revision N+1. The review that passed stays passed — the
-       failure belongs to the generation run, whose retry re-publishes. */
     const stillCurrent = await stepCheckStillCurrent(courseId, baseRevisionNumber);
     if (!stillCurrent.ok) {
       await stepFailRun(
@@ -645,8 +565,7 @@ export async function stageRevisionWorkflow(
     await stepMarkStep(runId, "publish");
     const published = await stepPublish(courseId, outlineVersion, reviewRunId);
     if (!published.ok) {
-      /* The review stays succeeded: a retry resumes at publication
-         instead of reviewing from round 0 (bug 2). */
+      // Review stays succeeded so a retry resumes at publication.
       await stepFailRun(
         courseId,
         runId,
@@ -659,8 +578,6 @@ export async function stageRevisionWorkflow(
     await stepMarkPlan(planId, "published", published.revisionNumber);
     return { ok: true as const, revisionNumber: published.revisionNumber };
   } catch (error) {
-    /* The current Course is untouched; the plan stays staged, and a
-       retry resumes from the first unwritten step. */
     await stepFailRun(courseId, runId, errorMessage(error));
     return { ok: false as const, reason: "revision-failed" };
   }

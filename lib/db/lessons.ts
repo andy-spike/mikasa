@@ -1,13 +1,3 @@
-/**
- * Repositories for the generated candidate (ticket #5). Lesson rows are
- * keyed to their stable Outline lesson id and the Outline version they
- * were written for, so a regenerated revision (ticket #14) is new rows,
- * never an overwrite of what the Learner may be reading.
- *
- * The Workflow passes the server-side Course id; Learner-facing reads go
- * through published revisions only (ticket #6), so an unpublished
- * candidate has no reading path at all.
- */
 import { and, eq } from "drizzle-orm";
 import type { Db } from "./index";
 import { courses, courseSpecs, generationRuns, lessons, outlines, sources } from "./schema";
@@ -16,7 +6,6 @@ import { parseLessonContent } from "../course/content";
 import type { CourseSpecification } from "../course/types";
 import { newLessonSourceRef, type PromptSource } from "../course/generate";
 
-/** The context one generation run needs, loaded server-side. */
 export type GenerationContext = {
   course: {
     id: string;
@@ -41,7 +30,6 @@ export type GenerationContext = {
     };
   };
   sources: PromptSource[];
-  /** Lesson ids already written for this Outline version (a resumed run). */
   written: string[];
 };
 
@@ -95,7 +83,6 @@ export async function loadGenerationContext(
   };
 }
 
-/** Writes one Lesson's content and records the run's progress. */
 export async function saveLessonContent(
   db: Db,
   courseId: string,
@@ -139,7 +126,6 @@ export async function saveLessonContent(
   });
 }
 
-/** Persists a Source found by a Lesson-specific lookup, deduped by URL. */
 export async function saveLessonSource(
   db: Db,
   courseId: string,
@@ -167,11 +153,6 @@ export async function saveLessonSource(
   return row.ref;
 }
 
-/**
- * Closes the run when the candidate is whole: every planned Lesson exists
- * for this Outline version. The Course moves to "reviewing" — review
- * itself is ticket #6.
- */
 export async function finishGeneration(
   db: Db,
   courseId: string,
@@ -211,8 +192,7 @@ export async function finishGeneration(
       .update(generationRuns)
       .set({ status: "succeeded", currentStep: "complete", updatedAt: new Date() })
       .where(eq(generationRuns.id, runId));
-    /* A staged revision (ticket #14) finishes its run without touching
-       the Course: it is published and stays readable throughout. */
+    /* A staged revision finishes without touching the Course. */
     if (options?.promoteCourse === false) return;
     await tx
       .update(courses)
@@ -222,7 +202,6 @@ export async function finishGeneration(
   return { ok: true, missing: 0 };
 }
 
-/** A failed run keeps its message and the Course stays retryable (ticket #7). */
 export async function failGeneration(
   db: Db,
   courseId: string,
@@ -235,8 +214,6 @@ export async function failGeneration(
       .update(generationRuns)
       .set({ status: "failed", error: message, updatedAt: new Date() })
       .where(eq(generationRuns.id, runId));
-    /* A staged revision (ticket #14) fails without touching the Course:
-       the published Course stays on duty and the plan stays retryable. */
     if (options?.touchCourse === false) return;
     await tx
       .update(courses)
@@ -245,7 +222,6 @@ export async function failGeneration(
   });
 }
 
-/** Lesson rows for one Outline version, keyed by their Outline lesson id. */
 export async function getLessonsForVersion(
   db: Db,
   courseId: string,
@@ -278,7 +254,6 @@ export async function getLessonsForVersion(
   }));
 }
 
-/** The candidate as review and correction consume it, in Outline order. */
 export async function getLessonContentsForVersion(
   db: Db,
   courseId: string,

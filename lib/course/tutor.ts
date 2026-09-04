@@ -1,25 +1,13 @@
-/**
- * The Tutor (ticket #10): a conversational agent over one published
- * Course. It reads the current Lesson, the Outline, the compact Course
- * specification, the recent conversation, and the Course's Sources — and
- * it can change nothing. No tools exist on this call; the prompt says so
- * in the same breath as its job, so the model never promises an edit.
- *
- * History is ModelMessages: the server's stored turns become the
- * conversation the model continues.
- */
+// The Tutor can change nothing: no tools exist on this call.
 import type { ModelMessage } from "ai";
 import type { ReadingLesson, ReadingCourse, SourceLink } from "./reading";
 import type { TutorTurnRow } from "@/lib/db/tutor";
 
-/** How much stored history rides with each turn. */
 const HISTORY_WINDOW = 20;
 
 type TutorContext = {
   course: Pick<ReadingCourse, "topic" | "goal">;
-  /** The Outline, module by module, for orientation only. */
   outline: { numeral: string; title: string; lessons: { title: string }[] }[];
-  /** The compact specification: what the Learner is aiming at. */
   spec: {
     depth: string;
     language: string;
@@ -27,13 +15,10 @@ type TutorContext = {
     premise: string;
     finalExercise: { task: string; acceptanceChecks: string[] };
   };
-  /** The Lesson the Learner is reading right now. */
   lesson: ReadingLesson;
-  /** The Course's Sources, for pointing at evidence. */
   sources: SourceLink[];
 };
 
-/** One Lesson's content, as the Tutor reads it. */
 function lessonText(lesson: ReadingLesson): string {
   const lines: string[] = [
     `Lesson: ${lesson.title}`,
@@ -56,7 +41,6 @@ function lessonText(lesson: ReadingLesson): string {
   return lines.join("\n");
 }
 
-/** The Tutor's standing instructions plus the Course context it reads. */
 export function tutorSystemPrompt(context: TutorContext): string {
   const outlineLines = context.outline
     .map((m) => `${m.numeral}. ${m.title}: ${m.lessons.map((l) => l.title).join(" · ")}`)
@@ -113,11 +97,6 @@ export function tutorSystemPrompt(context: TutorContext): string {
   ].join("\n");
 }
 
-/**
- * The conversation the model continues: the stored history as
- * ModelMessages and the new Learner message last. The Tutor's standing
- * instructions ride separately, through `instructions`.
- */
 export function tutorPrompt(history: TutorTurnRow[], message: string): ModelMessage[] {
   const recent = history.slice(-HISTORY_WINDOW);
   return [

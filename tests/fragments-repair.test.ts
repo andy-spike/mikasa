@@ -1,11 +1,5 @@
-/**
- * Recoverable fragment embedding (bug 9): the Tutor's search index can
- * fail to embed at publication without invalidating anything. An embed
- * failure leaves the Course ready and the revision published, records
- * the failure on the run alone, and the repair finishes the job; an
- * undo re-embeds the restored Lessons so the Tutor stops serving
- * pre-undo content.
- */
+// Embed failure leaves the Course published and records the failure on the
+// run alone; the repair finishes the job, and undo re-embeds the lessons.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import type { ChangePlanOp } from "@/lib/course/change-plan";
@@ -27,8 +21,6 @@ const navigation = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => navigation);
 
-/* The durable engine, captured: tests run the workflow bodies in place
-   and assert on what the actions dispatched. */
 const startCalls = vi.hoisted(() => ({
   list: [] as { workflow: unknown; args: unknown[] }[],
 }));
@@ -39,8 +31,6 @@ vi.mock("workflow/api", () => ({
   },
 }));
 
-/* The review's model-driven slices: nothing finds anything, so a
-   revision's review rounds pass without a model. */
 vi.mock("@/lib/course/review", () => ({
   structuralFindings: () => [],
   factualFindings: async () => [],
@@ -49,13 +39,12 @@ vi.mock("@/lib/course/review", () => ({
   MAX_CORRECTION_ROUNDS: 2,
 }));
 
-/* The generation model is scripted per test; the embedder is switched
-   per test, so a failure can be injected exactly once. */
 const modelState = vi.hoisted(() => ({
   current: undefined as ReturnType<typeof import("./helpers/fake-model").scriptedModel> | undefined,
 }));
 const embedState = vi.hoisted(() => ({
-  current: (texts: string[]) => Promise.resolve(texts.map(() => new Array<number>(1536).fill(0.01))),
+  current: (texts: string[]) =>
+    Promise.resolve(texts.map(() => new Array<number>(1536).fill(0.01))),
 }));
 vi.mock("@/lib/model", async () => {
   const actual = await vi.importActual<typeof import("@/lib/model")>("@/lib/model");
@@ -173,7 +162,6 @@ function lessonJson(title: string): string {
   });
 }
 
-/** One reconcile response covering the staged shape, as the model returns it. */
 function reconcileJson(outline: { modules: { lessons: { id: string }[] }[] }): string {
   return json({
     learningGraph: [],
@@ -208,7 +196,6 @@ async function signInWithGoogle(email: string): Promise<string> {
   return cookieHeader(callback);
 }
 
-/** A published Course whose search index is embedded for its revision. */
 async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
@@ -276,7 +263,6 @@ async function userIdOf(email: string): Promise<string> {
   return user.id;
 }
 
-/** A plan with every operation accepted, as the pane's review leaves it. */
 async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<string> {
   const created = await createChangePlan(db, await userIdOf(OWNER), courseId, ops);
   expect(created.ok).toBe(true);
@@ -288,10 +274,6 @@ async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<
   return plan.id;
 }
 
-/**
- * Stages the plan through the real staging transaction and runs the
- * durable revision in place, with the embedder the test installed.
- */
 async function stageAndPublish(
   courseId: string,
   planId: string,
@@ -348,7 +330,6 @@ describe("a revision whose embedding fails", () => {
 
     const result = await stageAndPublish(courseId, planId, [lessonJson("Lesson one")]);
 
-    /* The publication stands; only the search index is behind. */
     expect(result).toMatchObject({ ok: true, revisionNumber: 2 });
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
     expect(course.status).toBe("ready");
@@ -357,10 +338,8 @@ describe("a revision whose embedding fails", () => {
     const run = await runRow(courseId, 2);
     expect(run.fragmentsStatus).toBe("failed");
     expect(run.fragmentsError).toContain("The embedding provider is down.");
-    /* The failure no longer masquerades as a step. */
     expect(run.currentStep).not.toContain("fragments-failed");
 
-    /* The reading page sees the gap and would offer the rebuild. */
     expect(await searchIsIncomplete(db, courseId)).toBe(true);
   });
 
@@ -374,14 +353,12 @@ describe("a revision whose embedding fails", () => {
     };
     await stageAndPublish(courseId, planId, [lessonJson("Lesson one")]);
 
-    /* The action dispatches the durable repair for the current revision. */
     headerState.current = new Headers({ cookie: ownerCookie });
     const dispatched = await rebuildFragmentsAction(courseId);
     expect(dispatched).toEqual({ ok: true });
     const dispatch = startCalls.list.find((c) => c.workflow === repairFragmentsWorkflow);
     expect(dispatch?.args[0]).toEqual([courseId, 2]);
 
-    /* The repair re-embeds the whole revision and marks the run done. */
     embedState.current = async (texts: string[]) =>
       texts.map(() => new Array<number>(1536).fill(0.01));
     const fragmentsBefore = await listFragments(db, courseId);
@@ -409,7 +386,6 @@ describe("undoing a published change", () => {
     ]);
     await stageAndPublish(courseId, planId, [lessonJson("Lesson one")]);
 
-    /* The published revision's fragments describe the rewrite. */
     const published = await listFragments(db, courseId);
     expect(JSON.stringify(published.filter((f) => f.lessonRef === "l1"))).toContain(
       "Repainted: **Lesson one**",
@@ -419,12 +395,10 @@ describe("undoing a published change", () => {
     const undone = await undoPlanRevisionAction(courseId, planId);
     expect(undone).toMatchObject({ ok: true, revisionNumber: 3 });
 
-    /* The undo dispatched the repair for the restored Lesson. */
     const dispatch = startCalls.list.at(-1);
     expect(dispatch?.workflow).toBe(repairFragmentsWorkflow);
     expect(dispatch?.args[0]).toEqual([courseId, 3, ["l1"]]);
 
-    /* The repair swaps the fragments back to the restored content. */
     await repairFragmentsBody(db, embedState.current, courseId, 3, ["l1"]);
     const restored = await listFragments(db, courseId);
     const l1 = JSON.stringify(restored.filter((f) => f.lessonRef === "l1"));

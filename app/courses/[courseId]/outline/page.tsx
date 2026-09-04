@@ -12,13 +12,6 @@ import { findProposedPlanAction } from "@/lib/actions/tailor";
 import { outlineToEditorCourse } from "@/lib/course/view";
 import { requireLearner } from "@/lib/session";
 
-/**
- * The Outline checkpoint. While design runs (or after it fails) this is
- * the progress screen; at the checkpoint it is the Outline editor; once
- * approval opens generation it is the generating screen; and a Course
- * that failed after its Outline existed shows its failure here, with the
- * dispatching retry (ticket #7).
- */
 export default async function OutlinePage({ params }: PageProps<"/courses/[courseId]/outline">) {
   const { user } = await requireLearner();
   const { courseId } = await params;
@@ -29,8 +22,6 @@ export default async function OutlinePage({ params }: PageProps<"/courses/[cours
   }
 
   if (course.status === "failed") {
-    /* A failure after design: the Outline exists and a generation run
-       carries the error. Design failures keep the design screen. */
     const outline = await latestOutline(db, courseId);
     const generation = outline ? await latestGenerationRun(db, courseId) : undefined;
     if (outline && generation) {
@@ -77,8 +68,6 @@ export default async function OutlinePage({ params }: PageProps<"/courses/[cours
   }
 
   const outline = await latestOutline(db, courseId);
-  /* A Course past design always has Outline rows; without them there is
-     nothing to checkpoint yet. */
   if (!outline) notFound();
 
   if (course.status === "generating" || course.status === "reviewing") {

@@ -1,11 +1,5 @@
-/**
- * Auth-protected route behavior. `requireLearner` is what every signed-in
- * page calls first: signed out, it sends the visitor to the sign-in
- * experience (the landing); signed in, it hands over the Learner.
- *
- * The signed-in case runs the real Google flow against a fake Google, so
- * the session cookie is one Better Auth itself issued.
- */
+// The signed-in case runs the real Google flow, so the session cookie is one
+// Better Auth itself issued.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -30,7 +24,6 @@ const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
 
 const ORIGIN = "http://localhost:3000";
 
-/** Signs a Learner in through the full fake-Google flow, returns the cookies. */
 async function signInWithGoogle(email: string): Promise<string> {
   fakeGoogle({ sub: `sub-${email}`, name: "A Learner", email, email_verified: true });
 

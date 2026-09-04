@@ -1,18 +1,3 @@
-/**
- * Specification reconciliation: when the Learner changes the Outline after
- * design, the private specification falls out of step with it. Approval
- * (and nothing else) reconciles the two, so generation starts from a spec
- * that references exactly the Lessons the approved Outline has.
- *
- * Like the rest of design, this is a plain function with the model
- * injected; the workflow-less caller is `approveOutlineAction`.
- *
- * What survives untouched: the contract, the throughline, the final
- * Exercise, and the evidence ledger (Source refs are independent of
- * structure). What the model rewrites: the learning graph and the
- * per-Lesson alignment, keeping existing node ids wherever a node carries
- * over, so downstream references stay meaningful.
- */
 import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
 import { z } from "zod";
@@ -40,15 +25,7 @@ const reconcileSchema = z.object({
   ),
 });
 
-/**
- * Rewrites the graph and alignment against the current Outline. Throws
- * `DesignError` when the model skips a Lesson or invents ids: a spec that
- * does not join to the Outline would poison generation.
- *
- * `adjustments` are the Learner's accepted content demands (#13): they
- * ride along into the reconciled specification verbatim, so generation
- * honors them exactly as the Learner accepted them.
- */
+// A spec that does not join to the Outline would poison generation.
 export async function reconcileSpecification(
   model: LanguageModel,
   outline: OutlineData,
@@ -136,7 +113,6 @@ export async function reconcileSpecification(
   };
 }
 
-/** Whether two adjustment lists carry the same demands, order aside. */
 function sameAdjustments(a: LessonAdjustment[], b: LessonAdjustment[]): boolean {
   if (a.length !== b.length) return false;
   const key = (x: LessonAdjustment) =>
@@ -146,13 +122,6 @@ function sameAdjustments(a: LessonAdjustment[], b: LessonAdjustment[]): boolean 
   return b.every((x) => left.has(key(x)));
 }
 
-/**
- * Whether the specification can drive generation for this Outline as it
- * is (#17): every Lesson has an alignment entry, every graph node points
- * at a Lesson the Outline has, and the specification's demands are
- * exactly the ones the caller wants baked in. Staged revisions check
- * this before spending a model call on reconciliation.
- */
 export function specNeedsReconciliation(
   spec: CourseSpecification,
   outline: OutlineData,

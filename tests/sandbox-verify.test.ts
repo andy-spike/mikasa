@@ -1,9 +1,5 @@
-/**
- * Executable-claim verification (ticket #9) with the Sandbox substituted:
- * detection (coding vs non-coding), the plan, the run with its evidence,
- * findings that block publication, the per-round retry cache, and a
- * Sandbox that was never given anything from the deployment.
- */
+// Executable-claim verification with the Sandbox substituted; the Sandbox is
+// never given anything from the deployment.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
@@ -342,7 +338,6 @@ describe("verification in review and publication", () => {
 
   it("a non-coding Course publishes with no verification rows at all", async () => {
     const courseId = await seedReviewing();
-    /* No codeVerifications rows exist; publication only needs the review. */
     await saveCodeVerification(db, courseId, 1, 0, {
       passed: true,
       evidence: { commands: [] },

@@ -1,10 +1,3 @@
-/**
- * Applying a Change plan to the Outline (ticket #13), end to end: the
- * real server actions against PGlite with a real session. Mixed accepted
- * and discarded operations apply together or not at all, the Outline
- * moves past the specification so approval must reconcile it, and the
- * Learner's accepted content demands reach that reconciliation.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -25,7 +18,6 @@ const navigation = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => navigation);
 
-/* The durable engine, stubbed: `start` records what it was handed. */
 const workflowStarts = vi.hoisted(() => ({
   calls: [] as { courseId: string; runId: string; outlineVersion: number }[],
 }));
@@ -146,7 +138,6 @@ async function signInWithGoogle(email: string): Promise<string> {
   return cookieHeader(callback);
 }
 
-/** A Course at the Outline checkpoint, specification fresh for version 1. */
 async function seedAwaitingApproval(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
@@ -186,10 +177,6 @@ function asOwner() {
   headerState.current = new Headers({ cookie: ownerCookie });
 }
 
-/**
- * A three-operation plan, with the given review: rename Lesson one, add a
- * Lesson, remove Lesson two. Returns the plan id.
- */
 async function proposeThree(
   courseId: string,
   reviews: ("accepted" | "discarded")[],
@@ -224,8 +211,6 @@ describe("applyPlanToOutlineAction", () => {
       .from(outlines)
       .where(eq(outlines.courseId, courseId))
       .orderBy(desc(outlines.version));
-    /* One version bump, carrying exactly the accepted operations: the
-       rename and the removal landed, the discarded addition did not. */
     expect(outline.version).toBe(2);
     const lessons = outline.data.modules[0].lessons;
     expect(lessons.map((l) => [l.id, l.title])).toEqual([["l1", "Lesson one, renamed"]]);
@@ -237,7 +222,6 @@ describe("applyPlanToOutlineAction", () => {
   it("marks the specification stale, and approval reconciles it with the accepted content demands", async () => {
     asOwner();
     const courseId = await seedAwaitingApproval(OWNER);
-    /* Accept the rename and a content demand for the renamed Lesson. */
     const userId = (await db.select().from(users).where(eq(users.email, OWNER)))[0].id;
     const created = await createChangePlan(db, userId, courseId, [
       { kind: "lessonProse", lessonId: "l1", instruction: "Lead with the failure mode." },
@@ -256,13 +240,11 @@ describe("applyPlanToOutlineAction", () => {
       .select()
       .from(courseSpecs)
       .where(and(eq(courseSpecs.courseId, courseId), eq(courseSpecs.outlineVersion, 1)));
-    /* The Outline moved past the specification. */
     expect(spec.outlineVersion).toBe(1);
 
     const approved = await approveOutlineAction(courseId, 2);
     expect(approved).toEqual({ ok: true, duplicate: false });
 
-    /* Approval reconciled, and the accepted demands rode with it. */
     expect(reconcileCalls.calls).toHaveLength(1);
     expect(reconcileCalls.calls[0].adjustments).toEqual([
       {
@@ -284,7 +266,6 @@ describe("applyPlanToOutlineAction", () => {
     const courseId = await seedAwaitingApproval(OWNER);
     const planId = await proposeThree(courseId, ["accepted", "accepted", "accepted"]);
 
-    /* A manual edit moves the Outline to version 2 while the plan pends. */
     const manual = await applyOutlineOpAction(courseId, 1, {
       kind: "renameModule",
       moduleId: "m1",
@@ -295,7 +276,6 @@ describe("applyPlanToOutlineAction", () => {
     const result = await applyPlanToOutlineAction(courseId, planId);
     expect(result).toMatchObject({ ok: false, reason: "conflict" });
 
-    /* Nothing was applied: the Outline is exactly what the manual edit left. */
     const [outline] = await db
       .select()
       .from(outlines)
@@ -330,7 +310,6 @@ describe("applyPlanToOutlineAction", () => {
       .where(eq(outlines.courseId, courseId))
       .orderBy(desc(outlines.version));
     expect(outline.version).toBe(2);
-    /* The shape did not change; the version did. */
     expect(outline.data).toEqual(OUTLINE);
   });
 

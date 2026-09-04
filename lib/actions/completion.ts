@@ -1,10 +1,5 @@
 "use server";
 
-/**
- * Completion actions (ticket #8): the Lesson pane's mark and undo. Thin —
- * authorize, delegate to `lib/db/completion`, which enforces ownership and
- * publication in the query.
- */
 import { db } from "@/lib/db";
 import { requireLearner } from "@/lib/session";
 import { markLessonDone, markLessonUndone, type MarkResult } from "@/lib/db/completion";

@@ -1,13 +1,3 @@
-/**
- * Durable Course generation (ADR 0005), started by Outline approval
- * (ticket #4). One Workflow step per Lesson: a failure costs one Lesson's
- * work, and the engine's step memoization means a retry (ticket #7)
- * resumes from the first unwritten Lesson, not from zero.
- *
- * This file owns only the Workflow shape; everything substantive lives in
- * `lib/course/generate` (plain functions, injected providers) and
- * `lib/db/lessons` (state).
- */
 import type { LessonContent } from "@/lib/course/content";
 import type { PromptSource } from "@/lib/course/generate";
 import type { GenerationContext } from "@/lib/db/lessons";
@@ -41,19 +31,12 @@ async function stepMarkStep(runId: string, step: string): Promise<void> {
     .where(eq(generationRuns.id, runId));
 }
 
-/** The declared order for this Outline version; a broken graph fails here. */
 async function stepOrder(context: GenerationContext): Promise<OutlineLesson[]> {
   "use step";
   const { generationOrder } = await import("@/lib/course/generate");
   return generationOrder(context.spec, context.outline.data);
 }
 
-/**
- * One Lesson: decide whether it needs a Lesson-specific Source (only when
- * Grounding is on), fetch and store it if so, then write and persist the
- * Lesson. The new Source's ref rides back so the next lessons' prompts
- * can cite it too.
- */
 async function stepGenerateLesson(
   context: GenerationContext,
   runId: string,
@@ -130,23 +113,12 @@ async function stepFail(courseId: string, runId: string, message: string): Promi
   await failGeneration(db, courseId, runId, message);
 }
 
-/* ------------------------------------------------------------------ */
-/* Review and publication (ticket #6).                                 */
-
 type ReviewPayload = {
   runId: string;
   round: number;
   findings: { kind: string; lessonRef: string | null; detail: string; correction: string }[];
 };
 
-/** One full review pass: structural (pure), factual and code, learning design, and — for a coding Course — the Sandbox.
- *
- * `onlyLessonRefs` scopes the model-driven work to the named Lessons
- * (ticket #14): a staged revision reruns factual, design, and Sandbox
- * work only for the regenerated Lessons, whose content is the only
- * content that changed. The structural pass stays whole-Course — it is
- * pure, and the Outline itself is what changed.
- */
 async function stepReviewRound(
   courseId: string,
   outlineVersion: number,
@@ -176,8 +148,6 @@ async function stepReviewRound(
     language: context.course.language,
   };
 
-  /* The review's model-driven scope: everything, or — for a staged
-     revision — only the regenerated Lessons. */
   const scope =
     onlyLessonRefs && onlyLessonRefs.length > 0
       ? lessonContents.filter((l) => onlyLessonRefs.includes(l.lessonId))
@@ -193,11 +163,7 @@ async function stepReviewRound(
     ...(await designFindings(model, courseMeta, context.spec, context.outline.data, scope)),
   ];
 
-  /* Executable claims (ticket #9): only a coding Course creates Sandbox
-     work; a coding Course re-verifies after every correction round, since
-     corrections may have rewritten the code. A pass already recorded for
-     this round is reused, so a Workflow retry does not re-run the
-     Sandbox. */
+  // Reuse the recorded Sandbox pass so a retry does not re-run it.
   if (needsCodeVerification(context.course, scope)) {
     const existing = await findCodeVerification(db, courseId, outlineVersion, round);
     if (!existing) {
@@ -242,7 +208,6 @@ async function stepReviewRound(
   return { runId, round, findings: found };
 }
 
-/** Rewrites one affected Lesson against its findings and saves it. */
 async function stepCorrectLesson(
   courseId: string,
   outlineVersion: number,
@@ -287,7 +252,6 @@ function summaryOfBlock(block: unknown): string {
   return b.text ?? "";
 }
 
-/** The findings just corrected become "corrected"; the next round starts clean. */
 async function stepMarkCorrected(runId: string, round: number): Promise<void> {
   "use step";
   const { markFindingsCorrected } = await import("@/lib/db/review");
@@ -309,13 +273,6 @@ async function stepPublish(
     : { ok: false, reason: result.reason };
 }
 
-/**
- * Embeds the published Lessons' fragments (ticket #11), so the Tutor's
- * Course search answers from exactly what was just published. Runs after
- * the revision exists; re-running replaces the fragments wholesale. An
- * embedding failure is recorded on the run alone (bug 9): the Course
- * stays ready and the repair workflow can finish the job later.
- */
 async function stepEmbedFragments(
   courseId: string,
   outlineVersion: number,
@@ -352,7 +309,6 @@ async function stepFailReview(courseId: string, runId: string, message: string):
   await failReview(db, courseId, runId, message);
 }
 
-/** Marks a passed review as passed, so publication may look at it. */
 async function stepFinishReviewRun(runId: string): Promise<void> {
   "use step";
   const { finishReviewRun } = await import("@/lib/db/review");
@@ -368,11 +324,6 @@ async function stepOpenReviewRun(courseId: string, outlineVersion: number): Prom
   return run.id;
 }
 
-/**
- * Where a retry re-enters (ticket #7). A review that already passed with
- * no open findings is not run again: the run resumes at publication. A
- * Course whose revision is already published has nothing left to do.
- */
 async function stepReviewResumePoint(
   courseId: string,
   outlineVersion: number,
@@ -406,14 +357,6 @@ async function stepReviewResumePoint(
   return { action: "review" };
 }
 
-/**
- * One durable pass over an approved Outline version: load, order, write
- * every Lesson in dependency order (Module by Module — the Outline's
- * order within a Module is the Learner's approved order), then review the
- * complete candidate, correct at most twice, and publish atomically. A
- * candidate that still has findings after the second correction round
- * fails the Course, unpublished and retryable.
- */
 export async function generateCourseWorkflow(
   courseId: string,
   runId: string,
@@ -436,8 +379,6 @@ export async function generateCourseWorkflow(
     const already = new Set(context.written);
 
     for (let i = 0; i < order.length; i++) {
-      /* Resume (ticket #7): a Lesson the failed run already wrote is
-         kept, not regenerated. */
       if (already.has(order[i].id)) {
         priorLessons.push({ title: order[i].title, summary: order[i].summary });
         continue;
@@ -463,9 +404,6 @@ export async function generateCourseWorkflow(
       };
     }
 
-    /* Review: structural + factual and code + learning design, then at
-       most two rounds of targeted corrections. A retry whose review
-       already passed resumes at publication instead. */
     const resume = await stepReviewResumePoint(courseId, outlineVersion);
     if (resume.action === "done") {
       return { ok: true as const, revisionNumber: resume.revisionNumber };
@@ -508,16 +446,12 @@ export async function generateCourseWorkflow(
       return { ok: false as const, reason: "review-failed" };
     }
 
-    /* The review passed: record that, so publication's own guard sees a
-       passed run and a retry resumes at publication, not through it. */
     await stepFinishReviewRun(reviewRunId);
 
     await stepMarkStep(runId, "publish");
     const published = await stepPublish(courseId, outlineVersion, reviewRunId);
     if (!published.ok) {
-      /* The review stays succeeded: a retry resumes at publication
-         instead of reviewing from round 0 (bug 2). The Course fails with
-         the run, so it stays retryable from the Courses screen. */
+      // Review stays succeeded so a retry resumes at publication.
       await stepFail(courseId, runId, published.reason ?? "Publication failed.");
       return { ok: false as const, reason: "publish-failed" };
     }

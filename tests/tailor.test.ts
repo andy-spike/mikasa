@@ -1,11 +1,3 @@
-/**
- * The Tailor (ticket #12), end to end: the real route handler and review
- * action against PGlite with real sessions and a streaming model — a
- * separate persistent conversation, validated plan creation through the
- * proposal tool, one review at a time, accepting and discarding
- * operation by operation, and a review that changes nothing in the
- * Course.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
@@ -19,7 +11,6 @@ vi.mock("@/lib/db", async () => {
 const headerState = vi.hoisted(() => ({ current: new Headers() }));
 vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
 
-/* The Tailor's model is the streaming fake; its prompts are recorded. */
 const tailorModelState = vi.hoisted(() => ({
   current: undefined as
     | ReturnType<typeof import("./helpers/fake-model").streamingModel>
@@ -129,7 +120,6 @@ async function signInWithGoogle(email: string): Promise<string> {
   return cookieHeader(callback);
 }
 
-/** A published two-Lesson Course, for the given owner. */
 async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
   const [course] = await db
@@ -175,7 +165,6 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   return course.id;
 }
 
-/** One Tailor turn through the real route; returns the streamed text. */
 async function turn(
   cookie: string,
   courseId: string,
@@ -194,7 +183,6 @@ async function turn(
   return { status: response.status, text };
 }
 
-/** A turn whose model proposes a plan, then explains it. */
 function planThenText(ops: unknown, text: string) {
   return [{ toolCall: { name: "proposeChangePlan", input: { ops } } }, text];
 }
@@ -240,7 +228,6 @@ describe("the conversation", () => {
     ]);
     expect(rows[0].content).toBe("Split the ordering Lesson for me.");
 
-    /* A second turn continues the same conversation. */
     await turn(ownerCookie, courseId, "And make the new one shorter.");
     const again = await db
       .select()
@@ -321,7 +308,6 @@ describe("the proposal tool", () => {
     const [plan] = await db.select().from(changePlans).where(eq(changePlans.courseId, courseId));
     expect(plan.status).toBe("proposed");
     expect(plan.baseOutlineVersion).toBe(1);
-    /* Published Course: the plan pins the revision it was drawn against. */
     expect(plan.baseRevisionNumber).toBe(1);
 
     const ops = await db
@@ -446,7 +432,6 @@ describe("the review", () => {
       .orderBy(changeOperations.position);
     expect(ops.map((o) => o.status)).toEqual(["accepted", "discarded"]);
 
-    /* Both decisions undo, independently. */
     expect((await reviewTailorOperationAction(planId, first, "proposed")).ok).toBe(true);
     expect((await reviewTailorOperationAction(planId, second, "proposed")).ok).toBe(true);
     const restored = await db
@@ -544,8 +529,8 @@ describe("validatePlanOps", () => {
   });
 
   it("refuses a Module without Lessons when the plan is proposed", () => {
-    /* An empty Module would sail through staging only to block
-       publication (bug 5); the front door refuses it. */
+    /* An empty Module would pass staging but block publication, so the front
+       door refuses it. */
     expect(() =>
       validatePlanOps(OUTLINE, [{ kind: "addModule", moduleId: "m2", title: "Module two" }]),
     ).toThrow(/no Lessons/);

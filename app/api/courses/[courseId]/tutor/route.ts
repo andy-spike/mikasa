@@ -1,13 +1,5 @@
 import "server-only";
 
-/**
- * The Tutor's turn endpoint (ticket #10). One POST per turn: authorize,
- * resolve the conversation, stream the answer, and — only if the stream
- * finished cleanly — store the completed turn as canonical history.
- *
- * The client sends just the Lesson it is reading, the message, and
- * nothing else; the server owns everything else about the conversation.
- */
 import { headers } from "next/headers";
 import { z } from "zod";
 import { isStepCount, streamText } from "ai";
@@ -46,8 +38,6 @@ export async function POST(
   const published = await findOwnedPublishedCourse(db, session.user.id, courseId);
   if (!published) return json(404, { error: "Course not found." });
 
-  /* The conversation exists only if a turn already completed; the model
-     gets whatever history there is, and a first turn starts clean. */
   const conversation = await findTutorConversation(db, session.user.id, courseId, lessonId);
   if (!conversation.ok) {
     return json(conversation.reason === "not-found" ? 404 : 409, {
@@ -58,7 +48,6 @@ export async function POST(
     ? await listTutorMessages(db, conversation.conversationId)
     : [];
 
-  /* The context the Tutor reads, in the reading adapter's own terms. */
   const reading = toReadingCourse(published.course, published.outline.data, published.lessonRows);
   const lesson = reading.modules.flatMap((m) => m.lessons).find((l) => l.id === lessonId);
   if (!lesson)
@@ -69,7 +58,6 @@ export async function POST(
   const result = streamText({
     model: tutorModel(),
     providerOptions: tutorProviderOptions(),
-    /* No tools: the Tutor can change nothing in the Course. */
     abortSignal: request.signal,
     instructions: tutorSystemPrompt({
       course: { topic: reading.topic, goal: reading.goal },
@@ -90,12 +78,9 @@ export async function POST(
     }),
     messages: tutorPrompt(history, message),
     tools: tutorTools({ db, courseId, embedQuery, webSearch }),
-    /* The Tutor reads, it never writes, and it does not wander: at most
-       four agent steps (search, read, answer) before it must speak. */
     stopWhen: [isStepCount(4)],
     onEnd: async (event) => {
-      /* Only a cleanly finished stream becomes history. An error or an
-         abort never lands here, so the turn leaves no trace to duplicate. */
+      /* Only a cleanly finished stream becomes history. */
       const text =
         event.content
           .filter((part): part is { type: "text"; text: string } => part.type === "text")

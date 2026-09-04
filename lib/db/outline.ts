@@ -1,10 +1,3 @@
-/**
- * Repositories for the Outline checkpoint (ticket #4): applying structure
- * changes as new Outline versions, reading specification staleness, and
- * opening the generation run that approval starts. Every entry point takes
- * the Drizzle instance and, where a Learner is involved, enforces
- * ownership in the query.
- */
 import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "./index";
 import {
@@ -24,7 +17,6 @@ import {
   type OutlineOp,
 } from "../course/structure";
 
-/** Why an Outline change or an approval did not go through. */
 export type OutlineRejection =
   | "not-found"
   | "conflict"
@@ -44,14 +36,8 @@ function reject(
 }
 
 /**
- * One Outline change, applied as a new version inside one transaction.
- * `baseVersion` is the version the Learner was looking at: if the current
- * version is higher, someone changed the Outline first and the whole
- * change is rejected without partial application.
- *
- * A Course may only be reshaped while it waits for Outline approval; a
- * generating or published Course changes through revisions (tickets
- * #13/#14), never through this door.
+ * `baseVersion` is optimistic concurrency: a higher current version rejects
+ * the whole change with no partial application.
  */
 export async function applyOutlineChange(
   db: Db,
@@ -109,12 +95,10 @@ export async function applyOutlineChange(
   });
 }
 
-/** The specification reads as stale when the Outline moved past it. */
 export function specIsStale(spec: CourseSpecRow, outlineVersion: number): boolean {
   return spec.outlineVersion < outlineVersion;
 }
 
-/** The Course's specification row, if design produced one. */
 export async function findCourseSpecRow(
   db: Db,
   courseId: string,
@@ -133,7 +117,6 @@ export async function findCourseSpecRow(
   return row;
 }
 
-/** Saves the specification for the Outline version it fits. */
 export async function saveReconciledSpec(
   db: Db,
   courseId: string,
@@ -153,13 +136,7 @@ export type ApprovalStart =
   | { ok: true; run: GenerationRun; duplicate: boolean }
   | { ok: false; reason: OutlineRejection; message: string };
 
-/**
- * Approval's transactional half: re-checks the version the Learner
- * approved, sanity-checks the shape, and opens the generation run pinned
- * to exactly this Outline version. The unique (course, version) index on
- * generation runs turns a double approval into `duplicate: true` instead
- * of a second run.
- */
+/** The unique (course, version) index turns a double approval into `duplicate: true`, not a second run. */
 export async function openGenerationRun(
   db: Db,
   ownerId: string,
@@ -190,8 +167,6 @@ export async function openGenerationRun(
     }
 
     if (course.status !== "awaiting-outline-approval") {
-      // An earlier approval already opened a run for a version; only a
-      // matching one is an idempotent re-approval.
       const [existing] = await tx
         .select()
         .from(generationRuns)
@@ -240,7 +215,6 @@ export async function openGenerationRun(
   });
 }
 
-/** The newest generation run for a Course, if any. */
 export async function latestGenerationRun(
   db: Db,
   courseId: string,
@@ -254,7 +228,6 @@ export async function latestGenerationRun(
   return run;
 }
 
-/** A generation run that failed before doing any work keeps the Course retryable. */
 export async function failGenerationRun(
   db: Db,
   courseId: string,
@@ -276,11 +249,8 @@ export async function failGenerationRun(
 }
 
 /**
- * Records the Tutor search index's state for a run's revision (bug 9).
- * The published Course and the run's own status are never touched: an
- * embedding failure is repairable, not fatal. A version without a run
- * (an undo's) has nowhere to record it, and that is fine — the missing
- * rows themselves are what the reading page's check looks for.
+ * Records the Tutor search index state without touching the Course: an
+ * embedding failure is repairable, not fatal.
  */
 export async function recordFragmentsStatus(
   db: Db,
@@ -307,11 +277,7 @@ export type ApprovalContext = {
   specRow: CourseSpecRow | undefined;
 };
 
-/**
- * Everything the approval action needs to decide and reconcile, read
- * outside the run-opening transaction: the model call must not happen
- * inside a database transaction.
- */
+/** Read outside the run-opening transaction: the model call must not happen inside it. */
 export async function loadApprovalContext(
   db: Db,
   ownerId: string,

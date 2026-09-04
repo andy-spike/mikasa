@@ -2,12 +2,6 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-/**
- * Vendored shadcn/base-ui Textarea, adapted at the line it changes: the
- * shipped field is a bottom-underline on a transparent ground, and this
- * world's fields are a canvas inset that steps up on focus. Square, like
- * everything else.
- */
 function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea

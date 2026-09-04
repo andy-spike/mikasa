@@ -1,16 +1,3 @@
-/**
- * Review, correction, publication gates (ticket #6). Three reviews run
- * over the complete candidate — structural (pure code), factual and code
- * (model), learning design (model) — their findings drive targeted
- * corrections for at most two rounds, and a candidate only publishes when
- * a round comes back clean.
- *
- * Findings name the Lesson they concern (or null for the Course as a
- * whole); corrections rewrite only the named Lessons. A review that still
- * finds problems after the second correction round fails the Course: it
- * stays unpublished and the failure message is the Learner's retry handle
- * (ticket #7).
- */
 import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
 import { z } from "zod";
@@ -23,7 +10,6 @@ export type FindingKind = "structural" | "factual" | "learning-design" | "code-e
 
 export type Finding = {
   kind: FindingKind;
-  /** null: the finding concerns the Course as a whole. */
   lessonRef: string | null;
   detail: string;
   correction: string;
@@ -39,22 +25,14 @@ const findingsSchema = z.object({
   ),
 });
 
-/** How many correction rounds review may drive. Two, per the product's contract. */
 export const MAX_CORRECTION_ROUNDS = 2;
 
-/** Every reading source the structural review needs, no model involved. */
 export type StructuralInput = {
   spec: CourseSpecification;
   outline: OutlineData;
   lessons: LessonContent[];
 };
 
-/**
- * The deterministic review: every planned Lesson present and whole (all
- * six parts), citations resolvable, and the learning graph honoured — no
- * Lesson may assume a skill that its graph position has not introduced
- * yet. These are bugs, not opinions, so they are checked exactly.
- */
 export function structuralFindings(input: StructuralInput): Finding[] {
   const findings: Finding[] = [];
   const planned = input.outline.modules.flatMap((m) => m.lessons);
@@ -138,8 +116,6 @@ export function structuralFindings(input: StructuralInput): Finding[] {
     }
   }
 
-  /* The graph: a Lesson's assumed skills must be introduced no later than
-     itself, in the approved order. */
   const position = new Map(planned.map((l, i) => [l.id, i]));
   const introducedAt = new Map<string, number>();
   for (const node of input.spec.learningGraph) {
@@ -167,11 +143,6 @@ export function structuralFindings(input: StructuralInput): Finding[] {
   return findings;
 }
 
-/**
- * The factual and code review: the model reads the complete candidate with
- * its Sources and reports claims or code that will not hold. Findings name
- * the Lesson; the correction says what to change, not new prose.
- */
 export async function factualFindings(
   model: LanguageModel,
   course: { topic: string; goal: string; language: string },
@@ -218,11 +189,6 @@ export async function factualFindings(
   return output.findings.map((f) => ({ ...f, kind: "factual" as const }));
 }
 
-/**
- * The learning-design review: cohesion with the throughline, prerequisite
- * order the learner can actually follow, Exercises that build toward the
- * final one. Reads the whole candidate; reports on whole Lessons.
- */
 export async function designFindings(
   model: LanguageModel,
   course: { topic: string; goal: string; language: string },
@@ -298,12 +264,6 @@ const correctionSchema = z.object({
   bridge: z.string().min(1),
 });
 
-/**
- * One correction: rewrite the affected Lesson against its findings, in the
- * same six-part shape as generation. Everything about the Lesson that no
- * finding named is carried through unchanged by the model's own output
- * being the full Lesson — the prompt names exactly what to fix.
- */
 export async function correctLesson(
   model: LanguageModel,
   course: { topic: string; goal: string; language: string },

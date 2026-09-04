@@ -1,23 +1,4 @@
-/**
- * Durable Course design (ADR 0005). The Learner can leave and return while
- * this runs: every meaningful fact — which step, what failed, what the
- * Outline looks like — lands in Postgres through `lib/db/design`, and the
- * engine resumpts the run from there on Vercel.
- *
- * This file owns only the Workflow shape: directives, step boundaries,
- * error containment. Everything substantive happens in `lib/course/design`
- * (plain functions, injected providers — the tests exercise those directly)
- * and `lib/db/design` (state). Steps stay thin so the Workflow wrapper
- * would survive an engine swap.
- *
- * Arguments and return values of every step are JSON-only (Workflow ships
- * them across process boundaries); that is why providers are resolved
- * inside each step rather than injected from the workflow body.
- *
- * Resume (ticket #7): `resumeFrom` names the first step a retry must
- * actually run. Work the failed run already persisted — Sources, Outline
- * and its draft — is reused from the database instead of regenerated.
- */
+// Step args cross process boundaries as JSON, so providers resolve inside each step.
 import type { DesignCourse, OutlineDraft } from "@/lib/course/design";
 import type {
   CourseSpecification,
@@ -26,10 +7,8 @@ import type {
   OutlineData,
 } from "@/lib/course/types";
 
-/** The steps a design runs, in order. */
 export type DesignStep = "sources" | "outline" | "specification" | "persist";
 
-/** What the workflow body needs before any step runs. */
 type Loaded = { course: DesignCourse };
 
 function errorMessage(error: unknown): string {
@@ -37,7 +16,6 @@ function errorMessage(error: unknown): string {
   return typeof error === "string" ? error : "Course design failed.";
 }
 
-/** Reads the Course and its design input. A missing id ends the run. */
 async function stepLoadCourse(courseId: string): Promise<Loaded | null> {
   "use step";
   const { findCourseForDesign } = await import("@/lib/db/design");
@@ -63,10 +41,6 @@ async function stepMarkStep(runId: string, step: string): Promise<void> {
   await recordDesignStep(db, runId, step);
 }
 
-/**
- * Sources only exist when Grounding is on; the lib function is the guard.
- * A resume past this step loads the persisted Sources instead.
- */
 async function stepDesignSources(
   course: DesignCourse,
   courseId: string,
@@ -95,15 +69,6 @@ async function stepDesignSources(
   return sources;
 }
 
-/**
- * Drafts and bounds-checks the Outline in one step: a draft outside the
- * Depth bounds fails the step, which the engine retries — effectively a
- * fresh sample — before the run is allowed to fail for good. A resume
- * past this step loads the persisted Outline and its draft instead; if
- * the persisted Outline carries no draft (nothing to build a
- * specification from), the step drafts fresh rather than generating a
- * hollow specification.
- */
 async function stepDesignOutline(
   course: DesignCourse,
   courseId: string,
@@ -125,7 +90,6 @@ async function stepDesignOutline(
         outlineVersion: existing.version,
       };
     }
-    /* Nothing usable persisted: fall through and draft. */
   }
 
   const draft = await draftOutline(designModel(), course, sources);
@@ -146,7 +110,6 @@ async function stepDesignSpecification(
   return designSpecification(designModel(), course, outline, draft, sources);
 }
 
-/** Persists the specification and flips the Course to Outline-ready. */
 async function stepPersist(
   courseId: string,
   runId: string,
@@ -160,7 +123,6 @@ async function stepPersist(
   await completeDesignRun(db, courseId, runId);
 }
 
-/** Records the failure so the Course stays retryable-looking (ticket #7). */
 async function stepFail(courseId: string, runId: string, message: string): Promise<void> {
   "use step";
   const { failDesignRun } = await import("@/lib/db/design");
@@ -168,13 +130,6 @@ async function stepFail(courseId: string, runId: string, message: string): Promi
   await failDesignRun(db, courseId, runId, message);
 }
 
-/**
- * One design pass: Sources (when Grounding is on) → Outline → private
- * specification → persist. `resumeFrom` starts the pass at a later step,
- * reusing what the failed run already persisted. A step that exhausts its
- * retries fails the run; the Course records the failure and waits for
- * retry.
- */
 export async function designCourseWorkflow(
   courseId: string,
   runId: string,
@@ -192,8 +147,6 @@ export async function designCourseWorkflow(
   const reached = (step: DesignStep) => order.indexOf(step) >= order.indexOf(resumeFrom);
 
   try {
-    /* A resume past a step reuses what the failed run persisted; a fresh
-       run (or a resume to its first unfinished step) runs the step. */
     await stepMarkStep(runId, "sources");
     const sources = await stepDesignSources(loaded.course, courseId, !reached("sources"));
 

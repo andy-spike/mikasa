@@ -23,36 +23,18 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 
-/**
- * The checkpoint the product is built around: the Outline exists, no Lesson
- * content does, and the learner shapes it before any is generated.
- *
- * The same grammar as the rail — mark, number, title, hairline-divided rows,
- * one accent — with the summaries the rail deliberately leaves out, because
- * this is the surface where you decide what a Lesson is for.
- *
- * Every change is one server operation against the current Outline version,
- * saved as soon as it is made; a change made against an older version is
- * rejected as a conflict rather than applied blindly.
- */
-
 type Module = OutlineEditorCourse["modules"][number];
 
 type Props = {
   course: OutlineEditorCourse;
-  /** The durable run's current step, while the Course is generating. */
   runStep?: string | null;
-  /** The Tailor's restored conversation (#12). */
   tailorTurns?: Turn[];
-  /** The Change plan under review, as the server has it. */
   tailorPlan?: PlanView | null;
-  /** The plan as the server has it now, after a turn may have proposed one. */
   onRefreshPlan?: () => Promise<PlanView | null>;
 };
 
 export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefreshPlan }: Props) {
   const router = useRouter();
-  /* The Tailor column follows the page scroll once it outgrows the viewport. */
   const tailorRef = useRef<HTMLElement | null>(null);
   useStickyFollow(tailorRef);
   const [modules, setModules] = useState<Module[]>(course.modules);
@@ -66,8 +48,6 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
   );
   const [pending, startTransition] = useTransition();
 
-  /* The Tailor's plan under review (#12): server-restored, then locally
-     amended by the review actions. A refresh delivers the server's truth. */
   const [plan, setPlan] = useState<PlanView | null | undefined>(tailorPlan);
   const [restoredPlan, setRestoredPlan] = useState(tailorPlan);
   if (tailorPlan !== restoredPlan) {
@@ -75,9 +55,6 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     setPlan(tailorPlan);
   }
 
-  /* The server is the source of truth: after a conflict the refresh lands
-     a newer version, and this render-time adjustment adopts it (the
-     documented way to reset state when a prop changes). */
   const [adopted, setAdopted] = useState(course.version);
   if (course.version !== adopted) {
     setAdopted(course.version);
@@ -88,8 +65,6 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
 
   const lessons = useMemo(() => modules.flatMap((m) => m.lessons), [modules]);
 
-  /* Durable work continues with the page closed, so while the Course is
-     generating this screen polls — same courtesy as the design screen. */
   const polling = course.phase !== "editing";
   useEffect(() => {
     if (!polling) return;
@@ -125,9 +100,6 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     });
   }
 
-  /* The Tailor's turn (#12): the client posts only the message; the
-     server owns the conversation. When a turn completes, the server may
-     have proposed a plan, so the review refreshes from it. */
   async function askTailor(text: string, onDelta: (chunk: string) => void): Promise<boolean> {
     try {
       const response = await fetch(`/api/courses/${course.id}/tailor`, {
@@ -147,7 +119,6 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
         if (value) onDelta(value);
       }
     } catch {
-      /* Network dropped mid-stream: the turn is not stored server-side. */
       return false;
     }
   }
@@ -168,14 +139,10 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
           : p,
       );
     } else {
-      /* The review did not land: the server's state wins. */
       if (onRefreshPlan) setPlan(await onRefreshPlan());
     }
   }
 
-  /* Applying the accepted operations (#13): all together, through the
-     Outline's own change door, or not at all. A conflict means the
-     Outline moved since the plan was drawn; the server's shape wins. */
   function applyPlan() {
     if (!plan) return;
     setError(null);
@@ -248,7 +215,6 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
   return (
     <div className="mx-auto w-full max-w-[68rem] px-5 sm:px-8">
       <div className="flex flex-col lg:flex-row lg:gap-10">
-        {/* The Outline itself */}
         <div className="min-w-0 flex-1 pt-10">
           <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
             {course.topic}
@@ -456,7 +422,6 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
             </Button>
           </div>
 
-          {/* The decision bar. It stays with you down a twenty-Lesson Outline. */}
           <div className="sticky bottom-0 mt-10 border-t border-hair bg-canvas py-4">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
               <Button onClick={approve} disabled={pending}>
@@ -482,10 +447,6 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
           </div>
         </div>
 
-        {/* The Tailor. The Tutor is not here: there is no Lesson content for
-            it to be grounded in until the Outline is approved. The plan's
-            accepted operations apply through the editor's own change door
-            (#13); nothing moves until then. */}
         <aside
           ref={tailorRef}
           className="w-full shrink-0 border-t border-hair pt-8 pb-20 lg:sticky lg:top-0 lg:w-[20rem] lg:self-start lg:border-t-0 lg:border-l lg:pt-10 lg:pb-10 lg:pl-8"
@@ -533,11 +494,6 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
   );
 }
 
-/**
- * Splitting asks what the second half is, because only the learner knows
- * where the seam goes. The first half keeps its identity; the second half
- * is new.
- */
 function SplitDialog({
   lesson,
   onClose,
@@ -547,8 +503,6 @@ function SplitDialog({
   onClose: () => void;
   onSplit: (secondTitle: string, secondSummary: string) => void;
 }) {
-  /* Keyed by the Lesson being split (see the render site), so the fields
-     start empty for each split without an effect. */
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
 

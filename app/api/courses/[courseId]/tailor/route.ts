@@ -1,13 +1,5 @@
 import "server-only";
 
-/**
- * The Tailor's turn endpoint (ticket #12). A separate, persistent,
- * streamed conversation about reshaping the Course. The Tailor proposes
- * a Change plan through one tool, whose schema validates every
- * operation; the plan is stored for the Learner to review operation by
- * operation. Nothing here changes the Course — review is read-only by
- * design, and application lives in tickets #13/#14.
- */
 import { headers } from "next/headers";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
@@ -48,7 +40,6 @@ export async function POST(
   const course = await findOwnedCourse(db, session.user.id, courseId);
   if (!course) return json(404, { error: "Course not found." });
 
-  /* The shape the Tailor tailors: ids, titles, order. */
   const [outline] = await db
     .select()
     .from(outlines)
@@ -67,8 +58,6 @@ export async function POST(
       }))
     : [];
 
-  /* The conversation exists only if a turn already completed; the model
-     gets whatever history there is, and a first turn starts clean. */
   const conversationId = await findTailorConversation(db, session.user.id, courseId);
   const history = conversationId ? await listTailorMessages(db, conversationId) : [];
 
@@ -130,8 +119,7 @@ export async function POST(
     },
     stopWhen: [isStepCount(4)],
     onEnd: async (event) => {
-      /* Only a cleanly finished stream becomes history — the conversation
-         itself is born here, on the first completed turn. */
+      /* Only a cleanly finished stream becomes history. */
       const text =
         event.content
           .filter((part): part is { type: "text"; text: string } => part.type === "text")

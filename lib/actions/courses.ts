@@ -1,10 +1,5 @@
 "use server";
 
-/**
- * Course actions. Thin on purpose: authorize, validate, delegate —
- * `lib/course/limits` owns the rules, `lib/db/design` owns state, and the
- * Workflow engine owns the durable run (ADR 0005).
- */
 import { eq } from "drizzle-orm";
 import { start } from "workflow/api";
 import { db } from "@/lib/db";
@@ -24,11 +19,6 @@ export type CreateCourseResult =
   | { ok: true; courseId: string }
   | { ok: false; errors: CourseInputErrors };
 
-/**
- * Hands the Course to the design engine and links the workflow run to the
- * design-run row. If the engine cannot take the run (misconfigured
- * deployment), the run fails visibly and stays retryable.
- */
 async function startDesign(courseId: string): Promise<CourseInputErrors | null> {
   const run = await startDesignRun(db, courseId);
   try {
@@ -44,10 +34,6 @@ async function startDesign(courseId: string): Promise<CourseInputErrors | null> 
   }
 }
 
-/**
- * Creates a Course owned by the signed-in Learner and starts its durable
- * design. The Learner leaves this action long before the Outline exists.
- */
 export async function createCourseAction(
   input: Partial<Record<keyof CourseInput, unknown>>,
 ): Promise<CreateCourseResult> {
@@ -66,12 +52,6 @@ export async function createCourseAction(
   return { ok: true, courseId: course.id };
 }
 
-/**
- * Runs work again over a failed Course: the dispatching retry of ticket
- * #7. The stage the failure came from decides what runs again — design
- * resumes past its persisted steps; generation keeps written Lessons and
- * a passed review; nothing valid is regenerated.
- */
 export type RetryResult = { ok: true; courseId: string } | { ok: false; errors: CourseInputErrors };
 
 export async function retryCourseAction(courseId: string): Promise<RetryResult> {
@@ -84,8 +64,7 @@ export async function retryCourseAction(courseId: string): Promise<RetryResult> 
     return { ok: false, errors: { form: "This Course has nothing to retry." } };
   }
 
-  /* A failed generation (lessons, review, publication) outranks design:
-     it means the Course had already reached the generation stage. */
+  // A failed generation outranks design: the Course had already reached generation.
   const generation = await latestGenerationRun(db, courseId);
   if (generation && generation.status === "failed") {
     const reopened = await resetGenerationRun(db, courseId, generation.id);
@@ -111,9 +90,6 @@ export async function retryCourseAction(courseId: string): Promise<RetryResult> 
 
   const design = await latestDesignRun(db, courseId);
   if (!design) return { ok: false, errors: { form: "This Course has no run to retry." } };
-
-  /* A design that failed before anything persisted starts over; one that
-     failed later resumes past its persisted steps. */
   const RESUMABLE = new Set(["outline", "specification", "persist"]);
   const resumeFrom: "sources" | "outline" | "specification" | "persist" = RESUMABLE.has(
     design.currentStep,
@@ -138,11 +114,6 @@ export async function retryCourseAction(courseId: string): Promise<RetryResult> 
   }
 }
 
-/**
- * Rebuilds the current revision's Tutor search index (bug 9). The
- * published Course is never touched: the durable repair re-embeds the
- * revision's fragments and records the outcome on the run.
- */
 export type RebuildFragmentsResult = { ok: boolean; message?: string };
 
 export async function rebuildFragmentsAction(courseId: string): Promise<RebuildFragmentsResult> {
@@ -163,10 +134,6 @@ export async function rebuildFragmentsAction(courseId: string): Promise<RebuildF
   }
 }
 
-/**
- * Whether the current revision's Tutor search is out of date (bug 9).
- * The Workspace's rebuild strip polls this while a repair is running.
- */
 export async function searchIsIncompleteAction(courseId: string): Promise<boolean> {
   const { user } = await requireLearner();
   const course = await findOwnedCourse(db, user.id, courseId);

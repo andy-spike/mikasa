@@ -1,8 +1,3 @@
-/**
- * Ownership isolation: every Course query filters by the Learner, so
- * Learner B never sees Learner A's Courses, and a foreign id reads as
- * not-found.
- */
 import { describe, expect, it } from "vitest";
 import { findOwnedCourse, listOwnedCourses } from "@/lib/db/courses";
 import { courses, users } from "@/lib/db/schema";

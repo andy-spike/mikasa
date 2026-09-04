@@ -1,8 +1,3 @@
-/**
- * Sign-in against a fake Google, end to end: the route handler, the real
- * Better Auth flow, and the Drizzle schema on PGlite. First sign-in creates
- * the Learner; the next one restores the same account; sign-out ends it.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { createAuth, type Auth, type AuthDb } from "@/lib/auth";
@@ -21,7 +16,6 @@ function testAuth(db: AuthDb): Auth {
   });
 }
 
-/** Asks the handler for a Google authorize URL, like the landing button. */
 async function startGoogleSignIn(auth: Auth, callbackURL = "/courses") {
   const response = await auth.handler(
     new Request(`${ORIGIN}/api/auth/sign-in/social`, {
@@ -46,7 +40,6 @@ async function startGoogleSignIn(auth: Auth, callbackURL = "/courses") {
   return { response, authorize, state: state as string };
 }
 
-/** Completes the round trip: Google "calls back" with a code and the state. */
 async function finishGoogleSignIn(auth: Auth, state: string, start: Response, code: string) {
   return auth.handler(
     new Request(`${ORIGIN}/api/auth/callback/google?code=${code}&state=${state}`, {
@@ -122,7 +115,6 @@ describe("returning sign-in", () => {
     const firstSession = await sessionUser(auth, cookieHeader(firstCallback));
     expect(firstSession).not.toBeNull();
 
-    // New consent round: a fresh state and code, the same Google subject.
     const second = await startGoogleSignIn(auth);
     const secondCallback = await finishGoogleSignIn(auth, second.state, second.response, "code-2");
     const secondSession = await sessionUser(auth, cookieHeader(secondCallback));

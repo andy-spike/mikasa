@@ -10,10 +10,8 @@ type Props = {
   lesson: ReadingLesson & { n: number; moduleNumeral: string; moduleTitle: string };
   total: number;
   stamp?: string;
-  /** true only on the Lesson just marked, so the check strokes once */
   striking: boolean;
   next: { id: string; n: number; title: string } | null;
-  /** Resolves a Source ref to its link; absent, citations stay plain text. */
   sourceFor?: (ref: string) => SourceLink | undefined;
   onMark: () => void;
   onUnmark: () => void;
@@ -33,9 +31,6 @@ export function LessonPane({
 }: Props) {
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      {/* 41rem = the 36rem measure plus symmetric padding, so the visible
-          text column sits exactly on the article's centre line — the same
-          line the centred search bar tracks. */}
       <article className="mx-auto w-full max-w-[41rem] px-5 pt-6 pb-20 sm:px-8 sm:pt-9 lg:px-10">
         <p className="tnum text-[0.75rem] text-fg-3">
           Lesson {lesson.n} of {total}

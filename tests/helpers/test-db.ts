@@ -1,11 +1,6 @@
 /**
- * An in-process Postgres for tests (PGlite, per the implementation
- * conventions): real SQL, real migrations, no Docker, no network.
- *
- * The pgvector extension rides along (the aliased `pglite-vector` build,
- * which bundles it), so ticket #11's exact vector retrieval runs the real
- * `<=>` operator against real 1536-dimension columns in tests. Production
- * runs pgvector on Neon; see drizzle/0009 for the CREATE EXTENSION.
+ * PGlite with real SQL, migrations, and the pgvector build, so retrieval
+ * runs the real `<=>` operator against real 1536-dimension columns.
  */
 import { PGlite } from "pglite-vector";
 import { vector as vectorExtension } from "pglite-vector/vector";

@@ -1,8 +1,3 @@
-/**
- * Review, correction, and publication (ticket #6), with the model
- * scripted: the three review slices, targeted corrections, the two-round
- * cap, the atomic publish, and the privacy of a failed review.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 
@@ -188,7 +183,6 @@ describe("structuralFindings", () => {
     expect(details).toContain('cites Source "src-9"');
     expect(details).toContain("no worked example");
     expect(details).toContain("no bridge");
-    /* Every finding names its Lesson. */
     for (const finding of findings) {
       expect(finding.lessonRef).toBe("l2");
       expect(finding.kind).toBe("structural");
@@ -339,7 +333,6 @@ describe("publication", () => {
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
     expect(course.status).toBe("failed");
 
-    /* Another Learner, and even the owner, read nothing. */
     const reading = await findOwnedPublishedCourse(db, "u1", courseId);
     expect(reading).toBeUndefined();
   });
@@ -371,7 +364,6 @@ describe("reading path", () => {
     expect(reading?.sourceRows).toHaveLength(0);
     expect(reading?.outline.version).toBe(1);
 
-    /* Ownership is in the query. */
     expect(await findOwnedPublishedCourse(db, "someone-else", courseId)).toBeUndefined();
   });
 

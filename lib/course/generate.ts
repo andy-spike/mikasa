@@ -1,18 +1,3 @@
-/**
- * Course generation: one complete unpublished candidate, written Lesson by
- * Lesson in declared dependency order (docs/research/
- * cohesive-course-generation.md).
- *
- * Like design, every step is a plain function with its model and searcher
- * injected; `workflows/course-generation.ts` wraps them as Workflow steps,
- * one step per Lesson, so a failure costs one Lesson's work, not the
- * Course's. Nothing here knows about Workflow or the database.
- *
- * Sources are shared: every Lesson prompt gets the Course's gathered
- * Sources. A Lesson may additionally request one specific lookup when the
- * shared set cannot carry it — that is the only per-Lesson lookup there
- * is, and Grounding off removes it entirely.
- */
 import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
 import { nanoid } from "nanoid";
@@ -21,7 +6,6 @@ import { designProviderOptions } from "@/lib/model";
 import { parseLessonContent, type ContentBlock, type LessonContent } from "./content";
 import type { CourseSpecification, OutlineData, OutlineLesson } from "./types";
 
-/** A Source as a Lesson prompt sees it: the shared set plus any found for the Lesson. */
 export type PromptSource = {
   ref: string;
   title: string;
@@ -29,7 +13,6 @@ export type PromptSource = {
   excerpt: string;
 };
 
-/** The per-Lesson slice of Firecrawl, for a necessary Lesson-specific lookup. */
 export type LessonSourceSearcher = (
   query: string,
   limit: number,
@@ -39,13 +22,7 @@ export class GenerationError extends Error {
   name = "GenerationError";
 }
 
-/**
- * The declared dependency order: a Lesson comes after every Lesson whose
- * graph nodes it requires. Ties keep the Outline's order, which is the
- * order the Learner approved. A cycle or a missing node is a design bug
- * and fails the run loudly rather than generating a Course that builds on
- * nothing.
- */
+// Ties keep Outline order; a cycle or missing node fails loudly rather than generating on nothing.
 export function generationOrder(spec: CourseSpecification, outline: OutlineData): OutlineLesson[] {
   const lessons = outline.modules.flatMap((m) => m.lessons);
   const position = new Map(lessons.map((l, i) => [l.id, i]));
@@ -60,7 +37,6 @@ export function generationOrder(spec: CourseSpecification, outline: OutlineData)
     introducedBy.set(node.id, node.lessonId);
   }
 
-  /** prerequisite edges: lesson -> lessons it depends on */
   const dependsOn = new Map<string, Set<string>>(lessons.map((l) => [l.id, new Set<string>()]));
   for (const node of spec.learningGraph) {
     const dependentLesson = node.lessonId;
@@ -77,7 +53,6 @@ export function generationOrder(spec: CourseSpecification, outline: OutlineData)
     }
   }
 
-  /* Kahn's algorithm; the "queue" is the Outline order, so ties stay put. */
   const remaining = new Map([...dependsOn.entries()].map(([id, deps]) => [id, new Set(deps)]));
   const ordered: OutlineLesson[] = [];
   let progress = true;
@@ -106,11 +81,6 @@ const planSchema = z.object({
   query: z.string().optional(),
 });
 
-/**
- * Step: ask the model whether this Lesson needs a Source the shared set
- * does not carry, and get the query if so. Grounding off short-circuits:
- * no lookups exist in an ungrounded Course.
- */
 export async function planLessonSource(
   model: LanguageModel,
   course: { topic: string; goal: string; grounding: boolean },
@@ -149,10 +119,8 @@ export async function planLessonSource(
   return { needsSource: false };
 }
 
-/** How many pages one Lesson-specific lookup may fetch. */
 export const LESSON_SOURCE_LIMIT = 2;
 
-/** The ref prefix for a Source found for one Lesson. */
 export function newLessonSourceRef(): string {
   return `les-${nanoid(10)}`;
 }
@@ -166,13 +134,7 @@ const lessonContentSchema = z.object({
   bridge: z.string().min(1),
 });
 
-/**
- * Step: write one Lesson. The prompt carries the private specification for
- * this Lesson (its performance, its prerequisite skills, the throughline),
- * the summaries of every prior Lesson in the order written so far, and the
- * available Sources. Content is validated against the Lesson shape; Source
- * refs the model invents are dropped, not passed through.
- */
+// Invented source refs are dropped, not passed through.
 export async function generateLesson(
   model: LanguageModel,
   input: {
@@ -294,10 +256,6 @@ function languageName(language: string): string {
   return names[language] ?? "English";
 }
 
-/**
- * The candidate is complete only when every planned Lesson exists. The
- * Course advances to review on whole coverage — never on partial output.
- */
 export function candidateIsComplete(outline: OutlineData, writtenLessonIds: Set<string>): boolean {
   const planned = outline.modules.flatMap((m) => m.lessons.map((l) => l.id));
   return planned.every((id) => writtenLessonIds.has(id));
