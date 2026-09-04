@@ -1,6 +1,6 @@
 /**
  * The Tutor's retrieval (ticket #11), end to end against real pgvector
- * (PGlite with the vector extension): fragments embedded at 768
+ * (PGlite with the vector extension): fragments embedded at 1536
  * dimensions at publication, exact cosine Course search scoped to the
  * owned Course, Firecrawl web substitution, read-only tools, inline
  * Source links in the answer, and the four-step agent ceiling.
@@ -51,13 +51,13 @@ vi.mock("@/lib/web/firecrawl", () => ({
 import { streamingModel } from "./helpers/fake-model";
 
 /**
- * A deterministic, offline embedder: 768 dimensions, one hot dimension
+ * A deterministic, offline embedder: 1536 dimensions, one hot dimension
  * per known keyword. Fragment text and query text that share a keyword
  * land close together, which is all the retrieval proof needs.
  */
 function keywordEmbed(text: string): number[] {
   const words = ["windows", "joins", "indexes", "transactions", "vacuum"];
-  const vector = new Array<number>(768).fill(0.01);
+  const vector = new Array<number>(1536).fill(0.01);
   const lower = text.toLowerCase();
   words.forEach((word, i) => {
     if (lower.includes(word)) vector[i] = 1;
@@ -447,7 +447,7 @@ describe("the embeddings endpoint", () => {
         status: 200,
       })) as typeof fetch;
     try {
-      await expect(actual.embedTexts(["x"])).rejects.toThrow(/768 dimensions/);
+      await expect(actual.embedTexts(["x"])).rejects.toThrow(/1536 dimensions/);
     } finally {
       globalThis.fetch = realFetch;
       vi.unstubAllEnvs();

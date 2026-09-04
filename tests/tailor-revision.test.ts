@@ -82,7 +82,7 @@ vi.mock("@/lib/model", async () => {
     generationModel: () => revisionModelState.current!.model,
     embedTexts: async (texts: string[]) => {
       embedCalls.count += 1;
-      return texts.map(() => new Array<number>(768).fill(0.01));
+      return texts.map(() => new Array<number>(1536).fill(0.01));
     },
   };
 });
@@ -266,7 +266,7 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
   /* The Tutor's search index, as ticket #11 left it. */
   await embedCourseFragments(
     db,
-    async (texts) => texts.map(() => new Array<number>(768).fill(0.01)),
+    async (texts) => texts.map(() => new Array<number>(1536).fill(0.01)),
     course.id,
     1,
   );

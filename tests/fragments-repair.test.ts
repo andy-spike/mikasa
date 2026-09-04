@@ -55,7 +55,7 @@ const modelState = vi.hoisted(() => ({
   current: undefined as ReturnType<typeof import("./helpers/fake-model").scriptedModel> | undefined,
 }));
 const embedState = vi.hoisted(() => ({
-  current: (texts: string[]) => Promise.resolve(texts.map(() => new Array<number>(768).fill(0.01))),
+  current: (texts: string[]) => Promise.resolve(texts.map(() => new Array<number>(1536).fill(0.01))),
 }));
 vi.mock("@/lib/model", async () => {
   const actual = await vi.importActual<typeof import("@/lib/model")>("@/lib/model");
@@ -250,7 +250,7 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
 
   await embedCourseFragments(
     db,
-    async (texts) => texts.map(() => new Array<number>(768).fill(0.01)),
+    async (texts) => texts.map(() => new Array<number>(1536).fill(0.01)),
     course.id,
     1,
   );
@@ -383,7 +383,7 @@ describe("a revision whose embedding fails", () => {
 
     /* The repair re-embeds the whole revision and marks the run done. */
     embedState.current = async (texts: string[]) =>
-      texts.map(() => new Array<number>(768).fill(0.01));
+      texts.map(() => new Array<number>(1536).fill(0.01));
     const fragmentsBefore = await listFragments(db, courseId);
     expect(fragmentsBefore.filter((f) => f.lessonRef === "l1").length).toBeGreaterThan(0);
 

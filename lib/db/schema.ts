@@ -511,7 +511,7 @@ export type TutorMessage = typeof tutorMessages.$inferSelect;
 
 /**
  * A searchable fragment of a published Lesson (ticket #11): one block of
- * the Lesson's content, embedded at 768 dimensions when the revision was
+ * the Lesson's content, embedded at 1536 dimensions when the revision was
  * published. Retrieval is exact pgvector cosine search over the owned
  * Course's fragments — no index, perfect recall, Course-sized tables.
  */
@@ -528,7 +528,7 @@ export const lessonFragments = pgTable(
     ordinal: integer("ordinal").notNull(),
     /** The fragment's text, as the Tutor reads it. */
     content: text("content").notNull(),
-    embedding: vector("embedding", { dimensions: 768 }).notNull(),
+    embedding: vector("embedding", { dimensions: 1536 }).notNull(),
   },
   (table) => [
     index("lesson_fragments_course_id_idx").on(table.courseId),

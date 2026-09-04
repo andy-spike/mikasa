@@ -106,6 +106,13 @@
       "when": 1788316457277,
       "tag": "0014_free_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1788476426266,
+      "tag": "0015_flowery_speed_demon",
+      "breakpoints": true
     }
   ]
 }

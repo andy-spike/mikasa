@@ -70,7 +70,7 @@ vi.mock("@/lib/model", async () => {
   return {
     ...actual,
     generationModel: () => modelState.current!.model,
-    embedTexts: async (texts: string[]) => texts.map(() => new Array<number>(768).fill(0.01)),
+    embedTexts: async (texts: string[]) => texts.map(() => new Array<number>(1536).fill(0.01)),
   };
 });
 

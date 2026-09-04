@@ -1,0 +1,1 @@
+ALTER TABLE "lesson_fragments" ALTER COLUMN "embedding" SET DATA TYPE vector(1536);

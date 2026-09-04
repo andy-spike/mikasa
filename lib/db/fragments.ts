@@ -2,7 +2,7 @@ import "server-only";
 
 /**
  * Lesson fragments (ticket #11): the published Course's searchable text,
- * embedded at 768 dimensions at publication time. Retrieval is exact
+ * embedded at 1536 dimensions at publication time. Retrieval is exact
  * pgvector cosine search — ORDER BY embedding <=> query with no index,
  * perfect recall over Course-sized tables. Every query is scoped to one
  * Course id, so a Learner's Tutor can never see another Course's

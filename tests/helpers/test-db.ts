@@ -4,7 +4,7 @@
  *
  * The pgvector extension rides along (the aliased `pglite-vector` build,
  * which bundles it), so ticket #11's exact vector retrieval runs the real
- * `<=>` operator against real 768-dimension columns in tests. Production
+ * `<=>` operator against real 1536-dimension columns in tests. Production
  * runs pgvector on Neon; see drizzle/0009 for the CREATE EXTENSION.
  */
 import { PGlite } from "pglite-vector";

@@ -9,7 +9,7 @@
  */
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { LanguageModel } from "ai";
-import type { OpenRouterProviderOptions } from "@openrouter/ai-sdk-provider";
+import type { OpenRouterChatSettings, OpenRouterProviderOptions } from "@openrouter/ai-sdk-provider";
 
 /**
  * Feature profiles. `model` is an OpenRouter model id; `reasoning` is the
@@ -18,26 +18,46 @@ import type { OpenRouterProviderOptions } from "@openrouter/ai-sdk-provider";
  */
 export const MODEL_PROFILES = {
   design: {
-    model: "anthropic/claude-sonnet-4.5",
+    model: "z-ai/glm-5.3-flash",
     reasoning: { effort: "medium" },
   },
   grounding: {
-    model: "anthropic/claude-sonnet-4.5",
+    model: "z-ai/glm-5.3-flash",
     reasoning: { effort: "low" },
   },
   tutor: {
-    model: "anthropic/claude-sonnet-4.5",
+    model: "z-ai/glm-5.3-flash",
     reasoning: { effort: "low" },
   },
   embedding: {
-    model: "baai/bge-base-en-v1.5",
-    dimensions: 768,
+    model: "openai/text-embedding-3-small",
+    dimensions: 1536,
   },
 } as const;
 
 function openrouter() {
   return createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 }
+
+/**
+ * Provider routing for the design/generation family. Slugs verified live
+ * against OpenRouter's endpoints list for z-ai/glm-5.3-flash: Baseten is
+ * the fastest option OpenRouter carries (~214 t/s on Artificial
+ * Analysis), Friendli next (~175), then Makora (~102), DigitalOcean
+ * (~90), Together (~81). Nebius, Databricks, and Inco are faster on AA
+ * but do not serve this model through OpenRouter. `allow_fallbacks`
+ * stays true so a total outage falls back to default routing instead of
+ * failing. In provider v3 routing rides model settings (the second
+ * `openrouter()` argument), not per-call `providerOptions`. Tutor and
+ * grounding keep default routing: their turns are short, so first-token
+ * latency dominates and provider choice matters less.
+ */
+const DESIGN_PROVIDER_ORDER = ["baseten", "friendli", "makora", "digitalocean", "together"];
+
+/** Routing for the design/generation family, applied at model construction. */
+const DESIGN_ROUTING: OpenRouterChatSettings = {
+  provider: { order: [...DESIGN_PROVIDER_ORDER], allow_fallbacks: true },
+};
 
 /**
  * OpenRouter provider options for a feature: the reasoning profile rides
@@ -53,7 +73,7 @@ export function groundingProviderOptions(): { openrouter: OpenRouterProviderOpti
 
 /** The model Course design runs on (Outline draft and specification). */
 export function designModel(): LanguageModel {
-  return openrouter()(MODEL_PROFILES.design.model);
+  return openrouter()(MODEL_PROFILES.design.model, DESIGN_ROUTING);
 }
 
 /** The model that picks Source excerpts out of fetched pages. */
@@ -66,7 +86,7 @@ export function groundingModel(): LanguageModel {
  * a Course and writing its Lessons are the same class of work.
  */
 export function generationModel(): LanguageModel {
-  return openrouter()(MODEL_PROFILES.design.model);
+  return openrouter()(MODEL_PROFILES.design.model, DESIGN_ROUTING);
 }
 
 /** The model the Tutor converses on: fast to first word, still sharp. */
@@ -81,12 +101,12 @@ export function tutorProviderOptions(): { openrouter: OpenRouterProviderOptions 
 
 /**
  * Embeddings ride the same OpenRouter key, through its OpenAI-compatible
- * embeddings endpoint. bge-base-en-v1.5 is natively 768-dimensional — the
- * same shape as the `lesson_fragments.embedding` column — so no
- * dimension negotiation happens; the column and the model agree by
- * construction. Documents and queries embed through one deterministic
- * endpoint; the query side adds the retrieval prefix the model card
- * recommends.
+ * embeddings endpoint. text-embedding-3-small is natively
+ * 1536-dimensional — the same shape as the `lesson_fragments.embedding`
+ * column — so no dimension negotiation happens; the column and the model
+ * agree by construction. Documents and queries embed through one
+ * deterministic endpoint with no prefix: unlike the previous bge model,
+ * OpenAI embeddings take raw text on both sides.
  */
 const EMBEDDINGS_ENDPOINT = "https://openrouter.ai/api/v1/embeddings";
 
@@ -133,7 +153,7 @@ async function requestEmbeddings(texts: string[]): Promise<number[][]> {
   });
 }
 
-/** Embeds Course content (fragment text) at 768 dimensions. */
+/** Embeds Course content (fragment text) at 1536 dimensions. */
 export async function embedTexts(texts: string[]): Promise<number[][]> {
   const vectors: number[][] = [];
   for (let i = 0; i < texts.length; i += EMBED_BATCH) {
@@ -142,10 +162,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   return vectors;
 }
 
-/** bge-base-en-v1.5's card recommends this prefix on the query side. */
-const QUERY_PREFIX = "Represent this sentence for searching relevant passages: ";
-
-/** Embeds a retrieval query. Prefixes the query, per the model card. */
+/** Embeds a retrieval query. No prefix: the model takes raw text. */
 export async function embedQuery(text: string): Promise<number[]> {
-  return (await embedTexts([`${QUERY_PREFIX}${text}`]))[0];
+  return (await embedTexts([text]))[0];
 }
