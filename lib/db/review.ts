@@ -354,6 +354,72 @@ export async function resetGenerationRun(
   });
 }
 
+export type CancelGenerationResult =
+  | { ok: true; outlineVersion: number }
+  | { ok: false; reason: "not-found" | "too-late" };
+
+/**
+ * Discards an in-flight generation run and returns the Course to its last
+ * stable checkpoint. The approved Outline and specification stay; partial
+ * candidate Lessons and review work for the run's Outline version go.
+ * A later approval starts that version fresh. Repeating the call on a
+ * stranded Course (no run row left) still restores the checkpoint.
+ */
+export async function cancelGenerationRun(
+  db: Db,
+  ownerId: string,
+  courseId: string,
+): Promise<CancelGenerationResult> {
+  return db.transaction(async (tx) => {
+    const [course] = await tx
+      .select()
+      .from(courses)
+      .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
+      .limit(1);
+    if (!course) return { ok: false as const, reason: "not-found" as const };
+    if (course.status !== "generating" && course.status !== "reviewing") {
+      return { ok: false as const, reason: "too-late" as const };
+    }
+
+    const [run] = await tx
+      .select()
+      .from(generationRuns)
+      .where(eq(generationRuns.courseId, courseId))
+      .orderBy(desc(generationRuns.startedAt))
+      .limit(1);
+    if (run && run.status === "succeeded") {
+      return { ok: false as const, reason: "too-late" as const };
+    }
+
+    const [outline] = await tx
+      .select({ version: outlines.version })
+      .from(outlines)
+      .where(eq(outlines.courseId, courseId))
+      .orderBy(desc(outlines.version))
+      .limit(1);
+    const version = run?.outlineVersion ?? outline?.version ?? 1;
+
+    await tx
+      .delete(lessons)
+      .where(and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, version)));
+    await tx
+      .delete(reviewRuns)
+      .where(and(eq(reviewRuns.courseId, courseId), eq(reviewRuns.outlineVersion, version)));
+    if (run) await tx.delete(generationRuns).where(eq(generationRuns.id, run.id));
+
+    const [published] = await tx
+      .select({ id: revisions.id })
+      .from(revisions)
+      .where(eq(revisions.courseId, courseId))
+      .limit(1);
+    await tx
+      .update(courses)
+      .set({ status: published ? "ready" : "awaiting-outline-approval", updatedAt: new Date() })
+      .where(eq(courses.id, courseId));
+    return { ok: true as const, outlineVersion: version };
+  });
+}
+
 export type PublishedCourse = {
   course: Course;
   revision: Revision;

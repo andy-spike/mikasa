@@ -31,6 +31,13 @@ async function stepMarkStep(runId: string, step: string): Promise<void> {
     .where(eq(generationRuns.id, runId));
 }
 
+async function stepGenerationCancelled(runId: string): Promise<boolean> {
+  "use step";
+  const { generationRunCancelled } = await import("@/lib/db/outline");
+  const { db } = await import("@/lib/db");
+  return generationRunCancelled(db, runId);
+}
+
 async function stepOrder(context: GenerationContext): Promise<OutlineLesson[]> {
   "use step";
   const { generationOrder } = await import("@/lib/course/generate");
@@ -379,6 +386,9 @@ export async function generateCourseWorkflow(
     const already = new Set(context.written);
 
     for (let i = 0; i < order.length; i++) {
+      if (await stepGenerationCancelled(runId)) {
+        return { ok: false as const, reason: "cancelled" };
+      }
       if (already.has(order[i].id)) {
         priorLessons.push({ title: order[i].title, summary: order[i].summary });
         continue;
@@ -395,6 +405,9 @@ export async function generateCourseWorkflow(
       priorLessons.push({ title: order[i].title, summary: order[i].summary });
     }
 
+    if (await stepGenerationCancelled(runId)) {
+      return { ok: false as const, reason: "cancelled" };
+    }
     const finished = await stepFinish(courseId, outlineVersion, runId);
     if (!finished.ok) {
       return {
@@ -404,6 +417,9 @@ export async function generateCourseWorkflow(
       };
     }
 
+    if (await stepGenerationCancelled(runId)) {
+      return { ok: false as const, reason: "cancelled" };
+    }
     const resume = await stepReviewResumePoint(courseId, outlineVersion);
     if (resume.action === "done") {
       return { ok: true as const, revisionNumber: resume.revisionNumber };
@@ -423,6 +439,9 @@ export async function generateCourseWorkflow(
     let round = review.round;
     while (review.findings.length > 0 && round < MAX_CORRECTION_ROUNDS) {
       round += 1;
+      if (await stepGenerationCancelled(runId)) {
+        return { ok: false as const, reason: "cancelled" };
+      }
       await stepMarkStep(runId, `corrections:${round}`);
 
       const byLesson = new Map<string, ReviewPayload["findings"]>();
@@ -448,6 +467,9 @@ export async function generateCourseWorkflow(
 
     await stepFinishReviewRun(reviewRunId);
 
+    if (await stepGenerationCancelled(runId)) {
+      return { ok: false as const, reason: "cancelled" };
+    }
     await stepMarkStep(runId, "publish");
     const published = await stepPublish(courseId, outlineVersion, reviewRunId);
     if (!published.ok) {
@@ -458,6 +480,9 @@ export async function generateCourseWorkflow(
     await stepEmbedFragments(courseId, outlineVersion, runId);
     return { ok: true as const, revisionNumber: published.revisionNumber };
   } catch (error) {
+    if (await stepGenerationCancelled(runId)) {
+      return { ok: false as const, reason: "cancelled" };
+    }
     await stepFail(courseId, runId, errorMessage(error));
     return { ok: false as const, reason: "generation-failed" };
   }

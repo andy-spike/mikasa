@@ -1,12 +1,14 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { Db } from "./index";
 import {
   courses,
   courseSpecs,
+  designEvents,
   designRuns,
   outlines,
   sources,
   type Course,
+  type DesignEvent,
   type DesignRun,
   type Outline,
   type SourceRow,
@@ -24,6 +26,16 @@ import type { OutlineDraft } from "../course/design";
 export async function findCourseForDesign(db: Db, courseId: string): Promise<Course | undefined> {
   const [course] = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
   return course;
+}
+
+/** True while a cancelled design has not deleted the Course row yet. */
+export async function designCourseExists(db: Db, courseId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: courses.id })
+    .from(courses)
+    .where(eq(courses.id, courseId))
+    .limit(1);
+  return row !== undefined;
 }
 
 export async function startDesignRun(
@@ -49,6 +61,49 @@ export async function recordDesignStep(db: Db, runId: string, currentStep: strin
     .where(eq(designRuns.id, runId));
 }
 
+export type DesignEventKind =
+  | "sources-searching"
+  | "sources-found"
+  | "sources-ready"
+  | "outline-drafting"
+  | "outline-ready"
+  | "specification-working"
+  | "specification-ready";
+
+export async function appendDesignEvent(
+  db: Db,
+  courseId: string,
+  runId: string,
+  kind: DesignEventKind | string,
+  message: string,
+  payload?: Record<string, unknown> | null,
+): Promise<DesignEvent> {
+  const [event] = await db
+    .insert(designEvents)
+    .values({ courseId, runId, kind, message, payload: payload ?? null })
+    .returning();
+  return event;
+}
+
+export async function listDesignEvents(
+  db: Db,
+  courseId: string,
+  runId?: string,
+): Promise<DesignEvent[]> {
+  if (runId) {
+    return db
+      .select()
+      .from(designEvents)
+      .where(and(eq(designEvents.courseId, courseId), eq(designEvents.runId, runId)))
+      .orderBy(asc(designEvents.createdAt));
+  }
+  return db
+    .select()
+    .from(designEvents)
+    .where(eq(designEvents.courseId, courseId))
+    .orderBy(asc(designEvents.createdAt));
+}
+
 export async function saveDesignSources(
   db: Db,
   courseId: string,
@@ -69,6 +124,35 @@ export async function saveDesignSources(
       );
     }
   });
+}
+
+export async function upsertDesignSources(
+  db: Db,
+  courseId: string,
+  gathered: GatheredSource[],
+): Promise<void> {
+  if (gathered.length === 0) return;
+  for (const s of gathered) {
+    await db
+      .insert(sources)
+      .values({
+        courseId,
+        ref: s.ref,
+        title: s.title,
+        url: s.url,
+        fetchedAt: new Date(s.fetchedAt),
+        excerpt: s.excerpt,
+      })
+      .onConflictDoUpdate({
+        target: [sources.courseId, sources.url],
+        set: {
+          ref: s.ref,
+          title: s.title,
+          fetchedAt: new Date(s.fetchedAt),
+          excerpt: s.excerpt,
+        },
+      });
+  }
 }
 
 export async function saveDesignOutline(

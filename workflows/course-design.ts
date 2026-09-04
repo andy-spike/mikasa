@@ -44,13 +44,17 @@ async function stepMarkStep(runId: string, step: string): Promise<void> {
 async function stepDesignSources(
   course: DesignCourse,
   courseId: string,
+  runId: string,
   reuse: boolean,
 ): Promise<GatheredSource[]> {
   "use step";
   const { db } = await import("@/lib/db");
-  const { collectSources, firecrawlSearcher } = await import("@/lib/course/design");
+  const { gatherSources, selectExcerpts, firecrawlSearcher, EXCERPT_MAX_CHARS } =
+    await import("@/lib/course/design");
   const { groundingModel } = await import("@/lib/model");
-  const { listCourseSources } = await import("@/lib/db/design");
+  const { appendDesignEvent, listCourseSources, upsertDesignSources } =
+    await import("@/lib/db/design");
+  const { nanoid } = await import("nanoid");
 
   if (reuse) {
     const rows = await listCourseSources(db, courseId);
@@ -63,15 +67,92 @@ async function stepDesignSources(
     }));
   }
 
-  const sources = await collectSources(firecrawlSearcher(), groundingModel(), course);
-  const { saveDesignSources } = await import("@/lib/db/design");
-  await saveDesignSources(db, courseId, sources);
-  return sources;
+  {
+    const { sources } = await import("@/lib/db/schema");
+    const { eq } = await import("drizzle-orm");
+    await db.delete(sources).where(eq(sources.courseId, courseId));
+  }
+
+  if (!course.grounding) {
+    await appendDesignEvent(
+      db,
+      courseId,
+      runId,
+      "sources-ready",
+      "Grounding is off, so this Course is planned from the model's own knowledge.",
+      { count: 0 },
+    );
+    return [];
+  }
+
+  await appendDesignEvent(
+    db,
+    courseId,
+    runId,
+    "sources-searching",
+    "Searching for current sources on your Topic and Goal.",
+  );
+  const pages = await gatherSources(firecrawlSearcher(), course);
+  if (pages.length === 0) {
+    await appendDesignEvent(
+      db,
+      courseId,
+      runId,
+      "sources-ready",
+      "The search came back empty, so this Course is planned without extra sources.",
+      { count: 0 },
+    );
+    return [];
+  }
+
+  const refs = new Map(pages.map((p) => [p.url, `src-${nanoid(10)}`]));
+  const placeholder: GatheredSource[] = pages.map((p) => ({
+    ref: refs.get(p.url) ?? `src-${nanoid(10)}`,
+    title: p.title,
+    url: p.url,
+    fetchedAt: p.fetchedAt,
+    excerpt: p.content.slice(0, EXCERPT_MAX_CHARS).trim(),
+  }));
+  await upsertDesignSources(db, courseId, placeholder);
+  await appendDesignEvent(
+    db,
+    courseId,
+    runId,
+    "sources-found",
+    `Found ${pages.length} ${pages.length === 1 ? "source" : "sources"}. Reading the passages that matter for your Goal.`,
+    {
+      count: pages.length,
+      sources: placeholder.map((s) => ({ ref: s.ref, title: s.title, url: s.url })),
+    },
+  );
+
+  const excerpts = await selectExcerpts(groundingModel(), course, pages);
+  const gathered: GatheredSource[] = pages.map((p) => ({
+    ref: refs.get(p.url) ?? `src-${nanoid(10)}`,
+    title: p.title,
+    url: p.url,
+    fetchedAt: p.fetchedAt,
+    excerpt: excerpts.get(p.url) ?? p.content.slice(0, EXCERPT_MAX_CHARS).trim(),
+  }));
+  await upsertDesignSources(db, courseId, gathered);
+  await appendDesignEvent(
+    db,
+    courseId,
+    runId,
+    "sources-ready",
+    `Kept ${gathered.length} ${gathered.length === 1 ? "source" : "sources"} for the Outline.`,
+    {
+      count: gathered.length,
+      sources: gathered.map((s) => ({ ref: s.ref, title: s.title, url: s.url })),
+    },
+  );
+  return gathered;
 }
 
 async function stepDesignOutline(
   course: DesignCourse,
   courseId: string,
+  runId: string,
   sources: GatheredSource[],
   reuse: boolean,
 ): Promise<{ outline: OutlineData; draft: OutlineDraft; outlineVersion: number }> {
@@ -79,7 +160,7 @@ async function stepDesignOutline(
   const { db } = await import("@/lib/db");
   const { draftOutline, buildOutline } = await import("@/lib/course/design");
   const { designModel } = await import("@/lib/model");
-  const { latestOutline, saveDesignOutline } = await import("@/lib/db/design");
+  const { appendDesignEvent, latestOutline, saveDesignOutline } = await import("@/lib/db/design");
 
   if (reuse) {
     const existing = await latestOutline(db, courseId);
@@ -92,14 +173,42 @@ async function stepDesignOutline(
     }
   }
 
+  await appendDesignEvent(
+    db,
+    courseId,
+    runId,
+    "outline-drafting",
+    "Drafting the Modules and the Lesson titles from your Goal.",
+  );
   const draft = await draftOutline(designModel(), course, sources);
   const outline = buildOutline(draft, course.depth);
   const saved = await saveDesignOutline(db, courseId, outline, draft);
+  const lessonCount = outline.modules.reduce((n, m) => n + m.lessons.length, 0);
+  await appendDesignEvent(
+    db,
+    courseId,
+    runId,
+    "outline-ready",
+    `Drafted ${outline.modules.length} Modules with ${lessonCount} Lessons. Planning how they connect.`,
+    {
+      modules: outline.modules.map((m) => ({
+        numeral: m.numeral,
+        title: m.title,
+        lessons: m.lessons.map((l) => ({ title: l.title, summary: l.summary, minutes: l.minutes })),
+      })),
+      terminalPerformances: draft.terminalPerformances,
+      throughline: draft.throughline,
+      exclusions: draft.exclusions,
+      learnerAssumptions: draft.learnerAssumptions,
+    },
+  );
   return { outline, draft, outlineVersion: saved.version };
 }
 
 async function stepDesignSpecification(
   course: DesignCourse,
+  courseId: string,
+  runId: string,
   outline: OutlineData,
   draft: OutlineDraft,
   sources: GatheredSource[],
@@ -107,7 +216,25 @@ async function stepDesignSpecification(
   "use step";
   const { designSpecification } = await import("@/lib/course/design");
   const { designModel } = await import("@/lib/model");
-  return designSpecification(designModel(), course, outline, draft, sources);
+  const { appendDesignEvent } = await import("@/lib/db/design");
+  const { db } = await import("@/lib/db");
+
+  await appendDesignEvent(
+    db,
+    courseId,
+    runId,
+    "specification-working",
+    "Linking each Lesson to the Goal and the final exercise.",
+  );
+  const specification = await designSpecification(designModel(), course, outline, draft, sources);
+  await appendDesignEvent(
+    db,
+    courseId,
+    runId,
+    "specification-ready",
+    "The Lesson connections are set. Saving the Outline for your review.",
+  );
+  return specification;
 }
 
 async function stepPersist(
@@ -130,6 +257,13 @@ async function stepFail(courseId: string, runId: string, message: string): Promi
   await failDesignRun(db, courseId, runId, message);
 }
 
+async function stepDesignCancelled(courseId: string): Promise<boolean> {
+  "use step";
+  const { designCourseExists } = await import("@/lib/db/design");
+  const { db } = await import("@/lib/db");
+  return !(await designCourseExists(db, courseId));
+}
+
 export async function designCourseWorkflow(
   courseId: string,
   runId: string,
@@ -148,18 +282,29 @@ export async function designCourseWorkflow(
 
   try {
     await stepMarkStep(runId, "sources");
-    const sources = await stepDesignSources(loaded.course, courseId, !reached("sources"));
+    const sources = await stepDesignSources(loaded.course, courseId, runId, !reached("sources"));
+    if (await stepDesignCancelled(courseId)) return { ok: false as const, reason: "cancelled" };
 
     await stepMarkStep(runId, "outline");
-    const built = await stepDesignOutline(loaded.course, courseId, sources, !reached("outline"));
+    const built = await stepDesignOutline(
+      loaded.course,
+      courseId,
+      runId,
+      sources,
+      !reached("outline"),
+    );
+    if (await stepDesignCancelled(courseId)) return { ok: false as const, reason: "cancelled" };
 
     await stepMarkStep(runId, "specification");
     const specification = await stepDesignSpecification(
       loaded.course,
+      courseId,
+      runId,
       built.outline,
       built.draft,
       sources,
     );
+    if (await stepDesignCancelled(courseId)) return { ok: false as const, reason: "cancelled" };
 
     await stepMarkStep(runId, "persist");
     await stepPersist(
@@ -170,6 +315,7 @@ export async function designCourseWorkflow(
     );
     return { ok: true as const };
   } catch (error) {
+    if (await stepDesignCancelled(courseId)) return { ok: false as const, reason: "cancelled" };
     await stepFail(courseId, runId, errorMessage(error));
     return { ok: false as const, reason: "design-failed" };
   }

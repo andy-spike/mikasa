@@ -182,11 +182,33 @@ export const designRuns = pgTable(
   (table) => [index("design_runs_course_id_idx").on(table.courseId)],
 );
 
+export const designEvents = pgTable(
+  "design_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => designRuns.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    message: text("message").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("design_events_course_id_idx").on(table.courseId),
+    index("design_events_run_id_idx").on(table.runId),
+  ],
+);
+
 export type Course = typeof courses.$inferSelect;
 export type NewCourse = typeof courses.$inferInsert;
 export type Outline = typeof outlines.$inferSelect;
 export type SourceRow = typeof sources.$inferSelect;
 export type DesignRun = typeof designRuns.$inferSelect;
+export type DesignEvent = typeof designEvents.$inferSelect;
 export type CourseSpecRow = typeof courseSpecs.$inferSelect;
 export type GenerationRun = typeof generationRuns.$inferSelect;
 

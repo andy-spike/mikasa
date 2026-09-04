@@ -6,9 +6,9 @@ import { db } from "@/lib/db";
 import { courses, designRuns } from "@/lib/db/schema";
 import { failDesignRun, latestDesignRun, startDesignRun } from "@/lib/db/design";
 import { failGenerationRun, latestGenerationRun } from "@/lib/db/outline";
-import { resetGenerationRun, currentRevision } from "@/lib/db/review";
+import { cancelGenerationRun, resetGenerationRun, currentRevision } from "@/lib/db/review";
 import { searchIsIncomplete } from "@/lib/db/fragments";
-import { findOwnedCourse } from "@/lib/db/courses";
+import { deleteOwnedDesigningCourse, findOwnedCourse } from "@/lib/db/courses";
 import { requireLearner } from "@/lib/session";
 import { validateCourseInput, type CourseInput, type CourseInputErrors } from "@/lib/course/limits";
 import { designCourseWorkflow } from "@/workflows/course-design";
@@ -112,6 +112,28 @@ export async function retryCourseAction(courseId: string): Promise<RetryResult> 
       errors: { form: "The design engine could not start this retry. Try again." },
     };
   }
+}
+
+export type CancelResult = { ok: true } | { ok: false; reason: "not-found" | "too-late" };
+
+/**
+ * Discards a Course that is still designing. The in-flight workflow stops
+ * at its next step boundary; a design that finished first is kept and
+ * reported as too late so the learner lands on the Outline instead.
+ */
+export async function cancelDesignAction(courseId: string): Promise<CancelResult> {
+  const { user } = await requireLearner();
+  return deleteOwnedDesigningCourse(db, user.id, courseId);
+}
+
+/**
+ * Stops an in-flight generation and returns the Course to its Outline
+ * checkpoint. The approved Outline and specification stay; partial
+ * candidate Lessons and review work go, so a later approval starts fresh.
+ */
+export async function cancelGenerationAction(courseId: string): Promise<CancelResult> {
+  const { user } = await requireLearner();
+  return cancelGenerationRun(db, user.id, courseId);
 }
 
 export type RebuildFragmentsResult = { ok: boolean; message?: string };

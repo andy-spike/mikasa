@@ -228,6 +228,16 @@ export async function latestGenerationRun(
   return run;
 }
 
+/** True once the learner cancels: cancelling deletes the run row. */
+export async function generationRunCancelled(db: Db, runId: string): Promise<boolean> {
+  const [run] = await db
+    .select({ id: generationRuns.id })
+    .from(generationRuns)
+    .where(eq(generationRuns.id, runId))
+    .limit(1);
+  return run === undefined;
+}
+
 export async function failGenerationRun(
   db: Db,
   courseId: string,

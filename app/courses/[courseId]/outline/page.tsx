@@ -5,7 +5,12 @@ import { CourseFailed } from "@/components/course-failed";
 import { OutlineEditor } from "@/components/outline-editor";
 import { db } from "@/lib/db";
 import { findOwnedCourse } from "@/lib/db/courses";
-import { latestDesignRun, latestOutline } from "@/lib/db/design";
+import {
+  latestDesignRun,
+  latestOutline,
+  listCourseSources,
+  listDesignEvents,
+} from "@/lib/db/design";
 import { latestGenerationRun } from "@/lib/db/outline";
 import { loadTailorHistory } from "@/lib/db/tailor";
 import { findProposedPlanAction } from "@/lib/actions/tailor";
@@ -53,6 +58,18 @@ export default async function OutlinePage({ params }: PageProps<"/courses/[cours
 
   if (course.status === "designing") {
     const run = await latestDesignRun(db, courseId);
+    const [events, sourceRows, preview] = await Promise.all([
+      run ? listDesignEvents(db, courseId, run.id) : Promise.resolve([]),
+      listCourseSources(db, courseId),
+      latestOutline(db, courseId),
+    ]);
+    const domainOf = (url: string) => {
+      try {
+        return new URL(url).hostname.replace(/^www\./, "");
+      } catch {
+        return url;
+      }
+    };
     return (
       <AppShell section={course.topic}>
         <CourseDesignProgress
@@ -62,6 +79,31 @@ export default async function OutlinePage({ params }: PageProps<"/courses/[cours
           status="designing"
           step={run?.currentStep ?? "sources"}
           error={run?.error ?? null}
+          startedAt={run?.startedAt.toISOString() ?? course.createdAt.toISOString()}
+          events={events.map((e) => ({
+            kind: e.kind,
+            message: e.message,
+            createdAt: e.createdAt.toISOString(),
+          }))}
+          sources={sourceRows.map((s) => ({ title: s.title, url: s.url, domain: domainOf(s.url) }))}
+          preview={
+            preview
+              ? {
+                  modules: preview.data.modules.map((m) => ({
+                    numeral: m.numeral,
+                    title: m.title,
+                    lessons: m.lessons.map((l) => ({
+                      title: l.title,
+                      summary: l.summary,
+                      minutes: l.minutes,
+                    })),
+                  })),
+                  terminalPerformances: preview.draft?.terminalPerformances ?? [],
+                  premise: preview.draft?.throughline.premise ?? null,
+                  runningExample: preview.draft?.throughline.runningExample ?? null,
+                }
+              : null
+          }
         />
       </AppShell>
     );

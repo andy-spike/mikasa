@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, Combine, Plus, Scissors, X } from "lucide-react";
 import { applyOutlineOpAction, approveOutlineAction } from "@/lib/actions/outline";
+import { cancelGenerationAction } from "@/lib/actions/courses";
 import { applyPlanToOutlineAction, reviewTailorOperationAction } from "@/lib/actions/tailor";
 import type { OutlineEditorCourse } from "@/lib/course/view";
 import type { OutlineOp } from "@/lib/course/structure";
 import { TailorConversation, type PlanView, type Turn } from "./tailor-conversation";
 import { Button } from "./ui/button";
+import { CancelRunButton } from "./cancel-run-button";
 import { field } from "@/lib/ui";
 import { Skeleton } from "./ui/skeleton";
 import { Textarea } from "./ui/textarea";
@@ -61,6 +63,12 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     setModules(course.modules);
     setVersion(course.version);
     setError(null);
+  }
+
+  const [adoptedPhase, setAdoptedPhase] = useState(course.phase);
+  if (course.phase !== adoptedPhase) {
+    setAdoptedPhase(course.phase);
+    setGenerating(course.phase === "generating" || course.phase === "reviewing");
   }
 
   const lessons = useMemo(() => modules.flatMap((m) => m.lessons), [modules]);
@@ -199,6 +207,18 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
         <p className="mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
           You can leave this page. The Course will be here when you come back.
         </p>
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+          <CancelRunButton
+            idleLabel="Cancel generation"
+            confirmLabel="Discard the partial Course?"
+            pendingLabel="Discarding…"
+            onConfirm={() => cancelGenerationAction(course.id)}
+            onDone={() => router.refresh()}
+          />
+          <Button variant="quiet" render={<Link href="/courses" />} className="ml-auto">
+            Back to Courses
+          </Button>
+        </div>
         <div className="mt-9 space-y-2.5">
           {[10, 6, 8, 5, 9].map((w, i) => (
             <Skeleton
