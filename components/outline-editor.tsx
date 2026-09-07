@@ -12,8 +12,8 @@ import type { OutlineOp } from "@/lib/course/structure";
 import { TailorConversation, type PlanView, type Turn } from "./tailor-conversation";
 import { Button } from "./ui/button";
 import { CancelRunButton } from "./cancel-run-button";
+import { DoneCheck, UnsetMark } from "./workspace/marks";
 import { field } from "@/lib/ui";
-import { Skeleton } from "./ui/skeleton";
 import { Textarea } from "./ui/textarea";
 import { useStickyFollow } from "@/hooks/use-sticky-follow";
 import {
@@ -184,24 +184,39 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
   }
 
   if (generating) {
+    const reviewing = course.phase === "reviewing";
+    const savedIndex =
+      runStep && runStep.startsWith("lesson:")
+        ? lessons.findIndex((l) => runStep.slice(7) === l.id)
+        : -1;
+    // currentStep points at the last saved Lesson, so the next one is doing.
+    const doingIndex = reviewing || runStep === "complete" ? -1 : savedIndex + 1;
+    const allDone = doingIndex < 0 || doingIndex >= lessons.length;
+    const writingNumber = allDone ? lessons.length : doingIndex + 1;
+    const reviewStatus = !reviewing
+      ? null
+      : runStep?.startsWith("corrections:")
+        ? `Correction round ${runStep.slice("corrections:".length)}: fixing what the review found.`
+        : runStep === "publish"
+          ? "The review passed. Publishing the Course."
+          : runStep?.startsWith("lesson:")
+            ? "Correcting what the review found."
+            : "The review pass is running: structure, accuracy, learning design.";
     return (
       <div className="mx-auto w-full max-w-[38rem] px-5 pt-10 pb-24 sm:px-8" aria-live="polite">
         <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
           {course.topic}
         </h1>
         <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-          {course.phase === "reviewing"
-            ? `All ${lessons.length} Lessons are written. The review pass is next: structure, accuracy, learning design.`
+          {reviewing
+            ? `All ${lessons.length} Lessons are written. ${reviewStatus ?? ""}`
             : `Generating all ${lessons.length} Lessons in one pass, against the shape you just approved.`}
         </p>
-        {runStep ? (
+        {!reviewing ? (
           <p className="tnum mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
-            {runStep.startsWith("lesson:")
-              ? `Lesson ${Math.min(
-                  lessons.findIndex((l) => runStep.slice(7) === l.id) + 1 || 1,
-                  lessons.length,
-                )} of ${lessons.length}.`
-              : "Starting."}
+            {runStep && !runStep.startsWith("lesson:") && runStep !== "complete"
+              ? "Starting."
+              : `Lesson ${Math.min(writingNumber, lessons.length)} of ${lessons.length}.`}
           </p>
         ) : null}
         <p className="mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
@@ -213,21 +228,60 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
             confirmLabel="Discard the partial Course?"
             pendingLabel="Discarding…"
             onConfirm={() => cancelGenerationAction(course.id)}
-            onDone={() => router.refresh()}
+            onDone={(result) => {
+              if (result.ok) {
+                setError(null);
+                router.refresh();
+              } else {
+                setError(
+                  result.reason === "too-late"
+                    ? "This Course already moved past generation. Reload the page."
+                    : "The Course could not be discarded.",
+                );
+              }
+            }}
           />
           <Button variant="quiet" render={<Link href="/courses" />} className="ml-auto">
             Back to Courses
           </Button>
         </div>
-        <div className="mt-9 space-y-2.5">
-          {[10, 6, 8, 5, 9].map((w, i) => (
-            <Skeleton
-              key={i}
-              className="h-4 rounded-sm bg-panel"
-              style={{ width: `${w * 8 + 12}%` }}
-            />
-          ))}
-        </div>
+        {error ? (
+          <p role="alert" className="mt-3 text-[0.8125rem] leading-[1.5] text-fg-2">
+            {error}
+          </p>
+        ) : null}
+        <ol className="mt-6 border-t border-hair">
+          {lessons.map((lesson, i) => {
+            const done = allDone || i < doingIndex;
+            const doing = !allDone && i === doingIndex;
+            return (
+              <li
+                key={lesson.id}
+                className="grid grid-cols-[0.75rem_1fr_auto] items-center gap-x-2 border-b border-hair px-2 py-1.5"
+                aria-current={doing ? "true" : undefined}
+              >
+                <span className="flex h-4 w-3 items-center justify-center text-fg-3">
+                  {done ? <DoneCheck /> : <UnsetMark />}
+                </span>
+                <span className="min-w-0">
+                  <span
+                    className={
+                      doing
+                        ? "block truncate text-[0.8125rem] leading-5 font-medium text-fg"
+                        : "block truncate text-[0.8125rem] leading-5 text-fg-2"
+                    }
+                  >
+                    <span className="tnum mr-2 text-fg-3">{i + 1}</span>
+                    {lesson.title}
+                  </span>
+                </span>
+                <span className="text-[0.75rem] leading-[1.5] text-fg-3">
+                  {done ? "Done" : doing ? "Doing" : "Queued"}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       </div>
     );
   }

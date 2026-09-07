@@ -9,8 +9,10 @@ vi.mock("@/lib/db", async () => {
   return { db: await makeTestDb() };
 });
 
-const headerState = vi.hoisted(() => ({ current: new Headers() }));
-vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
+vi.mock("next/headers", async () => {
+  const { headerState } = await import("./helpers/request-context");
+  return { headers: async () => headerState.current };
+});
 
 const navigation = vi.hoisted(() => ({
   redirect: (url: string): never => {
@@ -20,34 +22,13 @@ const navigation = vi.hoisted(() => ({
 vi.mock("next/navigation", () => navigation);
 
 const { auth, requireLearner } = await import("@/lib/session");
-const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
+const { signInWithGoogle } = await import("./helpers/auth");
+const { setRequestCookie } = await import("./helpers/request-context");
 
 const ORIGIN = "http://localhost:3000";
 
-async function signInWithGoogle(email: string): Promise<string> {
-  fakeGoogle({ sub: `sub-${email}`, name: "A Learner", email, email_verified: true });
-
-  const signIn = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "google", callbackURL: "/courses" }),
-    }),
-  );
-  const { url } = (await signIn.json()) as { url: string };
-  const state = new URL(url).searchParams.get("state") as string;
-
-  const callback = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/callback/google?code=one-time-code&state=${state}`, {
-      headers: { cookie: cookieHeader(signIn) },
-    }),
-  );
-  expect(callback.status).toBe(302);
-  return cookieHeader(callback);
-}
-
 beforeEach(() => {
-  headerState.current = new Headers();
+  setRequestCookie(null);
 });
 
 afterEach(() => {
@@ -65,13 +46,13 @@ describe("requireLearner", () => {
       new Request(`${ORIGIN}/api/auth/sign-out`, { method: "POST", headers: { cookie } }),
     );
 
-    headerState.current = new Headers({ cookie });
+    setRequestCookie(cookie);
     await expect(requireLearner()).rejects.toThrow("NEXT_REDIRECT:/");
   });
 
   it("hands the session to a signed-in Learner", async () => {
     const cookie = await signInWithGoogle("learner@example.com");
-    headerState.current = new Headers({ cookie });
+    setRequestCookie(cookie);
 
     const session = await requireLearner();
     expect(session.user.email).toBe("learner@example.com");

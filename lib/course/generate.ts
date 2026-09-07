@@ -3,7 +3,12 @@ import type { LanguageModel } from "ai";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { designProviderOptions } from "@/lib/model";
-import { parseLessonContent, type ContentBlock, type LessonContent } from "./content";
+import {
+  lessonContentSchema,
+  parseLessonContent,
+  type ContentBlock,
+  type LessonContent,
+} from "./content";
 import type { CourseSpecification, OutlineData, OutlineLesson } from "./types";
 
 export type PromptSource = {
@@ -121,18 +126,79 @@ export async function planLessonSource(
 
 export const LESSON_SOURCE_LIMIT = 2;
 
+// How many Lessons one wave generates at once. Lessons only read the
+// Course specification and Outline summaries, never each other's prose,
+// so a wave is bounded by provider concurrency, not by data flow.
+export const LESSON_WAVE_SIZE = 5;
+
+const planBatchSchema = z.object({
+  plans: z.array(
+    z.object({
+      lessonId: z.string(),
+      needsSource: z.boolean(),
+      query: z.string().optional(),
+    }),
+  ),
+});
+
+export type LessonSourcePlan = { lessonId: string; needsSource: boolean; query?: string };
+
+// One model call plans the Source lookups for every pending Lesson, so the
+// workflow fetches once and generates with the full Source pool instead of
+// paying a planning call per Lesson in series.
+export async function planLessonSources(
+  model: LanguageModel,
+  course: { topic: string; goal: string; grounding: boolean },
+  lessons: { id: string; title: string; summary: string; performance?: string }[],
+  sharedSources: PromptSource[],
+): Promise<LessonSourcePlan[]> {
+  if (!course.grounding || lessons.length === 0) {
+    return lessons.map((l) => ({ lessonId: l.id, needsSource: false }));
+  }
+
+  const { output } = await generateText({
+    model,
+    providerOptions: designProviderOptions(),
+    output: Output.object({ schema: planBatchSchema }),
+    prompt: [
+      "Course Lessons are about to be written in parallel. For each Lesson,",
+      "decide whether it needs one web Source the shared set does not carry",
+      "— current facts, version numbers, a concrete reference. Most Lessons",
+      "need nothing.",
+      "",
+      `Topic: ${course.topic}`,
+      `Goal: ${course.goal}`,
+      "",
+      "Shared sources:",
+      ...sharedSources.map((s) => `- ${s.title} (${s.url}): ${s.excerpt.slice(0, 200)}`),
+      "",
+      "Lessons:",
+      ...lessons.map(
+        (l) =>
+          `- ${l.id}: ${l.title} — ${l.summary}${l.performance ? ` (teaches: ${l.performance})` : ""}`,
+      ),
+      "",
+      "Return plans: one entry per Lesson that needs a Source, with lessonId",
+      "and one specific search query. Omit Lessons that need nothing.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  });
+
+  if (!output) return lessons.map((l) => ({ lessonId: l.id, needsSource: false }));
+  const byId = new Map(output.plans.map((p) => [p.lessonId, p]));
+  return lessons.map((l) => {
+    const plan = byId.get(l.id);
+    if (plan?.needsSource && plan.query?.trim()) {
+      return { lessonId: l.id, needsSource: true, query: plan.query.trim() };
+    }
+    return { lessonId: l.id, needsSource: false };
+  });
+}
+
 export function newLessonSourceRef(): string {
   return `les-${nanoid(10)}`;
 }
-
-const lessonContentSchema = z.object({
-  body: z.array(z.unknown()).min(1),
-  workedExample: z.array(z.unknown()).min(1),
-  recallPrompt: z.string().min(1),
-  selfExplanationPrompt: z.string().min(1),
-  exercise: z.object({ task: z.string().min(1), check: z.string().min(1) }),
-  bridge: z.string().min(1),
-});
 
 // Invented source refs are dropped, not passed through.
 export async function generateLesson(
@@ -184,7 +250,7 @@ export async function generateLesson(
       "The course's throughline — extend it, do not restart it:",
       JSON.stringify(input.spec.throughline),
       "",
-      "Lessons already written (in order):",
+      "Lessons that come before this one (in order):",
       ...(input.priorLessons.length
         ? input.priorLessons.map((l) => `- ${l.title}: ${l.summary}`)
         : ["- (this is the first)"]),

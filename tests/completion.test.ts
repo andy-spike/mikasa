@@ -8,8 +8,10 @@ vi.mock("@/lib/db", async () => {
   return { db: await makeTestDb() };
 });
 
-const headerState = vi.hoisted(() => ({ current: new Headers() }));
-vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
+vi.mock("next/headers", async () => {
+  const { headerState } = await import("./helpers/request-context");
+  return { headers: async () => headerState.current };
+});
 
 const navigation = vi.hoisted(() => ({
   redirect: (url: string): never => {
@@ -19,108 +21,29 @@ const navigation = vi.hoisted(() => ({
 vi.mock("next/navigation", () => navigation);
 
 const { markLessonDoneAction, markLessonUndoneAction } = await import("@/lib/actions/completion");
-const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
-const {
-  completions,
-  courses,
-  courseSpecs,
-  generationRuns,
-  outlines,
-  reviewRuns,
-  revisions,
-  users,
-} = await import("@/lib/db/schema");
-const { saveLessonContent } = await import("@/lib/db/lessons");
-const { publishRevision } = await import("@/lib/db/review");
-const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
+const { completions, courses, revisions, users } = await import("@/lib/db/schema");
+const { parseLessonContent } = await import("@/lib/course/content");
+const { signInWithGoogle } = await import("./helpers/auth");
+const { setRequestCookie } = await import("./helpers/request-context");
+const { makeOutline, makeSpec } = await import("./helpers/fixtures");
+const { OWNER, OTHER, seedPublishedCourse } = await import("./helpers/published-course");
 
-const ORIGIN = "http://localhost:3000";
+const OUTLINE = makeOutline([2]);
 
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [
-        { id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 },
-        { id: "l2", ordinal: 2, title: "Lesson two", summary: "Second.", minutes: 20 },
-      ],
-    },
-  ],
-};
-
-const SPEC = {
-  contract: {
-    topic: "the Vercel AI SDK",
-    goal: "build my own AI chat app",
-    background: "",
-    depth: "reach",
-    language: "en",
-    terminalPerformances: ["Ship"],
-    exclusions: [],
-    learnerAssumptions: [],
-  },
+const SPEC = makeSpec(OUTLINE, {
+  topic: "the Vercel AI SDK",
+  goal: "build my own AI chat app",
+  terminalPerformances: ["Ship"],
   throughline: { premise: "p", runningExample: "r", vocabulary: [] },
-  learningGraph: [],
-  alignment: OUTLINE.modules[0].lessons.map((l) => ({
-    lessonId: l.id,
-    performance: "does",
-    prerequisiteNodes: [] as string[],
-    moduleMilestone: "m",
-    exerciseContribution: "c",
-  })),
-  finalExercise: { task: "t", acceptanceChecks: ["c"] },
-  evidence: [],
-};
+});
 
-async function signInWithGoogle(email: string): Promise<string> {
-  fakeGoogle({ sub: `sub-${email}`, name: "A Learner", email, email_verified: true });
-  const signIn = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "google", callbackURL: "/courses" }),
-    }),
-  );
-  const { url } = (await signIn.json()) as { url: string };
-  const state = new URL(url).searchParams.get("state") as string;
-  const callback = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/callback/google?code=one-time-code&state=${state}`, {
-      headers: { cookie: cookieHeader(signIn) },
-    }),
-  );
-  return cookieHeader(callback);
-}
-
-async function seedPublishedCourse(ownerEmail: string): Promise<string> {
-  const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
-  const [course] = await db
-    .insert(courses)
-    .values({
-      ownerId: user.id,
-      topic: "the Vercel AI SDK",
-      goal: "build my own AI chat app",
-      depth: "reach",
-      status: "reviewing",
-    })
-    .returning();
-  await db.insert(outlines).values({ courseId: course.id, version: 1, data: OUTLINE });
-  await db.insert(courseSpecs).values({ courseId: course.id, spec: SPEC, outlineVersion: 1 });
-  const [run] = await db
-    .insert(generationRuns)
-    .values({ courseId: course.id, outlineVersion: 1 })
-    .returning();
-
-  const { parseLessonContent } = await import("@/lib/course/content");
-  for (const l of OUTLINE.modules[0].lessons) {
-    await saveLessonContent(
-      db,
-      course.id,
-      1,
-      run.id,
+function seedCourse(ownerEmail: string): Promise<string> {
+  return seedPublishedCourse({
+    ownerEmail,
+    outline: OUTLINE,
+    spec: SPEC,
+    content: (l) =>
       parseLessonContent(l.id, l.title, {
         body: [{ kind: "p", text: "x" }],
         workedExample: [{ kind: "p", text: "y" }],
@@ -129,45 +52,31 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
         exercise: { task: "t", check: "c" },
         bridge: "b",
       }),
-    );
-  }
-
-  const [review] = await db
-    .insert(reviewRuns)
-    .values({ courseId: course.id, outlineVersion: 1, status: "succeeded" })
-    .returning();
-  const published = await publishRevision(db, course.id, 1, review.id);
-  expect(published.ok).toBe(true);
-  return course.id;
+  });
 }
 
-const OWNER = "owner@example.com";
-const OTHER = "other@example.com";
 let ownerCookie = "";
-let otherCookie = "";
 
 beforeEach(async () => {
-  headerState.current = new Headers();
+  setRequestCookie(null);
   ownerCookie = await signInWithGoogle(OWNER);
-  otherCookie = await signInWithGoogle(OTHER);
+  /* The second Learner exists for the cross-owner read at the bottom. */
+  await signInWithGoogle(OTHER);
 });
 
 afterEach(async () => {
   await db.delete(users);
-  headerState.current = new Headers();
+  setRequestCookie(null);
 });
 
 function asOwner() {
-  headerState.current = new Headers({ cookie: ownerCookie });
-}
-function asOther() {
-  headerState.current = new Headers({ cookie: otherCookie });
+  setRequestCookie(ownerCookie);
 }
 
 describe("markLessonDoneAction", () => {
   it("completes the Exercise, its Lesson, and eventually the Course", async () => {
     asOwner();
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
 
     const first = await markLessonDoneAction(courseId, "l1");
     expect(first.ok).toBe(true);
@@ -192,7 +101,7 @@ describe("markLessonDoneAction", () => {
 
   it("marks are idempotent: marking twice keeps one completion and its first day", async () => {
     asOwner();
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
 
     const first = await markLessonDoneAction(courseId, "l1");
     const again = await markLessonDoneAction(courseId, "l1");
@@ -205,7 +114,7 @@ describe("markLessonDoneAction", () => {
 
   it("unmarking clears the Lesson and the Course's completion", async () => {
     asOwner();
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
 
     await markLessonDoneAction(courseId, "l1");
     await markLessonDoneAction(courseId, "l2");
@@ -223,7 +132,7 @@ describe("markLessonDoneAction", () => {
 
   it("refuses a Lesson the published Course does not have", async () => {
     asOwner();
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const result = await markLessonDoneAction(courseId, "l-ghost");
     expect(result).toMatchObject({ ok: false, reason: "unknown-lesson" });
     expect(await db.select().from(completions).where(eq(completions.courseId, courseId))).toEqual(
@@ -231,19 +140,9 @@ describe("markLessonDoneAction", () => {
     );
   });
 
-  it("reads another Learner's Course as not-found and never writes to it", async () => {
-    asOther();
-    const courseId = await seedPublishedCourse(OWNER);
-    const result = await markLessonDoneAction(courseId, "l1");
-    expect(result).toMatchObject({ ok: false, reason: "not-found" });
-    expect(await db.select().from(completions).where(eq(completions.courseId, courseId))).toEqual(
-      [],
-    );
-  });
-
   it("refuses a Course that has not published", async () => {
     asOwner();
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     await db.delete(revisions).where(eq(revisions.courseId, courseId));
     const result = await markLessonDoneAction(courseId, "l1");
     expect(result).toMatchObject({ ok: false, reason: "not-published" });
@@ -253,10 +152,10 @@ describe("markLessonDoneAction", () => {
 describe("persistence across sessions", () => {
   it("the reading path restores Completion for the owning Learner only", async () => {
     asOwner();
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     await markLessonDoneAction(courseId, "l1");
 
-    headerState.current = new Headers();
+    setRequestCookie(null);
     ownerCookie = await signInWithGoogle(OWNER);
     asOwner();
 

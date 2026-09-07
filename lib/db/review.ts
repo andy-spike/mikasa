@@ -26,6 +26,17 @@ export async function openReviewRun(
   outlineVersion: number,
   options?: { touchCourse?: boolean },
 ): Promise<ReviewRun> {
+  /* Sandbox results belong to one review run. A new run must re-run them
+     against the current Lessons: reusing the previous run's failed result
+     would fail the new run even after corrections fixed the code. */
+  await db
+    .delete(codeVerifications)
+    .where(
+      and(
+        eq(codeVerifications.courseId, courseId),
+        eq(codeVerifications.outlineVersion, outlineVersion),
+      ),
+    );
   const [run] = await db.insert(reviewRuns).values({ courseId, outlineVersion }).returning();
   if (options?.touchCourse === false) return run;
   await db
@@ -387,9 +398,6 @@ export async function cancelGenerationRun(
       .where(eq(generationRuns.courseId, courseId))
       .orderBy(desc(generationRuns.startedAt))
       .limit(1);
-    if (run && run.status === "succeeded") {
-      return { ok: false as const, reason: "too-late" as const };
-    }
 
     const [outline] = await tx
       .select({ version: outlines.version })

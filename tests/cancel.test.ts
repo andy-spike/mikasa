@@ -3,8 +3,9 @@ import { and, eq } from "drizzle-orm";
 import { deleteOwnedDesigningCourse } from "@/lib/db/courses";
 import { generationRunCancelled } from "@/lib/db/outline";
 import { designCourseExists } from "@/lib/db/design";
-import { cancelGenerationRun } from "@/lib/db/review";
+import { cancelGenerationRun, openReviewRun } from "@/lib/db/review";
 import {
+  codeVerifications,
   courses,
   designRuns,
   generationRuns,
@@ -16,6 +17,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { makeTestDb } from "./helpers/test-db";
+import { makeOutline, makeSpec } from "./helpers/fixtures";
 
 type TestDb = Awaited<ReturnType<typeof makeTestDb>>;
 
@@ -49,43 +51,13 @@ async function seedDesigningCourse(db: TestDb, ownerId: string) {
   return { course, run };
 }
 
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [{ id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 }],
-    },
-  ],
-};
-
-const SPEC = {
-  contract: {
-    topic: "the Vercel AI SDK",
-    goal: "build my own AI chat app",
-    background: "",
-    depth: "reach",
-    language: "en",
-    terminalPerformances: ["Ship"],
-    exclusions: [],
-    learnerAssumptions: [],
-  },
+const OUTLINE = makeOutline([1]);
+const SPEC = makeSpec(OUTLINE, {
+  topic: "the Vercel AI SDK",
+  goal: "build my own AI chat app",
+  terminalPerformances: ["Ship"],
   throughline: { premise: "p", runningExample: "r", vocabulary: [] },
-  learningGraph: [],
-  alignment: [
-    {
-      lessonId: "l1",
-      performance: "does",
-      prerequisiteNodes: [],
-      moduleMilestone: "m",
-      exerciseContribution: "c",
-    },
-  ],
-  finalExercise: { task: "t", acceptanceChecks: ["c"] },
-  evidence: [],
-};
+});
 
 async function seedGeneratingCourse(db: TestDb, ownerId: string) {
   const [course] = await db
@@ -161,17 +133,6 @@ describe("cancelling a designing Course", () => {
     expect(result).toEqual({ ok: false, reason: "too-late" });
     expect((await db.select().from(courses).where(eq(courses.id, course.id))).length).toBe(1);
   });
-
-  it("refuses a Course owned by someone else", async () => {
-    const db = await makeTestDb();
-    const owner = await seedUser(db, "u1");
-    await seedUser(db, "u2");
-    const { course } = await seedDesigningCourse(db, owner.id);
-
-    const result = await deleteOwnedDesigningCourse(db, "u2", course.id);
-    expect(result).toEqual({ ok: false, reason: "not-found" });
-    expect((await db.select().from(courses).where(eq(courses.id, course.id))).length).toBe(1);
-  });
 });
 
 describe("cancelling a generating Course", () => {
@@ -235,16 +196,46 @@ describe("cancelling a generating Course", () => {
     expect(result).toEqual({ ok: false, reason: "too-late" });
   });
 
-  it("refuses a Course owned by someone else", async () => {
+  it("still cancels a reviewing Course whose lessons already finished", async () => {
+    /* Regression: finishGeneration flips the run to succeeded while the
+       course is reviewing. A dead review worker must not strand the course
+       with no way back to the Outline. */
     const db = await makeTestDb();
-    const owner = await seedUser(db, "u1");
-    await seedUser(db, "u2");
-    const { course } = await seedGeneratingCourse(db, owner.id);
+    const user = await seedUser(db, "u1");
+    const { course, run } = await seedGeneratingCourse(db, user.id);
+    await db.update(courses).set({ status: "reviewing" }).where(eq(courses.id, course.id));
+    await db
+      .update(generationRuns)
+      .set({ status: "succeeded", currentStep: "complete" })
+      .where(eq(generationRuns.id, run.id));
 
-    const result = await cancelGenerationRun(db, "u2", course.id);
-    expect(result).toEqual({ ok: false, reason: "not-found" });
-    const [kept] = await db.select().from(courses).where(eq(courses.id, course.id));
-    expect(kept.status).toBe("generating");
+    const result = await cancelGenerationRun(db, user.id, course.id);
+    expect(result).toEqual({ ok: true, outlineVersion: 1 });
+
+    const [after] = await db.select().from(courses).where(eq(courses.id, course.id));
+    expect(after.status).toBe("awaiting-outline-approval");
+    expect(await db.select().from(generationRuns).where(eq(generationRuns.id, run.id))).toEqual([]);
+  });
+
+  it("a new review run drops the previous run's Sandbox result", async () => {
+    /* Otherwise the new run reuses a stale failure and can never pass,
+       even after corrections fixed the code. */
+    const db = await makeTestDb();
+    const user = await seedUser(db, "u1");
+    const { course } = await seedGeneratingCourse(db, user.id);
+    await db.insert(codeVerifications).values({
+      courseId: course.id,
+      outlineVersion: 1,
+      round: 0,
+      status: "failed",
+      evidence: { commands: [] },
+    });
+
+    await openReviewRun(db, course.id, 1, { touchCourse: false });
+
+    expect(
+      await db.select().from(codeVerifications).where(eq(codeVerifications.courseId, course.id)),
+    ).toEqual([]);
   });
 });
 

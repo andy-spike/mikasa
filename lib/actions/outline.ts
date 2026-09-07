@@ -1,8 +1,10 @@
 "use server";
 
+import { eq } from "drizzle-orm";
 import { start } from "workflow/api";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { generationRuns } from "@/lib/db/schema";
 import { requireLearner } from "@/lib/session";
 import { reconcileSpecification } from "@/lib/course/reconcile";
 import { designModel } from "@/lib/model";
@@ -149,7 +151,11 @@ export async function approveOutlineAction(
   if (opened.duplicate) return { ok: true, duplicate: true };
 
   try {
-    await start(generateCourseWorkflow, [courseId, opened.run.id, outline.version]);
+    const started = await start(generateCourseWorkflow, [courseId, opened.run.id, outline.version]);
+    await db
+      .update(generationRuns)
+      .set({ workflowRunId: started.runId })
+      .where(eq(generationRuns.id, opened.run.id));
     return { ok: true, duplicate: false };
   } catch {
     await failGenerationRun(

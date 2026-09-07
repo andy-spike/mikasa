@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Mikasa",
   description:
-    "Mikasa generates structured courses from a Topic and a Goal, so a learner goes from fundamentals to a concrete outcome.",
+    "Turn your Goal into a private Course. Shape the Outline, learn through connected Lessons and Exercises, and ask the Tutor and Tailor for support.",
 };
 
 const DIRECTION_CONTRACT = `<!--
@@ -27,6 +27,15 @@ OWN-WORLD: Graphite #0f1012 with three luminance steps up, or paper #ffffff with
 STORY: The learner sees all twenty Lessons at once, reads the one they are up to, marks its Exercise done, and watches the accent hand off to the next.
 FIRST VIEWPORT: Dense Outline rail on the left, drawn by the shadcn Sidebar carrying every Lesson without scrolling. The Lesson anchored beside it at a 36rem measure, on the same axis as the chrome above it, so opening the panel never moves the sentence being read. Panel closed at the right edge. Cmd-K opens the command palette, which is navigation, not a shortcut.
 FORM: Graphite Workspace, direction roll 21608bd1, re-roll 1, safer register, user-picked, code-led build path.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+-->
+<!--
+LANDING: personal-goal-course
+THESIS: A personal Goal becomes an approved Outline and a cohesive Course.
+OWN-WORLD: Inherit Graphite Workspace, both grounds, Geist, square controls and tonal separation. Preserve DESIGN.md's landing widths.
+STORY: Understand the offer, inspect an illustrative photography Outline, learn the approval workflow and capabilities, then start with Google.
+FIRST VIEWPORT: Left-aligned display heading and 36rem explanation, primary action beneath, followed by the 60rem two-column Goal and Outline example. Mobile stacks the example in reading order.
+FORM: Code-led extension of the landing composition already specified in DESIGN.md. No new visual world or direction roll.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 -->`;
 

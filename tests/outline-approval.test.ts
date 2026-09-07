@@ -8,8 +8,10 @@ vi.mock("@/lib/db", async () => {
   return { db: await makeTestDb() };
 });
 
-const headerState = vi.hoisted(() => ({ current: new Headers() }));
-vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
+vi.mock("next/headers", async () => {
+  const { headerState } = await import("./helpers/request-context");
+  return { headers: async () => headerState.current };
+});
 
 const navigation = vi.hoisted(() => ({
   redirect: (url: string): never => {
@@ -54,89 +56,31 @@ vi.mock("@/lib/course/reconcile", () => ({
   },
 }));
 
-const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
 const { courses, courseSpecs, generationRuns, outlines, users } = await import("@/lib/db/schema");
 const { applyOutlineOpAction, approveOutlineAction } = await import("@/lib/actions/outline");
-const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
-
-const ORIGIN = "http://localhost:3000";
-
-async function signInWithGoogle(email: string): Promise<string> {
-  fakeGoogle({ sub: `sub-${email}`, name: "A Learner", email, email_verified: true });
-
-  const signIn = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "google", callbackURL: "/courses" }),
-    }),
-  );
-  const { url } = (await signIn.json()) as { url: string };
-  const state = new URL(url).searchParams.get("state") as string;
-
-  const callback = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/callback/google?code=one-time-code&state=${state}`, {
-      headers: { cookie: cookieHeader(signIn) },
-    }),
-  );
-  expect(callback.status).toBe(302);
-  return cookieHeader(callback);
-}
+const { signInWithGoogle } = await import("./helpers/auth");
+const { setRequestCookie } = await import("./helpers/request-context");
+const { makeOutline, makeSpec } = await import("./helpers/fixtures");
 
 const OWNER_EMAIL = "owner@example.com";
-const OTHER_EMAIL = "other@example.com";
 
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [
-        { id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 },
-        { id: "l2", ordinal: 2, title: "Lesson two", summary: "Second.", minutes: 20 },
-      ],
-    },
-    {
-      id: "m2",
-      ordinal: 2,
-      numeral: "II",
-      title: "Module two",
-      lessons: [
-        { id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 },
-        { id: "l4", ordinal: 4, title: "Lesson four", summary: "Fourth.", minutes: 20 },
-      ],
-    },
-  ],
-};
-
-const SPEC = {
-  contract: {
-    topic: "the Vercel AI SDK",
-    goal: "build my own AI chat app",
-    background: "",
-    depth: "reach",
-    language: "en",
-    terminalPerformances: ["Ship a chat app"],
-    exclusions: [],
-    learnerAssumptions: [],
-  },
+const OUTLINE = makeOutline([2, 2]);
+const SPEC = makeSpec(OUTLINE, {
+  topic: "the Vercel AI SDK",
+  goal: "build my own AI chat app",
+  terminalPerformances: ["Ship a chat app"],
   throughline: { premise: "One app", runningExample: "The chat app", vocabulary: [] },
   learningGraph: [{ id: "g1", skill: "Stream text", requires: [], lessonId: "l1" }],
-  alignment: OUTLINE.modules.flatMap((m) =>
-    m.lessons.map((l) => ({
-      lessonId: l.id,
-      performance: "does the thing",
-      prerequisiteNodes: [],
-      moduleMilestone: "milestone",
-      exerciseContribution: "contributes",
-    })),
-  ),
+  alignment: (l) => ({
+    lessonId: l.id,
+    performance: "does the thing",
+    prerequisiteNodes: [],
+    moduleMilestone: "milestone",
+    exerciseContribution: "contributes",
+  }),
   finalExercise: { task: "Build it", acceptanceChecks: ["It runs"] },
-  evidence: [],
-};
+});
 
 async function seedAwaitingApproval(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
@@ -156,26 +100,21 @@ async function seedAwaitingApproval(ownerEmail: string): Promise<string> {
 }
 
 let ownerCookie = "";
-let otherCookie = "";
 
 beforeEach(async () => {
-  headerState.current = new Headers();
+  setRequestCookie(null);
   ownerCookie = await signInWithGoogle(OWNER_EMAIL);
-  otherCookie = await signInWithGoogle(OTHER_EMAIL);
   workflowStarts.calls.length = 0;
   reconcileCalls.count = 0;
 });
 
 afterEach(async () => {
   await db.delete(users);
-  headerState.current = new Headers();
+  setRequestCookie(null);
 });
 
 function asOwner() {
-  headerState.current = new Headers({ cookie: ownerCookie });
-}
-function asOther() {
-  headerState.current = new Headers({ cookie: otherCookie });
+  setRequestCookie(ownerCookie);
 }
 
 describe("applyOutlineOpAction", () => {
@@ -225,17 +164,6 @@ describe("applyOutlineOpAction", () => {
     const all = await db.select().from(outlines).where(eq(outlines.courseId, courseId));
     expect(all).toHaveLength(2);
     expect(current.version).toBe(2);
-  });
-
-  it("keeps another Learner out of the Course entirely", async () => {
-    asOther();
-    const courseId = await seedAwaitingApproval(OWNER_EMAIL);
-    const result = await applyOutlineOpAction(courseId, 1, {
-      kind: "renameModule",
-      moduleId: "m1",
-      title: "Mine now",
-    });
-    expect(result).toMatchObject({ ok: false, reason: "not-found" });
   });
 
   it("rejects a shape change once the Course left the checkpoint", async () => {
@@ -361,13 +289,5 @@ describe("approveOutlineAction", () => {
 
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
     expect(course.status).toBe("awaiting-outline-approval");
-  });
-
-  it("reads another Learner's Course as not-found", async () => {
-    asOther();
-    const courseId = await seedAwaitingApproval(OWNER_EMAIL);
-    const result = await approveOutlineAction(courseId, 1);
-    expect(result).toMatchObject({ ok: false, reason: "not-found" });
-    expect(workflowStarts.calls).toHaveLength(0);
   });
 });

@@ -3,7 +3,7 @@
 import { eq } from "drizzle-orm";
 import { start } from "workflow/api";
 import { db } from "@/lib/db";
-import { courses, designRuns } from "@/lib/db/schema";
+import { courses, designRuns, generationRuns } from "@/lib/db/schema";
 import { failDesignRun, latestDesignRun, startDesignRun } from "@/lib/db/design";
 import { failGenerationRun, latestGenerationRun } from "@/lib/db/outline";
 import { cancelGenerationRun, resetGenerationRun, currentRevision } from "@/lib/db/review";
@@ -72,7 +72,15 @@ export async function retryCourseAction(courseId: string): Promise<RetryResult> 
       return { ok: false, errors: { form: "This run cannot be retried." } };
     }
     try {
-      await start(generateCourseWorkflow, [courseId, generation.id, generation.outlineVersion]);
+      const started = await start(generateCourseWorkflow, [
+        courseId,
+        generation.id,
+        generation.outlineVersion,
+      ]);
+      await db
+        .update(generationRuns)
+        .set({ workflowRunId: started.runId })
+        .where(eq(generationRuns.id, generation.id));
       return { ok: true, courseId };
     } catch {
       await failGenerationRun(

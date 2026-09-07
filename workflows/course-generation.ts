@@ -1,335 +1,27 @@
-import type { LessonContent } from "@/lib/course/content";
-import type { PromptSource } from "@/lib/course/generate";
-import type { GenerationContext } from "@/lib/db/lessons";
-import type { OutlineLesson } from "@/lib/course/types";
+// Step args cross process boundaries as JSON, so providers resolve inside each step.
+import { LESSON_WAVE_SIZE } from "@/lib/course/generate";
 import { MAX_CORRECTION_ROUNDS } from "@/lib/course/review";
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return typeof error === "string" ? error : "Course generation failed.";
-}
-
-async function stepLoadContext(
-  courseId: string,
-  outlineVersion: number,
-): Promise<GenerationContext | null> {
-  "use step";
-  const { loadGenerationContext } = await import("@/lib/db/lessons");
-  const { db } = await import("@/lib/db");
-  const context = await loadGenerationContext(db, courseId, outlineVersion);
-  return context ?? null;
-}
-
-async function stepMarkStep(runId: string, step: string): Promise<void> {
-  "use step";
-  const { db } = await import("@/lib/db");
-  const { generationRuns } = await import("@/lib/db/schema");
-  const { eq } = await import("drizzle-orm");
-  await db
-    .update(generationRuns)
-    .set({ currentStep: step, updatedAt: new Date() })
-    .where(eq(generationRuns.id, runId));
-}
-
-async function stepGenerationCancelled(runId: string): Promise<boolean> {
-  "use step";
-  const { generationRunCancelled } = await import("@/lib/db/outline");
-  const { db } = await import("@/lib/db");
-  return generationRunCancelled(db, runId);
-}
-
-async function stepOrder(context: GenerationContext): Promise<OutlineLesson[]> {
-  "use step";
-  const { generationOrder } = await import("@/lib/course/generate");
-  return generationOrder(context.spec, context.outline.data);
-}
-
-async function stepGenerateLesson(
-  context: GenerationContext,
-  runId: string,
-  lesson: OutlineLesson,
-  nextLesson: OutlineLesson | null,
-  priorLessons: { title: string; summary: string }[],
-  extraSources: PromptSource[],
-): Promise<{ content: LessonContent; newSource?: PromptSource }> {
-  "use step";
-  const { db } = await import("@/lib/db");
-  const { planLessonSource, generateLesson, LESSON_SOURCE_LIMIT } =
-    await import("@/lib/course/generate");
-  const { saveLessonContent, saveLessonSource } = await import("@/lib/db/lessons");
-  const { generationModel } = await import("@/lib/model");
-  const { firecrawlSearcher } = await import("@/lib/course/design");
-
-  const model = generationModel();
-  const sources = [...context.sources, ...extraSources];
-
-  const plan = await planLessonSource(
-    model,
-    context.course,
-    {
-      title: lesson.title,
-      summary: lesson.summary,
-      performance: context.spec.alignment.find((a) => a.lessonId === lesson.id)?.performance,
-    },
-    sources,
-  );
-
-  let newSource: PromptSource | undefined;
-  if (plan.needsSource && plan.query) {
-    const pages = await firecrawlSearcher()(plan.query, LESSON_SOURCE_LIMIT);
-    const page = pages[0];
-    if (page && page.content.trim().length > 0) {
-      const excerpt = page.content.slice(0, 600).trim();
-      const ref = await saveLessonSource(db, context.course.id, {
-        title: page.title,
-        url: page.url,
-        excerpt,
-      });
-      newSource = { ref, title: page.title, url: page.url, excerpt };
-    }
-  }
-
-  const content = await generateLesson(model, {
-    course: context.course,
-    spec: context.spec,
-    lesson,
-    nextLesson,
-    priorLessons,
-    sources: newSource ? [...sources, newSource] : sources,
-  });
-
-  await saveLessonContent(db, context.course.id, context.outline.version, runId, content);
-  return { content, newSource };
-}
-
-async function stepFinish(
-  courseId: string,
-  outlineVersion: number,
-  runId: string,
-): Promise<{ ok: boolean; missing: number }> {
-  "use step";
-  const { finishGeneration } = await import("@/lib/db/lessons");
-  const { db } = await import("@/lib/db");
-  return finishGeneration(db, courseId, outlineVersion, runId);
-}
-
-async function stepFail(courseId: string, runId: string, message: string): Promise<void> {
-  "use step";
-  const { failGeneration } = await import("@/lib/db/lessons");
-  const { db } = await import("@/lib/db");
-  await failGeneration(db, courseId, runId, message);
-}
-
-type ReviewPayload = {
-  runId: string;
-  round: number;
-  findings: { kind: string; lessonRef: string | null; detail: string; correction: string }[];
-};
-
-async function stepReviewRound(
-  courseId: string,
-  outlineVersion: number,
-  runId: string,
-  round: number,
-  onlyLessonRefs?: string[],
-): Promise<ReviewPayload> {
-  "use step";
-  const { db } = await import("@/lib/db");
-  const { structuralFindings, factualFindings, designFindings } =
-    await import("@/lib/course/review");
-  const { needsCodeVerification, planVerification, runVerification, verificationFindings } =
-    await import("@/lib/course/sandbox-verify");
-  const { vercelSandboxProvider } = await import("@/lib/sandbox");
-  const { generationModel } = await import("@/lib/model");
-  const { loadGenerationContext, getLessonContentsForVersion } = await import("@/lib/db/lessons");
-  const { saveFindings, recordReviewStep, saveCodeVerification, findCodeVerification } =
-    await import("@/lib/db/review");
-
-  const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
-  const lessonContents = await getLessonContentsForVersion(db, courseId, outlineVersion);
-
-  const model = generationModel();
-  const courseMeta = {
-    topic: context.course.topic,
-    goal: context.course.goal,
-    language: context.course.language,
-  };
-
-  const scope =
-    onlyLessonRefs && onlyLessonRefs.length > 0
-      ? lessonContents.filter((l) => onlyLessonRefs.includes(l.lessonId))
-      : lessonContents;
-
-  const found = [
-    ...structuralFindings({
-      spec: context.spec,
-      outline: context.outline.data,
-      lessons: lessonContents,
-    }),
-    ...(await factualFindings(model, courseMeta, context.spec, context.sources, scope)),
-    ...(await designFindings(model, courseMeta, context.spec, context.outline.data, scope)),
-  ];
-
-  // Reuse the recorded Sandbox pass so a retry does not re-run it.
-  if (needsCodeVerification(context.course, scope)) {
-    const existing = await findCodeVerification(db, courseId, outlineVersion, round);
-    if (!existing) {
-      const plan = await planVerification(model, context.course, context.spec, scope);
-      const result = await runVerification(vercelSandboxProvider(), plan);
-      await saveCodeVerification(db, courseId, outlineVersion, round, result);
-      found.push(
-        ...verificationFindings(result).map((f) => ({
-          kind: "code-execution" as const,
-          lessonRef: f.lessonRef,
-          detail: f.detail,
-          correction: f.correction,
-        })),
-      );
-    } else {
-      const evidence = existing.evidence as {
-        commands?: {
-          run: string;
-          lessonRef: string;
-          exitCode: number;
-          stderr: string;
-          proves?: string;
-        }[];
-      };
-      found.push(
-        ...(evidence.commands ?? [])
-          .filter((c) => c.exitCode !== 0)
-          .map((c) => ({
-            kind: "code-execution" as const,
-            lessonRef: c.lessonRef,
-            detail: `The command "${c.run}" exited with code ${c.exitCode}${
-              c.stderr ? `: ${c.stderr.trim().slice(0, 300)}` : ""
-            }. It was meant to prove: ${c.proves ?? "the Lesson's claim"}`,
-            correction: `Fix the Lesson's code so that "${c.run}" runs cleanly.`,
-          })),
-      );
-    }
-  }
-
-  await recordReviewStep(db, runId, round);
-  await saveFindings(db, runId, courseId, outlineVersion, round, found);
-  return { runId, round, findings: found };
-}
-
-async function stepCorrectLesson(
-  courseId: string,
-  outlineVersion: number,
-  runId: string,
-  lessonRef: string,
-  findings: ReviewPayload["findings"],
-): Promise<void> {
-  "use step";
-  const { db } = await import("@/lib/db");
-  const { correctLesson } = await import("@/lib/course/review");
-  const { generationModel } = await import("@/lib/model");
-  const { loadGenerationContext, getLessonContentsForVersion, saveLessonContent } =
-    await import("@/lib/db/lessons");
-
-  const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
-  const all = await getLessonContentsForVersion(db, courseId, outlineVersion);
-  const current = all.find((l) => l.lessonId === lessonRef);
-  if (!current) return;
-
-  const corrected = await correctLesson(
-    generationModel(),
-    {
-      topic: context.course.topic,
-      goal: context.course.goal,
-      language: context.course.language,
-    },
-    context.spec,
-    current,
-    findings as Parameters<typeof correctLesson>[4],
-    all
-      .filter((l) => l.lessonId !== lessonRef)
-      .map((l) => ({
-        title: l.title,
-        summary: l.body.map(summaryOfBlock).join(" ").slice(0, 120),
-      })),
-  );
-  await saveLessonContent(db, courseId, outlineVersion, runId, corrected);
-}
-
-function summaryOfBlock(block: unknown): string {
-  const b = block as { text?: string };
-  return b.text ?? "";
-}
-
-async function stepMarkCorrected(runId: string, round: number): Promise<void> {
-  "use step";
-  const { markFindingsCorrected } = await import("@/lib/db/review");
-  const { db } = await import("@/lib/db");
-  await markFindingsCorrected(db, runId, round);
-}
-
-async function stepPublish(
-  courseId: string,
-  outlineVersion: number,
-  reviewRunId: string,
-): Promise<{ ok: boolean; reason?: string; revisionNumber?: number }> {
-  "use step";
-  const { publishRevision } = await import("@/lib/db/review");
-  const { db } = await import("@/lib/db");
-  const result = await publishRevision(db, courseId, outlineVersion, reviewRunId);
-  return result.ok
-    ? { ok: true, revisionNumber: result.revision.revisionNumber }
-    : { ok: false, reason: result.reason };
-}
-
-async function stepEmbedFragments(
-  courseId: string,
-  outlineVersion: number,
-  runId: string,
-): Promise<void> {
-  "use step";
-  const { db } = await import("@/lib/db");
-  const { embedCourseFragments } = await import("@/lib/course/fragments");
-  const { embedTexts } = await import("@/lib/model");
-  const { generationRuns } = await import("@/lib/db/schema");
-  const { eq } = await import("drizzle-orm");
-  try {
-    await embedCourseFragments(db, embedTexts, courseId, outlineVersion);
-    await db
-      .update(generationRuns)
-      .set({ fragmentsStatus: "done", fragmentsError: null, updatedAt: new Date() })
-      .where(eq(generationRuns.id, runId));
-  } catch (error) {
-    await db
-      .update(generationRuns)
-      .set({
-        fragmentsStatus: "failed",
-        fragmentsError: errorMessage(error),
-        updatedAt: new Date(),
-      })
-      .where(eq(generationRuns.id, runId));
-  }
-}
-
-async function stepFailReview(courseId: string, runId: string, message: string): Promise<void> {
-  "use step";
-  const { failReview } = await import("@/lib/db/review");
-  const { db } = await import("@/lib/db");
-  await failReview(db, courseId, runId, message);
-}
-
-async function stepFinishReviewRun(runId: string): Promise<void> {
-  "use step";
-  const { finishReviewRun } = await import("@/lib/db/review");
-  const { db } = await import("@/lib/db");
-  await finishReviewRun(db, runId, "succeeded");
-}
-
-async function stepOpenReviewRun(courseId: string, outlineVersion: number): Promise<string> {
-  "use step";
-  const { openReviewRun } = await import("@/lib/db/review");
-  const { db } = await import("@/lib/db");
-  const run = await openReviewRun(db, courseId, outlineVersion);
-  return run.id;
-}
+import {
+  groupFindingsByLesson,
+  runReviewRound,
+  stepEmbedFragments,
+  stepFailGeneration,
+  stepFetchSource,
+  stepFinish,
+  stepFinishReviewRun,
+  stepFailReview,
+  stepGenerateLesson,
+  stepGenerationCancelled,
+  stepLoadContext,
+  stepMarkStep,
+  stepMarkCorrected,
+  stepCorrectLesson,
+  stepOpenReviewRun,
+  stepOrder,
+  stepPlanSources,
+  stepPublish,
+  type ReviewFindingPayload,
+} from "./course-steps";
 
 async function stepReviewResumePoint(
   courseId: string,
@@ -373,7 +65,7 @@ export async function generateCourseWorkflow(
 
   const context = await stepLoadContext(courseId, outlineVersion);
   if (!context) {
-    await stepFail(courseId, runId, "The Course to generate no longer exists.");
+    await stepFailGeneration(courseId, runId, "The Course to generate no longer exists.", true);
     return { ok: false as const, reason: "course-not-found" };
   }
 
@@ -381,34 +73,45 @@ export async function generateCourseWorkflow(
     const order = await stepOrder(context);
     await stepMarkStep(runId, "lessons");
 
-    const extraSources: PromptSource[] = [];
-    const priorLessons: { title: string; summary: string }[] = [];
+    // Outline titles and summaries are known up front, so every Lesson
+    // prompt carries the same static framing and waves stay independent.
+    const priorLessons = order.map((l) => ({ title: l.title, summary: l.summary }));
+    const position = new Map(order.map((l, i) => [l.id, i]));
     const already = new Set(context.written);
+    const pending = order.filter((l) => !already.has(l.id));
 
-    for (let i = 0; i < order.length; i++) {
+    const sourcePlans = await stepPlanSources(
+      context,
+      pending.map((l) => ({ id: l.id, title: l.title, summary: l.summary })),
+    );
+    const fetched = await Promise.all(
+      sourcePlans.map((plan) => stepFetchSource(context.course.id, plan.query)),
+    );
+    const sources = [...context.sources, ...fetched.filter((f) => f !== null)];
+
+    for (let w = 0; w < pending.length; w += LESSON_WAVE_SIZE) {
       if (await stepGenerationCancelled(runId)) {
         return { ok: false as const, reason: "cancelled" };
       }
-      if (already.has(order[i].id)) {
-        priorLessons.push({ title: order[i].title, summary: order[i].summary });
-        continue;
-      }
-      const { newSource } = await stepGenerateLesson(
-        context,
-        runId,
-        order[i],
-        order[i + 1] ?? null,
-        priorLessons,
-        extraSources,
+      const wave = pending.slice(w, w + LESSON_WAVE_SIZE);
+      await Promise.all(
+        wave.map((lesson) =>
+          stepGenerateLesson(
+            context,
+            runId,
+            lesson,
+            order[position.get(lesson.id)! + 1] ?? null,
+            priorLessons,
+            sources,
+          ),
+        ),
       );
-      if (newSource) extraSources.push(newSource);
-      priorLessons.push({ title: order[i].title, summary: order[i].summary });
     }
 
     if (await stepGenerationCancelled(runId)) {
       return { ok: false as const, reason: "cancelled" };
     }
-    const finished = await stepFinish(courseId, outlineVersion, runId);
+    const finished = await stepFinish(courseId, outlineVersion, runId, true);
     if (!finished.ok) {
       return {
         ok: false as const,
@@ -426,42 +129,38 @@ export async function generateCourseWorkflow(
     }
 
     let reviewRunId: string;
-    let review: ReviewPayload;
+    let findings: ReviewFindingPayload[];
     if (resume.action === "publish") {
       reviewRunId = resume.reviewRunId;
-      review = { runId: reviewRunId, round: 0, findings: [] };
+      findings = [];
     } else {
       await stepMarkStep(runId, "review");
-      reviewRunId = await stepOpenReviewRun(courseId, outlineVersion);
-      review = await stepReviewRound(courseId, outlineVersion, reviewRunId, 0);
+      reviewRunId = await stepOpenReviewRun(courseId, outlineVersion, true);
+      findings = await runReviewRound(courseId, outlineVersion, reviewRunId, 0);
     }
 
-    let round = review.round;
-    while (review.findings.length > 0 && round < MAX_CORRECTION_ROUNDS) {
+    let round = 0;
+    while (findings.length > 0 && round < MAX_CORRECTION_ROUNDS) {
       round += 1;
       if (await stepGenerationCancelled(runId)) {
         return { ok: false as const, reason: "cancelled" };
       }
       await stepMarkStep(runId, `corrections:${round}`);
 
-      const byLesson = new Map<string, ReviewPayload["findings"]>();
-      for (const finding of review.findings) {
-        if (!finding.lessonRef) continue;
-        const list = byLesson.get(finding.lessonRef) ?? [];
-        list.push(finding);
-        byLesson.set(finding.lessonRef, list);
-      }
-      for (const [lessonRef, findings] of byLesson) {
-        await stepCorrectLesson(courseId, outlineVersion, runId, lessonRef, findings);
-      }
+      const byLesson = groupFindingsByLesson(findings);
+      await Promise.all(
+        [...byLesson].map(([lessonRef, lessonFindings]) =>
+          stepCorrectLesson(courseId, outlineVersion, runId, lessonRef, lessonFindings),
+        ),
+      );
       await stepMarkCorrected(reviewRunId, round - 1);
 
-      review = await stepReviewRound(courseId, outlineVersion, reviewRunId, round);
+      findings = await runReviewRound(courseId, outlineVersion, reviewRunId, round);
     }
 
-    if (review.findings.length > 0) {
-      const message = `The review still finds ${review.findings.length} problem(s) after ${MAX_CORRECTION_ROUNDS} correction rounds. The Course was not published.`;
-      await stepFailReview(courseId, reviewRunId, message);
+    if (findings.length > 0) {
+      const message = `The review still finds ${findings.length} problem(s) after ${MAX_CORRECTION_ROUNDS} correction rounds. The Course was not published.`;
+      await stepFailReview(courseId, reviewRunId, message, true);
       return { ok: false as const, reason: "review-failed" };
     }
 
@@ -474,7 +173,7 @@ export async function generateCourseWorkflow(
     const published = await stepPublish(courseId, outlineVersion, reviewRunId);
     if (!published.ok) {
       // Review stays succeeded so a retry resumes at publication.
-      await stepFail(courseId, runId, published.reason ?? "Publication failed.");
+      await stepFailGeneration(courseId, runId, published.reason ?? "Publication failed.", true);
       return { ok: false as const, reason: "publish-failed" };
     }
     await stepEmbedFragments(courseId, outlineVersion, runId);
@@ -483,7 +182,12 @@ export async function generateCourseWorkflow(
     if (await stepGenerationCancelled(runId)) {
       return { ok: false as const, reason: "cancelled" };
     }
-    await stepFail(courseId, runId, errorMessage(error));
+    await stepFailGeneration(
+      courseId,
+      runId,
+      error instanceof Error && error.message ? error.message : "Course generation failed.",
+      true,
+    );
     return { ok: false as const, reason: "generation-failed" };
   }
 }

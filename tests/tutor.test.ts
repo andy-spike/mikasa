@@ -8,8 +8,10 @@ vi.mock("@/lib/db", async () => {
   return { db: await makeTestDb() };
 });
 
-const headerState = vi.hoisted(() => ({ current: new Headers() }));
-vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
+vi.mock("next/headers", async () => {
+  const { headerState } = await import("./helpers/request-context");
+  return { headers: async () => headerState.current };
+});
 
 const tutorModelState = vi.hoisted(() => ({
   current: undefined as
@@ -25,121 +27,35 @@ vi.mock("@/lib/model", async () => {
   };
 });
 
-const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
-const {
-  courses,
-  courseSpecs,
-  generationRuns,
-  lessons,
-  outlines,
-  reviewRuns,
-  revisions,
-  sources,
-  tutorConversations,
-  tutorMessages,
-  users,
-} = await import("@/lib/db/schema");
+const { courses, lessons, outlines, revisions, tutorConversations, tutorMessages, users } =
+  await import("@/lib/db/schema");
 const { parseLessonContent } = await import("@/lib/course/content");
-const { saveLessonContent } = await import("@/lib/db/lessons");
-const { publishRevision } = await import("@/lib/db/review");
 const { loadTutorHistory } = await import("@/lib/db/tutor");
-const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
+const { signInWithGoogle } = await import("./helpers/auth");
+const { setRequestCookie } = await import("./helpers/request-context");
+const { makeOutline, makeSpec } = await import("./helpers/fixtures");
+const { OWNER, seedPublishedCourse } = await import("./helpers/published-course");
 const { streamingModel } = await import("./helpers/fake-model");
 const { POST } = await import("@/app/api/courses/[courseId]/tutor/route");
 
 const ORIGIN = "http://localhost:3000";
 
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [
-        { id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 },
-        { id: "l2", ordinal: 2, title: "Lesson two", summary: "Second.", minutes: 20 },
-      ],
+const OUTLINE = makeOutline([2]);
+const SPEC = makeSpec(OUTLINE);
+
+function seedCourse(ownerEmail: string): Promise<string> {
+  return seedPublishedCourse({
+    ownerEmail,
+    outline: OUTLINE,
+    spec: SPEC,
+    source: {
+      ref: "s1",
+      title: "Postgres window docs",
+      url: "https://example.com/windows",
+      excerpt: "A window function computes across rows.",
     },
-  ],
-};
-
-const SPEC = {
-  contract: {
-    topic: "window functions in SQL",
-    goal: "query with confidence",
-    background: "",
-    depth: "reach",
-    language: "en",
-    terminalPerformances: ["Write window queries"],
-    exclusions: [],
-    learnerAssumptions: [],
-  },
-  throughline: { premise: "windows first", runningExample: "r", vocabulary: [] },
-  learningGraph: [],
-  alignment: OUTLINE.modules[0].lessons.map((l) => ({
-    lessonId: l.id,
-    performance: "does",
-    prerequisiteNodes: [] as string[],
-    moduleMilestone: "m",
-    exerciseContribution: "c",
-  })),
-  finalExercise: { task: "t", acceptanceChecks: ["c"] },
-  evidence: [],
-};
-
-async function signInWithGoogle(email: string): Promise<string> {
-  fakeGoogle({ sub: `sub-${email}`, name: "A Learner", email, email_verified: true });
-  const signIn = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "google", callbackURL: "/courses" }),
-    }),
-  );
-  const { url } = (await signIn.json()) as { url: string };
-  const state = new URL(url).searchParams.get("state") as string;
-  const callback = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/callback/google?code=one-time-code&state=${state}`, {
-      headers: { cookie: cookieHeader(signIn) },
-    }),
-  );
-  return cookieHeader(callback);
-}
-
-async function seedPublishedCourse(ownerEmail: string): Promise<string> {
-  const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
-  const [course] = await db
-    .insert(courses)
-    .values({
-      ownerId: user.id,
-      topic: "window functions in SQL",
-      goal: "query with confidence",
-      depth: "reach",
-      status: "reviewing",
-    })
-    .returning();
-  await db.insert(outlines).values({ courseId: course.id, version: 1, data: OUTLINE });
-  await db.insert(courseSpecs).values({ courseId: course.id, spec: SPEC, outlineVersion: 1 });
-  await db.insert(sources).values({
-    courseId: course.id,
-    ref: "s1",
-    title: "Postgres window docs",
-    url: "https://example.com/windows",
-    excerpt: "A window function computes across rows.",
-  });
-  const [run] = await db
-    .insert(generationRuns)
-    .values({ courseId: course.id, outlineVersion: 1 })
-    .returning();
-
-  for (const l of OUTLINE.modules[0].lessons) {
-    await saveLessonContent(
-      db,
-      course.id,
-      1,
-      run.id,
+    content: (l) =>
       parseLessonContent(l.id, l.title, {
         body: [{ kind: "p", text: "The window does not fold." }],
         workedExample: [{ kind: "code", language: "sql", code: "select 1" }],
@@ -148,16 +64,7 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
         exercise: { task: "t", check: "c" },
         bridge: "b",
       }),
-    );
-  }
-
-  const [review] = await db
-    .insert(reviewRuns)
-    .values({ courseId: course.id, outlineVersion: 1, status: "succeeded" })
-    .returning();
-  const published = await publishRevision(db, course.id, 1, review.id);
-  expect(published.ok).toBe(true);
-  return course.id;
+  });
 }
 
 async function turn(
@@ -167,7 +74,7 @@ async function turn(
   message: string,
 ): Promise<{ status: number; text: string }> {
   /* next/headers resolves the route's cookies from the request. */
-  headerState.current = cookie ? new Headers({ cookie }) : new Headers();
+  setRequestCookie(cookie || null);
   const response = await POST(
     new Request(`${ORIGIN}/api/courses/${courseId}/tutor`, {
       method: "POST",
@@ -180,15 +87,11 @@ async function turn(
   return { status: response.status, text };
 }
 
-const OWNER = "owner@example.com";
-const OTHER = "other@example.com";
 let ownerCookie = "";
-let otherCookie = "";
 
 beforeEach(async () => {
-  headerState.current = new Headers();
+  setRequestCookie(null);
   ownerCookie = await signInWithGoogle(OWNER);
-  otherCookie = await signInWithGoogle(OTHER);
   tutorModelState.current = streamingModel([
     "Both split rows, but GROUP BY folds each group while PARTITION BY keeps every row.",
   ]);
@@ -196,12 +99,12 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await db.delete(users);
-  headerState.current = new Headers();
+  setRequestCookie(null);
 });
 
 describe("a completed turn", () => {
   it("streams the answer and stores both sides with stable identities", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const first = await turn(ownerCookie, courseId, "l1", "Is PARTITION BY just GROUP BY?");
     expect(first.status).toBe(200);
     expect(first.text).toContain("PARTITION BY keeps every row");
@@ -240,7 +143,7 @@ describe("a completed turn", () => {
   });
 
   it("gives the Tutor the Lesson, the Outline, the spec, the Sources, and the history", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     await turn(ownerCookie, courseId, "l1", "Is PARTITION BY just GROUP BY?");
 
     const prompt = tutorModelState.current!.prompts[0];
@@ -256,7 +159,7 @@ describe("a completed turn", () => {
   });
 
   it("changes nothing in the Course", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const before = {
       course: (await db.select().from(courses).where(eq(courses.id, courseId)))[0],
       outline: (await db.select().from(outlines).where(eq(outlines.courseId, courseId)))[0],
@@ -284,7 +187,7 @@ describe("a completed turn", () => {
 
 describe("an interrupted turn", () => {
   it("persists nothing, and a retry starts a clean turn", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
 
     tutorModelState.current = streamingModel([{ error: true }]);
     const failed = await turn(ownerCookie, courseId, "l1", "Why did my totals change?");
@@ -307,13 +210,13 @@ describe("an interrupted turn", () => {
 
 describe("history restoration", () => {
   it("returns the completed turns for the owning Learner, in order, across sessions", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     await turn(ownerCookie, courseId, "l1", "First question?");
     await turn(ownerCookie, courseId, "l2", "Second Lesson question?");
 
-    headerState.current = new Headers();
+    setRequestCookie(null);
     ownerCookie = await signInWithGoogle(OWNER);
-    headerState.current = new Headers({ cookie: ownerCookie });
+    setRequestCookie(ownerCookie);
 
     const history = await loadTutorHistory(
       db,
@@ -333,21 +236,8 @@ describe("history restoration", () => {
 });
 
 describe("ownership", () => {
-  it("refuses another Learner's Course for a turn", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
-    const response = await turn(otherCookie, courseId, "l1", "Let me in.");
-    expect(response.status).toBe(404);
-    expect((await db.select().from(tutorMessages)).length).toBe(0);
-  });
-
-  it("refuses a signed-out caller", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
-    const response = await turn("", courseId, "l1", "Anyone there?");
-    expect(response.status).toBe(401);
-  });
-
   it("refuses a Lesson the published Course does not have", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const response = await turn(ownerCookie, courseId, "l-ghost", "Hello?");
     expect(response.status).toBe(409);
     expect((await db.select().from(tutorMessages)).length).toBe(0);

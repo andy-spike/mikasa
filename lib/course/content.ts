@@ -44,7 +44,7 @@ const blockSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
-const lessonContentSchema = z.object({
+export const lessonContentSchema = z.object({
   body: z.array(blockSchema).min(1),
   workedExample: z.array(blockSchema).min(1),
   recallPrompt: z.string().min(1),

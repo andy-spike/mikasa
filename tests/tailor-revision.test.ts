@@ -8,8 +8,10 @@ vi.mock("@/lib/db", async () => {
   return { db: await makeTestDb() };
 });
 
-const headerState = vi.hoisted(() => ({ current: new Headers() }));
-vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
+vi.mock("next/headers", async () => {
+  const { headerState } = await import("./helpers/request-context");
+  return { headers: async () => headerState.current };
+});
 
 const navigation = vi.hoisted(() => ({
   redirect: (url: string): never => {
@@ -76,99 +78,41 @@ vi.mock("@/lib/model", async () => {
   };
 });
 
-const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
 const {
   changePlans,
   courses,
-  courseSpecs,
   generationRuns,
   lessonFragments,
   lessons,
   outlines,
-  reviewRuns,
   revisions,
   users,
 } = await import("@/lib/db/schema");
-const { parseLessonContent } = await import("@/lib/course/content");
-const { saveLessonContent } = await import("@/lib/db/lessons");
-const { publishRevision, currentRevision } = await import("@/lib/db/review");
+const { currentRevision } = await import("@/lib/db/review");
 const { createChangePlan } = await import("@/lib/db/tailor");
-const { embedCourseFragments } = await import("@/lib/course/fragments");
-const { reviewTailorOperationAction, retryPlanRevisionAction, stagePlanRevisionAction } =
-  await import("@/lib/actions/tailor");
-const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
+const { retryPlanRevisionAction, stagePlanRevisionAction } = await import("@/lib/actions/tailor");
+const { signInWithGoogle } = await import("./helpers/auth");
+const { setRequestCookie } = await import("./helpers/request-context");
+const { makeOutline, makeSpec } = await import("./helpers/fixtures");
+const {
+  OWNER,
+  seedPublishedCourse,
+  proposeAndAccept: acceptPlan,
+  washLesson,
+} = await import("./helpers/published-course");
 const { json, scriptedModel } = await import("./helpers/fake-model");
 const { stageRevisionWorkflow } = await import("@/workflows/course-revision");
 
-const ORIGIN = "http://localhost:3000";
-
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [
-        { id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 },
-        { id: "l2", ordinal: 2, title: "Lesson two", summary: "Second.", minutes: 20 },
-        { id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 },
-      ],
-    },
-  ],
-};
-
-const SPEC = {
-  contract: {
-    topic: "Watercolor washes",
-    goal: "Paint a clean wash",
-    background: "",
-    depth: "reach",
-    language: "en",
-    terminalPerformances: ["Paint a wash"],
-    exclusions: [],
-    learnerAssumptions: [],
-  },
+const OUTLINE = makeOutline([3]);
+const SPEC = makeSpec(OUTLINE, {
+  topic: "Watercolor washes",
+  goal: "Paint a clean wash",
+  terminalPerformances: ["Paint a wash"],
   throughline: { premise: "Water first", runningExample: "The sky wash", vocabulary: [] },
   learningGraph: [{ id: "g1", skill: "Load the brush", requires: [], lessonId: "l1" }],
-  alignment: [
-    {
-      lessonId: "l1",
-      performance: "does",
-      prerequisiteNodes: [],
-      moduleMilestone: "m",
-      exerciseContribution: "c",
-    },
-    {
-      lessonId: "l2",
-      performance: "does",
-      prerequisiteNodes: [],
-      moduleMilestone: "m",
-      exerciseContribution: "c",
-    },
-    {
-      lessonId: "l3",
-      performance: "does",
-      prerequisiteNodes: [],
-      moduleMilestone: "m",
-      exerciseContribution: "c",
-    },
-  ],
   finalExercise: { task: "Paint it", acceptanceChecks: ["It holds"] },
-  evidence: [],
-};
-
-function lessonContent(lessonId: string, title: string, text: string) {
-  return parseLessonContent(lessonId, title, {
-    body: [{ kind: "p", text }],
-    workedExample: [{ kind: "p", text: "The sky wash, again." }],
-    recallPrompt: "Recall it.",
-    selfExplanationPrompt: "Explain it.",
-    exercise: { task: "Paint one.", check: "It holds." },
-    bridge: "Next.",
-  });
-}
+});
 
 function lessonJson(title: string): string {
   return json({
@@ -194,76 +138,21 @@ function reconcileJson(lessonIds: string[]): string {
   });
 }
 
-async function signInWithGoogle(email: string): Promise<string> {
-  fakeGoogle({ sub: `sub-${email}`, name: "A Learner", email, email_verified: true });
-  const signIn = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "google", callbackURL: "/courses" }),
-    }),
-  );
-  const { url } = (await signIn.json()) as { url: string };
-  const state = new URL(url).searchParams.get("state") as string;
-  const callback = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/callback/google?code=one-time-code&state=${state}`, {
-      headers: { cookie: cookieHeader(signIn) },
-    }),
-  );
-  return cookieHeader(callback);
+function seedCourse(ownerEmail: string): Promise<string> {
+  return seedPublishedCourse({
+    ownerEmail,
+    outline: OUTLINE,
+    spec: SPEC,
+    grounding: false,
+    content: washLesson,
+    embed: (texts) => texts.map(() => new Array<number>(1536).fill(0.01)),
+  });
 }
 
-async function seedPublishedCourse(ownerEmail: string): Promise<string> {
-  const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
-  const [course] = await db
-    .insert(courses)
-    .values({
-      ownerId: user.id,
-      topic: "Watercolor washes",
-      goal: "Paint a clean wash",
-      depth: "reach",
-      grounding: false,
-      status: "reviewing",
-    })
-    .returning();
-  await db.insert(outlines).values({ courseId: course.id, version: 1, data: OUTLINE });
-  await db.insert(courseSpecs).values({ courseId: course.id, spec: SPEC, outlineVersion: 1 });
-  const [run] = await db
-    .insert(generationRuns)
-    .values({ courseId: course.id, outlineVersion: 1 })
-    .returning();
-
-  for (const [i, l] of OUTLINE.modules[0].lessons.entries()) {
-    await saveLessonContent(
-      db,
-      course.id,
-      1,
-      run.id,
-      lessonContent(l.id, l.title, `Lesson ${i + 1} of the wash course.`),
-    );
-  }
-
-  const [review] = await db
-    .insert(reviewRuns)
-    .values({ courseId: course.id, outlineVersion: 1, status: "succeeded" })
-    .returning();
-  const published = await publishRevision(db, course.id, 1, review.id);
-  expect(published.ok).toBe(true);
-
-  await embedCourseFragments(
-    db,
-    async (texts) => texts.map(() => new Array<number>(1536).fill(0.01)),
-    course.id,
-    1,
-  );
-  return course.id;
-}
-
-const OWNER = "owner@example.com";
 let ownerCookie = "";
 
 beforeEach(async () => {
-  headerState.current = new Headers();
+  setRequestCookie(null);
   ownerCookie = await signInWithGoogle(OWNER);
   reviewSlices.factualScope = [];
   reviewSlices.designScope = [];
@@ -273,28 +162,25 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await db.delete(users);
-  headerState.current = new Headers();
+  setRequestCookie(null);
 });
 
-async function proposeAndAccept(courseId: string): Promise<string> {
-  const userId = (await db.select().from(users).where(eq(users.email, OWNER)))[0].id;
-  const created = await createChangePlan(db, userId, courseId, [
-    { kind: "lessonProse", lessonId: "l1", instruction: "Lead with the water-to-pigment ratio." },
-    { kind: "removeLesson", lessonId: "l2" },
-    { kind: "renameLesson", lessonId: "l3", title: "Lesson three, Repainted", summary: "Third." },
-  ]);
-  expect(created.ok).toBe(true);
-  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } }).plan;
-  headerState.current = new Headers({ cookie: ownerCookie });
-  for (const operation of plan.operations) {
-    await reviewTailorOperationAction(plan.id, operation.id, "accepted");
-  }
-  return plan.id;
+function proposeAndAccept(courseId: string): Promise<string> {
+  return acceptPlan(
+    courseId,
+    [
+      { kind: "lessonProse", lessonId: "l1", instruction: "Lead with the water-to-pigment ratio." },
+      { kind: "removeLesson", lessonId: "l2" },
+      { kind: "renameLesson", lessonId: "l3", title: "Lesson three, Repainted", summary: "Third." },
+    ],
+    OWNER,
+    ownerCookie,
+  );
 }
 
 describe("stagePlanRevisionAction", () => {
   it("stages a candidate without touching the current Course, copying the unaffected Lessons", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const planId = await proposeAndAccept(courseId);
 
     const result = await stagePlanRevisionAction(courseId, planId);
@@ -325,7 +211,7 @@ describe("stagePlanRevisionAction", () => {
   });
 
   it("refuses a plan drawn against an older revision", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const userId = (await db.select().from(users).where(eq(users.email, OWNER)))[0].id;
     const created = await createChangePlan(db, userId, courseId, [
       { kind: "renameLesson", lessonId: "l1", title: "Renamed", summary: "First." },
@@ -336,7 +222,7 @@ describe("stagePlanRevisionAction", () => {
     const current = await currentRevision(db, courseId);
     expect(current?.revisionNumber).toBe(2);
 
-    headerState.current = new Headers({ cookie: ownerCookie });
+    setRequestCookie(ownerCookie);
     const planId = (created as { ok: true; plan: { id: string } }).plan.id;
     const result = await stagePlanRevisionAction(courseId, planId);
     expect(result).toMatchObject({ ok: false, reason: "stale" });
@@ -347,9 +233,9 @@ describe("stagePlanRevisionAction", () => {
 
 describe("stageRevisionWorkflow", () => {
   it("regenerates only the affected Lesson, retains the rest, and swaps the revision atomically", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const planId = await proposeAndAccept(courseId);
-    headerState.current = new Headers({ cookie: ownerCookie });
+    setRequestCookie(ownerCookie);
     const staged = await stagePlanRevisionAction(courseId, planId);
     expect(staged).toMatchObject({ ok: true, stagedOutlineVersion: 2 });
     embedCalls.count = 0;
@@ -404,9 +290,9 @@ describe("stageRevisionWorkflow", () => {
   });
 
   it("preserves the current Course on failure, and a retry finishes the job", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const planId = await proposeAndAccept(courseId);
-    headerState.current = new Headers({ cookie: ownerCookie });
+    setRequestCookie(ownerCookie);
     const staged = await stagePlanRevisionAction(courseId, planId);
     expect(staged).toMatchObject({ ok: true, stagedOutlineVersion: 2 });
 

@@ -8,8 +8,10 @@ vi.mock("@/lib/db", async () => {
   return { db: await makeTestDb() };
 });
 
-const headerState = vi.hoisted(() => ({ current: new Headers() }));
-vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
+vi.mock("next/headers", async () => {
+  const { headerState } = await import("./helpers/request-context");
+  return { headers: async () => headerState.current };
+});
 
 const navigation = vi.hoisted(() => ({
   redirect: (url: string): never => {
@@ -60,83 +62,25 @@ vi.mock("@/lib/course/reconcile", () => ({
   },
 }));
 
-const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
 const { changePlans, courseSpecs, courses, outlines, users } = await import("@/lib/db/schema");
 const { applyOutlineOpAction, approveOutlineAction } = await import("@/lib/actions/outline");
 const { applyPlanToOutlineAction, reviewTailorOperationAction } =
   await import("@/lib/actions/tailor");
 const { createChangePlan } = await import("@/lib/db/tailor");
-const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
+const { signInWithGoogle } = await import("./helpers/auth");
+const { setRequestCookie } = await import("./helpers/request-context");
+const { makeOutline, makeSpec } = await import("./helpers/fixtures");
 
-const ORIGIN = "http://localhost:3000";
-
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [
-        { id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 },
-        { id: "l2", ordinal: 2, title: "Lesson two", summary: "Second.", minutes: 20 },
-      ],
-    },
-  ],
-};
-
-const SPEC = {
-  contract: {
-    topic: "the Vercel AI SDK",
-    goal: "build my own AI chat app",
-    background: "",
-    depth: "reach",
-    language: "en",
-    terminalPerformances: ["Ship a chat app"],
-    exclusions: [],
-    learnerAssumptions: [],
-  },
+const OUTLINE = makeOutline([2]);
+const SPEC = makeSpec(OUTLINE, {
+  topic: "the Vercel AI SDK",
+  goal: "build my own AI chat app",
+  terminalPerformances: ["Ship a chat app"],
   throughline: { premise: "One app", runningExample: "The chat app", vocabulary: [] },
   learningGraph: [{ id: "g1", skill: "Stream text", requires: [], lessonId: "l1" }],
-  alignment: [
-    {
-      lessonId: "l1",
-      performance: "does",
-      prerequisiteNodes: [],
-      moduleMilestone: "m",
-      exerciseContribution: "c",
-    },
-    {
-      lessonId: "l2",
-      performance: "does",
-      prerequisiteNodes: [],
-      moduleMilestone: "m",
-      exerciseContribution: "c",
-    },
-  ],
   finalExercise: { task: "Build it", acceptanceChecks: ["It runs"] },
-  evidence: [],
-};
-
-async function signInWithGoogle(email: string): Promise<string> {
-  fakeGoogle({ sub: `sub-${email}`, name: "A Learner", email, email_verified: true });
-  const signIn = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "google", callbackURL: "/courses" }),
-    }),
-  );
-  const { url } = (await signIn.json()) as { url: string };
-  const state = new URL(url).searchParams.get("state") as string;
-  const callback = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/callback/google?code=one-time-code&state=${state}`, {
-      headers: { cookie: cookieHeader(signIn) },
-    }),
-  );
-  return cookieHeader(callback);
-}
+});
 
 async function seedAwaitingApproval(ownerEmail: string): Promise<string> {
   const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
@@ -156,25 +100,22 @@ async function seedAwaitingApproval(ownerEmail: string): Promise<string> {
 }
 
 const OWNER = "owner@example.com";
-const OTHER = "other@example.com";
 let ownerCookie = "";
-let otherCookie = "";
 
 beforeEach(async () => {
-  headerState.current = new Headers();
+  setRequestCookie(null);
   ownerCookie = await signInWithGoogle(OWNER);
-  otherCookie = await signInWithGoogle(OTHER);
   reconcileCalls.calls.length = 0;
   workflowStarts.calls.length = 0;
 });
 
 afterEach(async () => {
   await db.delete(users);
-  headerState.current = new Headers();
+  setRequestCookie(null);
 });
 
 function asOwner() {
-  headerState.current = new Headers({ cookie: ownerCookie });
+  setRequestCookie(ownerCookie);
 }
 
 async function proposeThree(
@@ -328,13 +269,9 @@ describe("applyPlanToOutlineAction", () => {
     expect(outline.version).toBe(1);
   });
 
-  it("refuses another Learner's plan and a plan already applied", async () => {
+  it("refuses a plan already applied", async () => {
     const courseId = await seedAwaitingApproval(OWNER);
     const planId = await proposeThree(courseId, ["accepted", "discarded", "accepted"]);
-
-    headerState.current = new Headers({ cookie: otherCookie });
-    const stranger = await applyPlanToOutlineAction(courseId, planId);
-    expect(stranger).toMatchObject({ ok: false, reason: "not-found" });
 
     asOwner();
     const first = await applyPlanToOutlineAction(courseId, planId);

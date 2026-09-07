@@ -10,6 +10,7 @@ vi.mock("@/lib/db", async () => {
 
 import { json, scriptedModel } from "./helpers/fake-model";
 import { makeTestDb } from "./helpers/test-db";
+import { makeOutline, makeSpec } from "./helpers/fixtures";
 import type { LessonContent } from "@/lib/course/content";
 
 const {
@@ -32,47 +33,27 @@ const { saveLessonContent } = await import("@/lib/db/lessons");
 const { courses, courseSpecs, generationRuns, outlines, revisions, users } =
   await import("@/lib/db/schema");
 
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [
-        { id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 },
-        { id: "l2", ordinal: 2, title: "Lesson two", summary: "Second.", minutes: 20 },
-      ],
-    },
-  ],
-};
-
-const SPEC = {
-  contract: {
-    topic: "the Vercel AI SDK",
-    goal: "build my own AI chat app",
-    background: "I know React.",
-    depth: "reach",
-    language: "en",
-    terminalPerformances: ["Ship a chat app"],
-    exclusions: [],
-    learnerAssumptions: [],
-  },
+const OUTLINE = makeOutline([2]);
+const SPEC = makeSpec(OUTLINE, {
+  topic: "the Vercel AI SDK",
+  goal: "build my own AI chat app",
+  background: "I know React.",
+  terminalPerformances: ["Ship a chat app"],
   throughline: { premise: "One app", runningExample: "The chat app", vocabulary: [] },
   learningGraph: [
     { id: "g1", skill: "Stream text", requires: [], lessonId: "l1" },
     { id: "g2", skill: "Ship it", requires: ["g1"], lessonId: "l2" },
   ],
-  alignment: OUTLINE.modules[0].lessons.map((l) => ({
+  alignment: (l) => ({
     lessonId: l.id,
     performance: `does ${l.title}`,
-    prerequisiteNodes: [] as string[],
+    prerequisiteNodes: [],
     moduleMilestone: "milestone",
     exerciseContribution: "contributes",
-  })),
+  }),
   finalExercise: { task: "Build it", acceptanceChecks: ["It runs"] },
   evidence: [{ sourceRef: "src-1", supports: "The main claim" }],
-};
+});
 
 function contentFor(lessonId: string, overrides: Partial<Record<string, unknown>> = {}) {
   return parseLessonContent(lessonId, `Lesson ${lessonId.slice(1)}`, {

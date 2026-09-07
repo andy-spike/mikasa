@@ -28,6 +28,7 @@ vi.mock("workflow/api", () => ({
 
 import { json, scriptedModel } from "./helpers/fake-model";
 import { makeTestDb } from "./helpers/test-db";
+import { makeOutline } from "./helpers/fixtures";
 
 const { candidateIsComplete, generateLesson, generationOrder, GenerationError, planLessonSource } =
   await import("@/lib/course/generate");
@@ -41,30 +42,7 @@ const {
   saveLessonSource,
 } = await import("@/lib/db/lessons");
 
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [
-        { id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 },
-        { id: "l2", ordinal: 2, title: "Lesson two", summary: "Second.", minutes: 20 },
-      ],
-    },
-    {
-      id: "m2",
-      ordinal: 2,
-      numeral: "II",
-      title: "Module two",
-      lessons: [
-        { id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 },
-        { id: "l4", ordinal: 4, title: "Lesson four", summary: "Fourth.", minutes: 20 },
-      ],
-    },
-  ],
-};
+const OUTLINE = makeOutline([2, 2]);
 
 const SPEC = {
   contract: {
@@ -246,6 +224,23 @@ describe("generateLesson", () => {
         sources: [],
       }),
     ).rejects.toThrow(GenerationError);
+  });
+
+  it("rejects malformed blocks as structured model output", async () => {
+    const lesson = JSON.parse(lessonJson("Lesson one"));
+    lesson.body.push({ kind: "code" });
+    const model = scriptedModel([json(lesson)]);
+
+    await expect(
+      generateLesson(model.model, {
+        course: { topic: "t", goal: "g", background: "", language: "en", depth: "reach" },
+        spec: SPEC,
+        lesson: { id: "l1", title: "Lesson one", summary: "First." },
+        nextLesson: null,
+        priorLessons: [],
+        sources: [],
+      }),
+    ).rejects.toMatchObject({ name: "AI_NoObjectGeneratedError" });
   });
 
   it("carries the learner's accepted demands into the Lesson's prompt", async () => {

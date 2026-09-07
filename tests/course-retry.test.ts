@@ -8,8 +8,10 @@ vi.mock("@/lib/db", async () => {
   return { db: await makeTestDb() };
 });
 
-const headerState = vi.hoisted(() => ({ current: new Headers() }));
-vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
+vi.mock("next/headers", async () => {
+  const { headerState } = await import("./helpers/request-context");
+  return { headers: async () => headerState.current };
+});
 
 const navigation = vi.hoisted(() => ({
   redirect: (url: string): never => {
@@ -29,7 +31,7 @@ vi.mock("workflow/api", () => ({
 import { json, scriptedModel } from "./helpers/fake-model";
 
 const { retryCourseAction } = await import("@/lib/actions/courses");
-const { auth } = await import("@/lib/session");
+
 const { db } = await import("@/lib/db");
 const { saveDesignSources } = await import("@/lib/db/design");
 const { saveLessonContent } = await import("@/lib/db/lessons");
@@ -46,64 +48,16 @@ const {
   sources,
   users,
 } = await import("@/lib/db/schema");
-const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
-
-const ORIGIN = "http://localhost:3000";
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [{ id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 }],
-    },
-  ],
-};
-const SPEC = {
-  contract: {
-    topic: "the Vercel AI SDK",
-    goal: "build my own AI chat app",
-    background: "",
-    depth: "reach",
-    language: "en",
-    terminalPerformances: ["Ship"],
-    exclusions: [],
-    learnerAssumptions: [],
-  },
+const { signInWithGoogle } = await import("./helpers/auth");
+const { setRequestCookie } = await import("./helpers/request-context");
+const { makeOutline, makeSpec } = await import("./helpers/fixtures");
+const OUTLINE = makeOutline([1]);
+const SPEC = makeSpec(OUTLINE, {
+  topic: "the Vercel AI SDK",
+  goal: "build my own AI chat app",
+  terminalPerformances: ["Ship"],
   throughline: { premise: "p", runningExample: "r", vocabulary: [] },
-  learningGraph: [],
-  alignment: [
-    {
-      lessonId: "l1",
-      performance: "does",
-      prerequisiteNodes: [],
-      moduleMilestone: "m",
-      exerciseContribution: "c",
-    },
-  ],
-  finalExercise: { task: "t", acceptanceChecks: ["c"] },
-  evidence: [],
-};
-
-async function signInWithGoogle(): Promise<string> {
-  fakeGoogle({ sub: "sub-1", name: "A Learner", email: "a@example.com", email_verified: true });
-  const signIn = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "google", callbackURL: "/courses" }),
-    }),
-  );
-  const { url } = (await signIn.json()) as { url: string };
-  const state = new URL(url).searchParams.get("state") as string;
-  const callback = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/callback/google?code=one-time-code&state=${state}`, {
-      headers: { cookie: cookieHeader(signIn) },
-    }),
-  );
-  return cookieHeader(callback);
-}
+});
 
 async function seedFailedCourse(stage: "design" | "generation"): Promise<string> {
   const [user] = await db.select().from(users).limit(1);
@@ -158,19 +112,19 @@ async function seedFailedCourse(stage: "design" | "generation"): Promise<string>
 let cookie = "";
 
 beforeEach(async () => {
-  headerState.current = new Headers();
-  cookie = await signInWithGoogle();
+  setRequestCookie(null);
+  cookie = await signInWithGoogle("a@example.com");
   workflowStarts.calls.length = 0;
 });
 
 afterEach(async () => {
   await db.delete(users);
-  headerState.current = new Headers();
+  setRequestCookie(null);
 });
 
 describe("retrying a failed design", () => {
   it("resumes past the persisted steps: sources are reused, not fetched again", async () => {
-    headerState.current = new Headers({ cookie });
+    setRequestCookie(cookie);
     const courseId = await seedFailedCourse("design");
 
     await saveDesignSources(db, courseId, [
@@ -194,7 +148,7 @@ describe("retrying a failed design", () => {
   });
 
   it("starts from the top when the failure happened before anything persisted", async () => {
-    headerState.current = new Headers({ cookie });
+    setRequestCookie(cookie);
     const courseId = await seedFailedCourse("design");
     await db
       .update(designRuns)
@@ -207,7 +161,7 @@ describe("retrying a failed design", () => {
   });
 
   it("refuses to retry a Course that did not fail", async () => {
-    headerState.current = new Headers({ cookie });
+    setRequestCookie(cookie);
     const courseId = await seedFailedCourse("design");
     await db
       .update(courses)
@@ -222,7 +176,7 @@ describe("retrying a failed design", () => {
 
 describe("retrying a failed generation", () => {
   it("reopens the same run so written Lessons are skipped, not regenerated", async () => {
-    headerState.current = new Headers({ cookie });
+    setRequestCookie(cookie);
     const courseId = await seedFailedCourse("generation");
 
     const [run] = await db

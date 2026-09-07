@@ -89,6 +89,7 @@ export async function saveLessonContent(
   outlineVersion: number,
   runId: string,
   content: LessonContent,
+  options?: { touchRun?: boolean },
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await tx
@@ -119,6 +120,9 @@ export async function saveLessonContent(
         },
       });
 
+    /* Corrections must not move the run marker back to a Lesson: the
+       workflow already recorded corrections:N, and the progress UI reads it. */
+    if (options?.touchRun === false) return;
     await tx
       .update(generationRuns)
       .set({ currentStep: `lesson:${content.lessonId}`, updatedAt: new Date() })
@@ -139,6 +143,8 @@ export async function saveLessonSource(
     .limit(1);
   if (existing) return existing.ref;
 
+  // Parallel waves can fetch the same URL twice: the unique index decides
+  // the winner, and the loser rereads the winning row instead of failing.
   const [row] = await db
     .insert(sources)
     .values({
@@ -149,8 +155,17 @@ export async function saveLessonSource(
       fetchedAt: new Date(),
       excerpt: source.excerpt,
     })
+    .onConflictDoNothing({ target: [sources.courseId, sources.url] })
     .returning();
-  return row.ref;
+  if (row) return row.ref;
+
+  const [raced] = await db
+    .select()
+    .from(sources)
+    .where(and(eq(sources.courseId, courseId), eq(sources.url, source.url)))
+    .limit(1);
+  if (raced) return raced.ref;
+  throw new Error("The Source was saved by another Lesson but cannot be read back.");
 }
 
 export async function finishGeneration(

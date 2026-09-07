@@ -9,8 +9,10 @@ vi.mock("@/lib/db", async () => {
   return { db: await makeTestDb() };
 });
 
-const headerState = vi.hoisted(() => ({ current: new Headers() }));
-vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
+vi.mock("next/headers", async () => {
+  const { headerState } = await import("./helpers/request-context");
+  return { headers: async () => headerState.current };
+});
 
 const navigation = vi.hoisted(() => ({
   redirect: (url: string): never => {
@@ -61,85 +63,33 @@ vi.mock("@/lib/model", async () => {
   };
 });
 
-const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
 const { json, scriptedModel } = await import("./helpers/fake-model");
-const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
 const { changePlans, courseSpecs, courses, generationRuns, lessons, outlines, reviewRuns, users } =
   await import("@/lib/db/schema");
-const { saveLessonContent } = await import("@/lib/db/lessons");
-const { publishRevision, currentRevision } = await import("@/lib/db/review");
-const { createChangePlan, stagePlanRevision, resumeStagedRevision } =
-  await import("@/lib/db/tailor");
-const { reviewTailorOperationAction } = await import("@/lib/actions/tailor");
+const { currentRevision } = await import("@/lib/db/review");
+const { stagePlanRevision, resumeStagedRevision } = await import("@/lib/db/tailor");
 const { retryCourseAction } = await import("@/lib/actions/courses");
 const { generateCourseWorkflow } = await import("@/workflows/course-generation");
 const { stageRevisionWorkflow } = await import("@/workflows/course-revision");
-const { parseLessonContent } = await import("@/lib/course/content");
+const { signInWithGoogle } = await import("./helpers/auth");
+const { setRequestCookie } = await import("./helpers/request-context");
+const { makeOutline, makeSpec } = await import("./helpers/fixtures");
+const {
+  OWNER,
+  seedPublishedCourse,
+  proposeAndAccept: acceptPlan,
+  userIdOf,
+} = await import("./helpers/published-course");
 
-const ORIGIN = "http://localhost:3000";
-
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [
-        { id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 },
-        { id: "l2", ordinal: 2, title: "Lesson two", summary: "Second.", minutes: 20 },
-      ],
-    },
-    {
-      id: "m2",
-      ordinal: 2,
-      numeral: "II",
-      title: "Module two",
-      lessons: [{ id: "l3", ordinal: 3, title: "Lesson three", summary: "Third.", minutes: 20 }],
-    },
-  ],
-};
-
-const SPEC = {
-  contract: {
-    topic: "Watercolor washes",
-    goal: "Paint a clean wash",
-    background: "",
-    depth: "reach",
-    language: "en",
-    terminalPerformances: ["Paint a wash"],
-    exclusions: [],
-    learnerAssumptions: [],
-  },
+const OUTLINE = makeOutline([2, 1]);
+const SPEC = makeSpec(OUTLINE, {
+  topic: "Watercolor washes",
+  goal: "Paint a clean wash",
+  terminalPerformances: ["Paint a wash"],
   throughline: { premise: "Water first", runningExample: "The sky wash", vocabulary: [] },
-  learningGraph: [],
-  alignment: [
-    {
-      lessonId: "l1",
-      performance: "does",
-      prerequisiteNodes: [],
-      moduleMilestone: "m",
-      exerciseContribution: "c",
-    },
-    {
-      lessonId: "l2",
-      performance: "does",
-      prerequisiteNodes: [],
-      moduleMilestone: "m",
-      exerciseContribution: "c",
-    },
-    {
-      lessonId: "l3",
-      performance: "does",
-      prerequisiteNodes: [],
-      moduleMilestone: "m",
-      exerciseContribution: "c",
-    },
-  ],
   finalExercise: { task: "Paint it", acceptanceChecks: ["It holds"] },
-  evidence: [],
-};
+});
 
 function lessonBodyText(title: string): string {
   return `Repainted: **${title}** works now.`;
@@ -171,30 +121,10 @@ function reconcileJson(outline: { modules: { lessons: { id: string }[] }[] }): s
   });
 }
 
-async function signInWithGoogle(email: string): Promise<string> {
-  fakeGoogle({ sub: `sub-${email}`, name: "A Learner", email, email_verified: true });
-  const signIn = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "google", callbackURL: "/courses" }),
-    }),
-  );
-  const { url } = (await signIn.json()) as { url: string };
-  const state = new URL(url).searchParams.get("state") as string;
-  const callback = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/callback/google?code=one-time-code&state=${state}`, {
-      headers: { cookie: cookieHeader(signIn) },
-    }),
-  );
-  return cookieHeader(callback);
-}
-
-const OWNER = "owner@example.com";
 let ownerCookie = "";
 
 beforeEach(async () => {
-  headerState.current = new Headers();
+  setRequestCookie(null);
   ownerCookie = await signInWithGoogle(OWNER);
   reviewState.throwFactual = false;
   publishRefusal.current = null;
@@ -202,12 +132,17 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await db.delete(users);
-  headerState.current = new Headers();
+  setRequestCookie(null);
 });
 
-async function userIdOf(email: string): Promise<string> {
-  const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  return user.id;
+function seedCourse(ownerEmail: string): Promise<string> {
+  return seedPublishedCourse({
+    ownerEmail,
+    outline: OUTLINE,
+    spec: SPEC,
+    grounding: false,
+    allModules: true,
+  });
 }
 
 async function seedGeneratingCourse(
@@ -234,44 +169,8 @@ async function seedGeneratingCourse(
   return { courseId: course.id, runId: run.id };
 }
 
-async function seedPublishedCourse(ownerEmail: string): Promise<string> {
-  const { courseId, runId } = await seedGeneratingCourse(ownerEmail);
-  for (const m of OUTLINE.modules) {
-    for (const l of m.lessons) {
-      await saveLessonContent(
-        db,
-        courseId,
-        1,
-        runId,
-        parseLessonContent(l.id, l.title, {
-          body: [{ kind: "p", text: `Lesson ${l.id} of the wash course.` }],
-          workedExample: [{ kind: "p", text: "The sky wash, again." }],
-          recallPrompt: "Recall it.",
-          selfExplanationPrompt: "Explain it.",
-          exercise: { task: "Paint one.", check: "It holds." },
-          bridge: "Next.",
-        }),
-      );
-    }
-  }
-  const [review] = await db
-    .insert(reviewRuns)
-    .values({ courseId, outlineVersion: 1, status: "succeeded" })
-    .returning();
-  const published = await publishRevision(db, courseId, 1, review.id);
-  expect(published.ok).toBe(true);
-  return courseId;
-}
-
-async function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<string> {
-  const created = await createChangePlan(db, await userIdOf(OWNER), courseId, ops);
-  expect(created.ok).toBe(true);
-  const plan = (created as { ok: true; plan: { id: string; operations: { id: string }[] } }).plan;
-  headerState.current = new Headers({ cookie: ownerCookie });
-  for (const operation of plan.operations) {
-    await reviewTailorOperationAction(plan.id, operation.id, "accepted");
-  }
-  return plan.id;
+function proposeAndAccept(courseId: string, ops: ChangePlanOp[]): Promise<string> {
+  return acceptPlan(courseId, ops, OWNER, ownerCookie);
 }
 
 async function stageForReal(courseId: string, planId: string) {
@@ -316,7 +215,7 @@ describe("a generation whose review fails", () => {
     expect(failedCourse.status).toBe("failed");
 
     reviewState.throwFactual = false;
-    headerState.current = new Headers({ cookie: ownerCookie });
+    setRequestCookie(ownerCookie);
     expect(await retryCourseAction(courseId)).toMatchObject({ ok: true });
     const [reopened] = await db.select().from(generationRuns).where(eq(generationRuns.id, runId));
     expect(reopened.status).toBe("running");
@@ -344,7 +243,7 @@ describe("a generation whose review fails", () => {
 
 describe("a staged revision whose review fails", () => {
   it("retry skips the written Lessons and the reconciliation, and the Course stays ready", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const planId = await proposeAndAccept(courseId, [
       { kind: "lessonProse", lessonId: "l1", instruction: "Lead with the water-to-pigment ratio." },
     ]);
@@ -422,7 +321,7 @@ describe("a staged revision whose review fails", () => {
 
 describe("a staged revision whose publication fails", () => {
   it("the passed review stands, and a retry publishes without any review call", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const planId = await proposeAndAccept(courseId, [
       { kind: "lessonProse", lessonId: "l1", instruction: "Lead with the water-to-pigment ratio." },
     ]);

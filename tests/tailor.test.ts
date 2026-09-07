@@ -8,8 +8,10 @@ vi.mock("@/lib/db", async () => {
   return { db: await makeTestDb() };
 });
 
-const headerState = vi.hoisted(() => ({ current: new Headers() }));
-vi.mock("next/headers", () => ({ headers: async () => headerState.current }));
+vi.mock("next/headers", async () => {
+  const { headerState } = await import("./helpers/request-context");
+  return { headers: async () => headerState.current };
+});
 
 const tailorModelState = vi.hoisted(() => ({
   current: undefined as
@@ -32,17 +34,13 @@ const navigation = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => navigation);
 
-const { auth } = await import("@/lib/session");
 const { db } = await import("@/lib/db");
 const {
   changeOperations,
   changePlans,
   courses,
-  courseSpecs,
-  generationRuns,
   lessons,
   outlines,
-  reviewRuns,
   revisions,
   tailorConversations,
   tailorMessages,
@@ -51,100 +49,27 @@ const {
   users,
 } = await import("@/lib/db/schema");
 const { parseLessonContent } = await import("@/lib/course/content");
-const { saveLessonContent } = await import("@/lib/db/lessons");
-const { publishRevision } = await import("@/lib/db/review");
 const { loadTailorHistory, findProposedPlan, createChangePlan } = await import("@/lib/db/tailor");
 const { reviewTailorOperationAction } = await import("@/lib/actions/tailor");
 const { validatePlanOps } = await import("@/lib/course/change-plan");
-const { cookieHeader, fakeGoogle } = await import("./helpers/fake-google");
+const { signInWithGoogle } = await import("./helpers/auth");
+const { setRequestCookie } = await import("./helpers/request-context");
+const { makeOutline, makeSpec } = await import("./helpers/fixtures");
+const { OWNER, seedPublishedCourse } = await import("./helpers/published-course");
 const { streamingModel } = await import("./helpers/fake-model");
 const { POST } = await import("@/app/api/courses/[courseId]/tailor/route");
 
 const ORIGIN = "http://localhost:3000";
 
-const OUTLINE = {
-  modules: [
-    {
-      id: "m1",
-      ordinal: 1,
-      numeral: "I",
-      title: "Module one",
-      lessons: [
-        { id: "l1", ordinal: 1, title: "Lesson one", summary: "First.", minutes: 20 },
-        { id: "l2", ordinal: 2, title: "Lesson two", summary: "Second.", minutes: 20 },
-      ],
-    },
-  ],
-};
+const OUTLINE = makeOutline([2]);
+const SPEC = makeSpec(OUTLINE);
 
-const SPEC = {
-  contract: {
-    topic: "window functions in SQL",
-    goal: "query with confidence",
-    background: "",
-    depth: "reach",
-    language: "en",
-    terminalPerformances: ["Write window queries"],
-    exclusions: [],
-    learnerAssumptions: [],
-  },
-  throughline: { premise: "windows first", runningExample: "r", vocabulary: [] },
-  learningGraph: [],
-  alignment: OUTLINE.modules[0].lessons.map((l) => ({
-    lessonId: l.id,
-    performance: "does",
-    prerequisiteNodes: [] as string[],
-    moduleMilestone: "m",
-    exerciseContribution: "c",
-  })),
-  finalExercise: { task: "t", acceptanceChecks: ["c"] },
-  evidence: [],
-};
-
-async function signInWithGoogle(email: string): Promise<string> {
-  fakeGoogle({ sub: `sub-${email}`, name: "A Learner", email, email_verified: true });
-  const signIn = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "google", callbackURL: "/courses" }),
-    }),
-  );
-  const { url } = (await signIn.json()) as { url: string };
-  const state = new URL(url).searchParams.get("state") as string;
-  const callback = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/callback/google?code=one-time-code&state=${state}`, {
-      headers: { cookie: cookieHeader(signIn) },
-    }),
-  );
-  return cookieHeader(callback);
-}
-
-async function seedPublishedCourse(ownerEmail: string): Promise<string> {
-  const [user] = await db.select().from(users).where(eq(users.email, ownerEmail)).limit(1);
-  const [course] = await db
-    .insert(courses)
-    .values({
-      ownerId: user.id,
-      topic: "window functions in SQL",
-      goal: "query with confidence",
-      depth: "reach",
-      status: "reviewing",
-    })
-    .returning();
-  await db.insert(outlines).values({ courseId: course.id, version: 1, data: OUTLINE });
-  await db.insert(courseSpecs).values({ courseId: course.id, spec: SPEC, outlineVersion: 1 });
-  const [run] = await db
-    .insert(generationRuns)
-    .values({ courseId: course.id, outlineVersion: 1 })
-    .returning();
-
-  for (const l of OUTLINE.modules[0].lessons) {
-    await saveLessonContent(
-      db,
-      course.id,
-      1,
-      run.id,
+function seedCourse(ownerEmail: string): Promise<string> {
+  return seedPublishedCourse({
+    ownerEmail,
+    outline: OUTLINE,
+    spec: SPEC,
+    content: (l) =>
       parseLessonContent(l.id, l.title, {
         body: [{ kind: "p", text: "The window does not fold." }],
         workedExample: [{ kind: "code", language: "sql", code: "select 1" }],
@@ -153,16 +78,7 @@ async function seedPublishedCourse(ownerEmail: string): Promise<string> {
         exercise: { task: "t", check: "c" },
         bridge: "b",
       }),
-    );
-  }
-
-  const [review] = await db
-    .insert(reviewRuns)
-    .values({ courseId: course.id, outlineVersion: 1, status: "succeeded" })
-    .returning();
-  const published = await publishRevision(db, course.id, 1, review.id);
-  expect(published.ok).toBe(true);
-  return course.id;
+  });
 }
 
 async function turn(
@@ -170,7 +86,7 @@ async function turn(
   courseId: string,
   message: string,
 ): Promise<{ status: number; text: string }> {
-  headerState.current = cookie ? new Headers({ cookie }) : new Headers();
+  setRequestCookie(cookie || null);
   const response = await POST(
     new Request(`${ORIGIN}/api/courses/${courseId}/tailor`, {
       method: "POST",
@@ -187,26 +103,22 @@ function planThenText(ops: unknown, text: string) {
   return [{ toolCall: { name: "proposeChangePlan", input: { ops } } }, text];
 }
 
-const OWNER = "owner@example.com";
-const OTHER = "other@example.com";
 let ownerCookie = "";
-let otherCookie = "";
 
 beforeEach(async () => {
-  headerState.current = new Headers();
+  setRequestCookie(null);
   ownerCookie = await signInWithGoogle(OWNER);
-  otherCookie = await signInWithGoogle(OTHER);
   tailorModelState.current = streamingModel(["I proposed the change for your review."]);
 });
 
 afterEach(async () => {
   await db.delete(users);
-  headerState.current = new Headers();
+  setRequestCookie(null);
 });
 
 describe("the conversation", () => {
   it("streams the answer and keeps its own persistent history", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const first = await turn(ownerCookie, courseId, "Split the ordering Lesson for me.");
     expect(first.status).toBe(200);
     expect(first.text).toContain("proposed the change");
@@ -249,7 +161,7 @@ describe("the conversation", () => {
   });
 
   it("gives the model the Course's shape with stable ids", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     await turn(ownerCookie, courseId, "What would you rename?");
 
     const prompt = tailorModelState.current!.prompts[0];
@@ -259,25 +171,18 @@ describe("the conversation", () => {
   });
 
   it("persists nothing on an interrupted turn", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     tailorModelState.current = streamingModel([{ error: true }]);
     const failed = await turn(ownerCookie, courseId, "Reshape everything.");
     expect(failed.text).toBe("");
     expect((await db.select().from(tailorMessages)).length).toBe(0);
     expect((await db.select().from(tailorConversations)).length).toBe(0);
   });
-
-  it("refuses another Learner's Course and a signed-out caller", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
-    expect((await turn(otherCookie, courseId, "Hello?")).status).toBe(404);
-    expect((await turn("", courseId, "Anyone there?")).status).toBe(401);
-    expect((await db.select().from(tailorMessages)).length).toBe(0);
-  });
 });
 
 describe("the proposal tool", () => {
   it("stores a validated plan pinned to the Course the Learner sees", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     tailorModelState.current = streamingModel(
       planThenText(
         [
@@ -331,7 +236,7 @@ describe("the proposal tool", () => {
   });
 
   it("refuses operations the Outline cannot take, and stores no plan", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     tailorModelState.current = streamingModel(
       planThenText(
         [{ kind: "renameLesson", lessonId: "l-ghost", title: "Ghost", summary: "No." }],
@@ -345,7 +250,7 @@ describe("the proposal tool", () => {
   });
 
   it("refuses a content change whose Lesson an earlier operation removed", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     tailorModelState.current = streamingModel(
       planThenText(
         [
@@ -360,7 +265,7 @@ describe("the proposal tool", () => {
   });
 
   it("leaves the newest proposal the only one under review", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     tailorModelState.current = streamingModel(
       planThenText(
         [{ kind: "renameLesson", lessonId: "l1", title: "A", summary: "a" }],
@@ -417,11 +322,11 @@ describe("the review", () => {
   }
 
   it("accepts and discards operation by operation, and restores", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const userId = (await db.select().from(users).where(eq(users.email, OWNER)))[0].id;
     const { planId, first, second } = await proposeTwo(userId, courseId);
 
-    headerState.current = new Headers({ cookie: ownerCookie });
+    setRequestCookie(ownerCookie);
     expect((await reviewTailorOperationAction(planId, first, "accepted")).ok).toBe(true);
     expect((await reviewTailorOperationAction(planId, second, "discarded")).ok).toBe(true);
 
@@ -443,7 +348,7 @@ describe("the review", () => {
   });
 
   it("changes nothing in the Course", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const userId = (await db.select().from(users).where(eq(users.email, OWNER)))[0].id;
     const { planId } = await proposeTwo(userId, courseId);
 
@@ -457,7 +362,7 @@ describe("the review", () => {
         .length,
     };
 
-    headerState.current = new Headers({ cookie: ownerCookie });
+    setRequestCookie(ownerCookie);
     const plan = await findProposedPlan(db, userId, courseId);
     for (const operation of plan!.operations) {
       await reviewTailorOperationAction(planId, operation.id, "accepted");
@@ -480,28 +385,13 @@ describe("the review", () => {
   });
 
   it("freezes a plan that is no longer under review", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
+    const courseId = await seedCourse(OWNER);
     const userId = (await db.select().from(users).where(eq(users.email, OWNER)))[0].id;
     const { planId, first } = await proposeTwo(userId, courseId);
     await db.update(changePlans).set({ status: "applied" }).where(eq(changePlans.id, planId));
 
-    headerState.current = new Headers({ cookie: ownerCookie });
+    setRequestCookie(ownerCookie);
     const result = await reviewTailorOperationAction(planId, first, "discarded");
-    expect(result.ok).toBe(false);
-    const [operation] = await db
-      .select()
-      .from(changeOperations)
-      .where(eq(changeOperations.id, first));
-    expect(operation.status).toBe("proposed");
-  });
-
-  it("refuses another Learner's plan", async () => {
-    const courseId = await seedPublishedCourse(OWNER);
-    const userId = (await db.select().from(users).where(eq(users.email, OWNER)))[0].id;
-    const { planId, first } = await proposeTwo(userId, courseId);
-
-    headerState.current = new Headers({ cookie: otherCookie });
-    const result = await reviewTailorOperationAction(planId, first, "accepted");
     expect(result.ok).toBe(false);
     const [operation] = await db
       .select()
