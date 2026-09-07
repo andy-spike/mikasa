@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mikasa
 
-## Getting Started
+Mikasa builds a complete Course for one Topic and Goal. A Learner approves the Outline first, then Mikasa generates and reviews the whole Course. The Learner works through Lessons, each ending in one Exercise. The Tutor answers questions. The Tailor proposes changes, and only Learner approval applies them.
 
-First, run the development server:
+Domain terms (Learner, Tutor, Tailor, Change plan) are defined in `CONTEXT.md`. Product rules live in `PRODUCT.md`, the interface direction in `DESIGN.md`, and architecture decisions in `docs/adr/`.
+
+## Stack
+
+Next.js (App Router), React, TypeScript, Tailwind. Postgres on Neon with Drizzle. Better Auth with Google OAuth. All model calls run through the AI SDK on OpenRouter. Durable course generation runs on Vercel Workflows. Coding lessons run in an isolated Vercel Sandbox before publication. Web search uses Firecrawl.
+
+## Setup
+
+Copy `.env.example` to `.env.local` and fill in the values. Auth vars are required at boot.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
+bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Runtime note
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The Next.js scripts use Node.js. Bun's fetch ignores Workflow's Undici dispatcher and times out local queue requests after five minutes, which course generation can exceed. Use `bun run dev` for the dev server. Bun is fine for installing packages and other scripts.
 
-## Learn More
+`node tests/workflow-queue.check.mjs` checks a queue request lasting 310 seconds. Bun 1.4.0 fails it with a TimeoutError.
 
-To learn more about Next.js, take a look at the following resources:
+## Commands
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Command | Purpose |
+| --- | --- |
+| `bun run dev` | Development server |
+| `bun run build` | Production build |
+| `bun run lint` / `lint:fix` | Oxlint |
+| `bun run format` / `format:check` | Oxfmt |
+| `bun run typecheck` | `tsc --noEmit` |
+| `bun run test` | Vitest |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Database
 
-## Deploy on Vercel
+Two Neon Postgres branches: dev for daily work, main for production.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Command | Effect |
+| --- | --- |
+| `bun run db:generate` | Generate migrations with drizzle-kit |
+| `bun run db:migrate` | Apply migrations to dev |
+| `bun run db:migrate:main` | Promote to main after dev is verified |
