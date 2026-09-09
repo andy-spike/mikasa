@@ -17,6 +17,7 @@ import { webSearch } from "@/lib/web/firecrawl";
 const turnSchema = z.object({
   lessonId: z.string().min(1),
   message: z.string().min(1).max(4000),
+  effort: z.enum(["low", "medium", "high"]).default("low"),
 });
 
 function json(status: number, body: { error: string }) {
@@ -32,7 +33,7 @@ export async function POST(
 
   const parsed = turnSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return json(400, { error: "That request was not a Tutor turn." });
-  const { lessonId, message } = parsed.data;
+  const { lessonId, message, effort } = parsed.data;
 
   const { courseId } = await params;
   const published = await findOwnedPublishedCourse(db, session.user.id, courseId);
@@ -57,7 +58,7 @@ export async function POST(
 
   const result = streamText({
     model: tutorModel(),
-    providerOptions: tutorProviderOptions(),
+    providerOptions: tutorProviderOptions(effort),
     abortSignal: request.signal,
     instructions: tutorSystemPrompt({
       course: { topic: reading.topic, goal: reading.goal },

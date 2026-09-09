@@ -2,13 +2,6 @@
 version: 1
 slug: "app-courses-courseid-page-tsx"
 primary_target: "app/courses/[courseId]/page.tsx"
-related_targets: []
----
-
----
-version: 1
-slug: "app-courses-courseid-page-tsx"
-primary_target: "app/courses/[courseId]/page.tsx"
 related_targets: ["components/workspace"]
 ---
 
@@ -36,15 +29,15 @@ A working shell where every pixel carries information and the only colour is whe
 
 **Surfaces separate by luminance, never by border.** Four steps up from a graphite canvas. Hairlines divide; nothing is a card, nothing floats except the command palette.
 
-**The rail.** The Outline is a dense left rail carrying all twenty Lessons without scrolling at a laptop height, four facts per row: mark, number, title, and either the completion date or the estimate. Summaries do not belong in a scanning surface; they live on the Lesson. The rail collapses to a stub and comes back on click, keyboard, or the palette.
+**The rail.** The Outline is a dense left rail carrying the Course structure, three facts per row: mark, number, and title. Summaries do not belong in a scanning surface; they live on the Lesson. It is open on wide screens, collapses to a stub on smaller laptops, and comes back on click, keyboard, or the palette.
 
-**The panel.** One panel at the right edge, closed by default, holding the Tutor or the Tailor with an explicit mode switch at its top. Opening it below 1280px costs the rail. While it is open it owns its own close and its own switch, so the shell shows no second control naming the same thing.
+**The panel.** One panel at the right edge, closed by default, holding the Tutor or the Tailor with an explicit mode switch at its top. On smaller laptops, opening it collapses the Outline and closing it restores the Learner's prior Outline state. While it is open it owns its own close and its own switch, so the shell shows no second control naming the same thing.
 
 **The command palette.** ⌘K is real navigation, not a shortcut: every Lesson and every action in the workspace is reachable from it without the pointer. A Course is generated in one pass, so every Lesson is there; the empty state covers a search that matches nothing.
 
 **Two grounds.** The workspace ships graphite and paper. The same system re-grounded, not a second design: four surface steps either way, the sidebars one step off the reading ground, and both grounds landing on the same contrast floors. A stored choice wins, the operating system decides otherwise, and the class is on `<html>` before first paint. One switch in the chrome, holding no React state.
 
-**The rails are the shadcn Sidebar.** Both of them, adapted rather than rebuilt: one open state per rail across both widths, no cookie, no provider-level keyboard shortcut, and `inert` while parked off the canvas. The Outline collapses to an icon rail, the panel goes offcanvas, and below `md` both become sheets.
+**The rails are the shadcn Sidebar.** Both of them, adapted rather than rebuilt: one open state per rail across both widths, no cookie, no provider-level keyboard shortcut, and `inert` while parked off the canvas. At 1440px and above both may remain open. From 1280px to 1439px only one full edge tool opens at a time. Below 1280px both become sheets.
 
 **Accent law.** One accent — `#4fd1a5` on graphite, `#0a7f5f` on paper — means exactly one thing: the Lesson you are up to, the first that is set and not done. Which Lesson is *open* is carried by a raised ground, never by colour, so the two signals never compete for the same meaning. The accent is not spent on done, on code, on a hover, or on a button.
 
@@ -68,7 +61,7 @@ Deferred with the logic: generation in progress, network and model errors, unsav
 
 ## Interaction and layout
 
-The Lesson holds a 65 to 75 character measure and does not stretch with the window. Every body block shares one right edge at that measure; code and tables scroll inside it rather than reaching past it, and each horizontal scroller fades its own edge while there is something past it. The reading column holds still by keeping the region around it a constant size: the rail's collapse is paid back as left pad, and from `2xl` up a closed panel keeps its width in reserve on the right so the column can centre in the space it will still occupy once the panel opens. Zero drift measured at 1280, 1440, 1600 and 1920 on both toggles. Keyboard reaches the rail toggle, every Lesson, mark done, the panel, and the palette. Below `md` both rails become sheets: focus moves in, Escape closes, the layer behind goes inert, and focus returns to the control that opened it. That is the dialog primitive's job now, not the shell's.
+The Lesson holds a 65 to 75 character measure and does not stretch with the window. Every body block shares one right edge at that measure; code and tables scroll inside it rather than reaching past it, and each horizontal scroller fades its own edge while there is something past it. The Lesson stays centred on the viewport. Edge tools are fixed and reserve no width when closed, so their transitions never translate or resize the Lesson. Keyboard reaches the Outline toggle, every Lesson, mark done, the panel, and the palette. Below 1280px both edge tools become sheets: focus moves in, Escape closes, the layer behind goes inert, and focus returns to the control that opened it. That is the dialog primitive's job now, not the shell's.
 
 ## Still not built
 

@@ -3,17 +3,17 @@ import type { ReadingBlock, SourceLink } from "@/lib/course/reading";
 
 export function SourceLinks({ sources }: { sources: SourceLink[] }) {
   return (
-    <p className="flex max-w-(--measure) flex-wrap items-center gap-x-3 gap-y-1">
+    <p className="flex max-w-(--measure) min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
       {sources.map((source) => (
         <a
           key={source.ref}
           href={source.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[0.75rem] text-fg-3 underline decoration-hair underline-offset-2 transition-colors hover:text-fg-2 focus-visible:text-fg-2"
+          className="inline-flex min-w-0 max-w-full items-center gap-1 text-[0.75rem] text-fg-3 underline decoration-hair underline-offset-2 transition-colors hover:text-fg-2 focus-visible:text-fg-2"
         >
-          <span className="label">Source</span>
-          <span className="truncate">{source.title}</span>
+          <span className="label shrink-0">Source</span>
+          <span className="min-w-0 truncate">{source.title}</span>
         </a>
       ))}
     </p>
@@ -133,6 +133,7 @@ export function LessonBlock({
             <span className="label text-fg-3">{language}</span>
           </div>
           <pre
+            tabIndex={0}
             className="scroll-thin scroll-x"
             style={{ "--scroll-bg": "var(--panel)" } as CSSProperties}
           >
@@ -167,6 +168,7 @@ export function LessonBlock({
   return (
     <figure className="max-w-(--measure)">
       <div
+        tabIndex={0}
         className="scroll-thin scroll-x"
         style={{ "--scroll-bg": "var(--canvas)" } as CSSProperties}
       >

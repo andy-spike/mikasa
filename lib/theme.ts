@@ -4,9 +4,20 @@ export type ThemeChoice = "system" | "light" | "dark";
 const listeners = new Set<() => void>();
 
 export function subscribeTheme(onChange: () => void) {
+  const media = matchMedia("(prefers-color-scheme: dark)");
+  const syncSystem = () => {
+    if (readTheme() === "system") {
+      document.documentElement.classList.toggle("dark", media.matches);
+    }
+    onChange();
+  };
   listeners.add(onChange);
+  media.addEventListener("change", syncSystem);
+  window.addEventListener("storage", syncSystem);
   return () => {
     listeners.delete(onChange);
+    media.removeEventListener("change", syncSystem);
+    window.removeEventListener("storage", syncSystem);
   };
 }
 

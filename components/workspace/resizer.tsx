@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, type KeyboardEvent, type PointerEvent } from "react";
 import { useSidebar } from "@/components/ui/sidebar";
 
 type Props = {
@@ -13,46 +13,53 @@ type Props = {
 
 export function Resizer({ side, width, min, max, onResize }: Props) {
   const { state, isMobile } = useSidebar();
-  const drag = useRef<{ x: number; start: number } | null>(null);
+  const drag = useRef<{ x: number; width: number } | null>(null);
+  const clamp = (next: number) => Math.min(max, Math.max(min, next));
 
   if (isMobile || state === "collapsed") return null;
 
-  function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-    drag.current = { x: e.clientX, start: width };
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      void 0;
-    }
-    document.documentElement.setAttribute("data-resizing", "");
+  function onPointerDown(event: PointerEvent<HTMLDivElement>) {
+    drag.current = { x: event.clientX, width };
+    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+  function onPointerMove(event: PointerEvent<HTMLDivElement>) {
     if (!drag.current) return;
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-    const delta = ((e.clientX - drag.current.x) / rem) * (side === "left" ? 1 : -1);
-    onResize(Math.min(max, Math.max(min, drag.current.start + delta)));
+    const direction = side === "left" ? 1 : -1;
+    onResize(clamp(drag.current.width + ((event.clientX - drag.current.x) / rem) * direction));
   }
 
-  function end() {
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    onResize(clamp(width + direction * (side === "left" ? 1 : -1)));
+  }
+
+  function endPointerResize(event: PointerEvent<HTMLDivElement>) {
     drag.current = null;
-    document.documentElement.removeAttribute("data-resizing");
+    event.currentTarget.blur();
   }
 
   return (
     <div
       role="separator"
+      tabIndex={0}
       aria-orientation="vertical"
-      aria-label={side === "left" ? "Resize the Outline" : "Resize the panel"}
-      aria-valuemin={Math.round(min * 16)}
-      aria-valuemax={Math.round(max * 16)}
-      aria-valuenow={Math.round(width * 16)}
+      aria-label={side === "left" ? "Resize the Outline" : "Resize the Tutor or Tailor"}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={Math.round(width)}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={end}
-      onLostPointerCapture={end}
-      className="absolute inset-y-0 z-20 w-1.5 touch-none cursor-col-resize transition-colors hover:bg-rule"
-      style={side === "left" ? { right: 0 } : { left: 0 }}
-    />
+      onPointerUp={endPointerResize}
+      onLostPointerCapture={endPointerResize}
+      onKeyDown={onKeyDown}
+      className="group/resizer absolute inset-y-0 z-20 w-2 touch-none cursor-col-resize outline-none"
+      style={side === "left" ? { right: -4 } : { left: -4 }}
+    >
+      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover/resizer:bg-rule group-focus-visible/resizer:bg-fg-3" />
+    </div>
   );
 }

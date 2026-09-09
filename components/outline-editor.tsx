@@ -16,6 +16,7 @@ import { DoneCheck, UnsetMark } from "./workspace/marks";
 import { field } from "@/lib/ui";
 import { Textarea } from "./ui/textarea";
 import { useStickyFollow } from "@/hooks/use-sticky-follow";
+import type { ReasoningEffort } from "@/lib/model";
 import {
   Dialog,
   DialogContent,
@@ -73,7 +74,7 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
 
   const lessons = useMemo(() => modules.flatMap((m) => m.lessons), [modules]);
 
-  const polling = course.phase !== "editing";
+  const polling = generating || course.phase !== "editing";
   useEffect(() => {
     if (!polling) return;
     const timer = setInterval(() => router.refresh(), 4000);
@@ -101,6 +102,7 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
       const result = await approveOutlineAction(course.id, version);
       if (result.ok) {
         setGenerating(true);
+        router.refresh();
       } else {
         setError(result.message);
         if (result.reason === "conflict") router.refresh();
@@ -108,12 +110,16 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     });
   }
 
-  async function askTailor(text: string, onDelta: (chunk: string) => void): Promise<boolean> {
+  async function askTailor(
+    text: string,
+    effort: ReasoningEffort,
+    onDelta: (chunk: string) => void,
+  ): Promise<boolean> {
     try {
       const response = await fetch(`/api/courses/${course.id}/tailor`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, effort }),
       });
       if (!response.ok || !response.body) return false;
 

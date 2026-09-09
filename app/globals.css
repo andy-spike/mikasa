@@ -238,21 +238,43 @@
     font-variant-numeric: tabular-nums lining;
   }
 
-  .scroll-thin {
+  * {
     scrollbar-width: thin;
     scrollbar-color: var(--thumb) transparent;
   }
-  .scroll-thin::-webkit-scrollbar {
+  @supports selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: auto;
+      scrollbar-color: auto;
+    }
+  }
+  *::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
-  .scroll-thin::-webkit-scrollbar-track {
+  *::-webkit-scrollbar-button,
+  *::-webkit-scrollbar-button:single-button {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
+    width: 0;
+    height: 0;
     background: transparent;
   }
-  .scroll-thin::-webkit-scrollbar-thumb {
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
     background: var(--thumb);
     border: 3px solid transparent;
     background-clip: content-box;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
   /* Lea Verou's scroll shadows: the cover layers scroll with the content
      (local), the shadows do not, so each edge fades in only while there is
@@ -278,7 +300,7 @@
     background-attachment: local, local, scroll, scroll;
   }
 
-  .scroll-thin::-webkit-scrollbar-thumb:hover {
+  *::-webkit-scrollbar-thumb:hover {
     background: var(--thumb-hover);
     border: 3px solid transparent;
     background-clip: content-box;
@@ -286,6 +308,24 @@
 }
 
 @layer components {
+  .new-course-label {
+    max-width: 0;
+    margin-left: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition:
+      max-width var(--dur) var(--ease),
+      margin-left var(--dur) var(--ease),
+      opacity var(--dur-fast) var(--ease);
+  }
+
+  .new-course-button:hover .new-course-label,
+  .new-course-button:focus-visible .new-course-label {
+    max-width: 6rem;
+    margin-left: 0.5rem;
+    opacity: 1;
+  }
+
   /* The one label style. Small, tracked, never Literata-sized. */
   .label {
     font-size: 0.6875rem;
@@ -305,14 +345,6 @@
   /* The floating layer. Offset and blur, never a halo. */
   .lift {
     box-shadow: var(--lift);
-  }
-
-  /* Constant region: from 2xl up the closed panel keeps its width in
-     reserve as a right pad, so opening it never moves the sentence. */
-  @media (min-width: 1536px) {
-    .mk-panel-reserve {
-      padding-right: var(--mk-panel-reserve, 21rem);
-    }
   }
 }
 
@@ -374,13 +406,4 @@
   * {
     transition-duration: 1ms !important;
   }
-}
-
-/* A rail being dragged must follow the pointer frame by frame; the 200ms
-   settle animation on the gap, the container, and the reading column's
-   reserve would otherwise read as lag. */
-[data-resizing] [data-slot="sidebar-gap"],
-[data-resizing] [data-slot="sidebar-container"],
-[data-resizing] [data-slot="sidebar-inset"] {
-  transition: none !important;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { ReadingLesson, SourceLink } from "@/lib/course/reading";
 import { Button } from "@/components/ui/button";
 import { DoneCheck } from "./marks";
@@ -11,6 +11,7 @@ type Props = {
   total: number;
   stamp?: string;
   striking: boolean;
+  previous: { id: string; n: number; title: string } | null;
   next: { id: string; n: number; title: string } | null;
   sourceFor?: (ref: string) => SourceLink | undefined;
   onMark: () => void;
@@ -23,6 +24,7 @@ export function LessonPane({
   total,
   stamp,
   striking,
+  previous,
   next,
   sourceFor,
   onMark,
@@ -76,12 +78,34 @@ export function LessonPane({
           </section>
         ) : null}
 
-        <footer className="mt-12 max-w-(--measure) border-t border-hair pt-4">
+        <footer
+          className={`mt-12 grid max-w-(--measure) gap-3 border-t border-hair pt-4 ${previous && next ? "grid-cols-2" : "grid-cols-1"}`}
+        >
+          {previous ? (
+            <Button
+              variant="bare"
+              onClick={() => onOpen(previous.id)}
+              className="group flex min-w-0 items-center gap-3 px-3 py-3 text-left hover:bg-panel"
+            >
+              <ArrowLeft
+                className="h-4 w-4 shrink-0 text-fg-3 transition-transform duration-120 ease-expo group-hover:-translate-x-1"
+                strokeWidth={1.75}
+              />
+              <span className="min-w-0">
+                <span className="label block text-fg-dim">Previous</span>
+                <span className="mt-1 block truncate text-[0.9375rem] text-fg-2 group-hover:text-fg">
+                  <span className="tnum mr-2 text-fg-3">{previous.n}</span>
+                  {previous.title}
+                </span>
+              </span>
+            </Button>
+          ) : null}
+
           {next ? (
             <Button
               variant="bare"
               onClick={() => onOpen(next.id)}
-              className="group flex w-full max-w-(--measure) items-center gap-3 px-3 py-3 text-left hover:bg-panel"
+              className="group flex min-w-0 items-center gap-3 px-3 py-3 text-left hover:bg-panel"
             >
               <span className="min-w-0">
                 <span className="label block text-fg-dim">Next</span>
@@ -95,11 +119,7 @@ export function LessonPane({
                 strokeWidth={1.75}
               />
             </Button>
-          ) : (
-            <p className="px-3 py-3 text-[0.9375rem] text-fg-3">
-              This is the last Lesson in the Course.
-            </p>
-          )}
+          ) : null}
         </footer>
       </article>
     </div>

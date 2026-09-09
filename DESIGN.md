@@ -249,7 +249,7 @@ Colour is rationed to one job. `#4fd1a5` on graphite, `#0a7f5f` on paper, marks 
 - One accent with exactly one meaning, spent on roughly one row per screen.
 - Fewest facts per row: three in the Outline rail, three in the Courses list, everything else a click away.
 - Geist and Geist Mono only; no serif anywhere in the product.
-- Reading column pinned to a 36rem measure that never moves when chrome opens.
+- A viewport-centred Lesson at a 36rem measure, with fixed edge tools that never move it.
 - Both rails are the shadcn Sidebar, adapted rather than reinvented.
 - Command palette as primary navigation, not a power-user shortcut.
 
@@ -471,7 +471,7 @@ One panel, two modes, an explicit segmented switch at the top on a canvas-inset 
 
 - **Tutor thread:** the learner's turns sit one luminance step up in a right-shouldered rounded block; the Tutor's answers are unadorned prose at second ink. Pending state is a live-region line, not a spinner.
 - **Composer:** canvas-inset field that steps up to raised on focus-within; Enter sends, Shift-Enter breaks.
-- **Tailor plan:** hairline-divided rows on the panel's own ground — verb label, target, change, reason, then Approve/Discard or Applied/Undo. Deliberately not a card list.
+- **Tailor plan:** hairline-divided rows on the panel's own ground — verb label, target, change, reason, then Approve/Discard or Applied/Undo. Deliberately not a card list. Once every change has a decision and at least one is approved, the Course revision starts immediately; a neutral live status names its current stage while the published Course remains readable.
 
 ### Prose Blocks
 

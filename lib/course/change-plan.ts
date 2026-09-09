@@ -84,7 +84,7 @@ export const changePlanOpSchema = z.discriminatedUnion("kind", [
 ]) satisfies z.ZodType<ChangePlanOp>;
 
 export const changePlanSchema = z.object({
-  ops: z.array(changePlanOpSchema).min(1).max(20),
+  ops: z.array(changePlanOpSchema).min(1).max(10),
 });
 
 const STRUCTURE_KINDS = new Set([

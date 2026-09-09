@@ -19,6 +19,7 @@ import { designModel, designProviderOptions } from "@/lib/model";
 
 const turnSchema = z.object({
   message: z.string().min(1).max(4000),
+  effort: z.enum(["low", "medium", "high"]).default("low"),
 });
 
 function json(status: number, body: { error: string }) {
@@ -34,7 +35,7 @@ export async function POST(
 
   const parsed = turnSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return json(400, { error: "That request was not a Tailor turn." });
-  const { message } = parsed.data;
+  const { message, effort } = parsed.data;
 
   const { courseId } = await params;
   const course = await findOwnedCourse(db, session.user.id, courseId);
@@ -63,29 +64,33 @@ export async function POST(
 
   const result = streamText({
     model: designModel(),
-    providerOptions: designProviderOptions(),
+    providerOptions: designProviderOptions(effort),
     abortSignal: request.signal,
     instructions: [
       "You are the Tailor of Mikasa, a learning workspace. The Learner",
       "wants to reshape their Course: add, remove, rename, move, split, or",
       "merge Modules and Lessons, or rewrite a Lesson's prose or Exercise.",
       "",
-      "Listen to what the Learner wants changed and why. When you know",
-      "enough, call proposeChangePlan with every operation the change",
-      "needs, in order. Use the Lesson and Module ids from the Course's",
-      "shape below. Then say, briefly and concretely, what you proposed",
-      "and why — the Learner accepts or discards each operation, and",
-      "nothing changes until they apply the accepted ones.",
-      "",
-      "If the Learner only asks a question, answer it in plain prose and",
-      "propose nothing. If a request is vague, ask what they mean before",
-      "proposing. Never promise the change is done: proposing is not",
-      "applying.",
+      "Rules:",
+      "- Propose at most 10 operations per plan, in apply order. Larger",
+      "  reshapes become follow-up plans.",
+      "- Use only the Lesson and Module ids from the Course's shape below.",
+      "  Use them exactly. If the request names an id that is not in the",
+      "  shape, refuse that part and propose nothing for it.",
+      "- If the Learner only asks a question and requests no change, answer",
+      "  it in plain prose and never call proposeChangePlan.",
+      "- If the request is vague or missing a target, ask exactly one",
+      "  clarifying question and propose nothing until they answer.",
+      "- After calling proposeChangePlan, reply in this fixed shape:",
+      "  1) What changed (one line per op). 2) Op list with ids. 3) What",
+      "  needs approval. Nothing else.",
+      "- Never say the change is done or applied. Say only what you proposed.",
+      "  Nothing changes until the Learner accepts and applies it.",
       "",
       "The Course's shape (ids are stable; use them exactly):",
       JSON.stringify(shape),
       "",
-      `Language: answer in ${course.language}.`,
+      `Language: always answer in ${course.language}, the course language.`,
     ].join("\n"),
     messages: [
       ...history.map((turn) =>

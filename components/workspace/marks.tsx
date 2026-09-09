@@ -20,11 +20,7 @@ export function DoneCheck({
 
 export function LiveMark({ handing = false }: { handing?: boolean }) {
   return (
-    <span
-      aria-hidden
-      className={handing ? "mk-handoff flex" : "flex"}
-      style={{ color: "var(--live)" }}
-    >
+    <span aria-hidden className={handing ? "mk-handoff flex text-fg-3" : "flex text-fg-3"}>
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
         <path d="M3 1.5 9.5 6 3 10.5 Z" fill="currentColor" />
       </svg>

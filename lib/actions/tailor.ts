@@ -86,7 +86,7 @@ export async function findStagedPlanAction(courseId: string): Promise<StagedPlan
     plan: toPlanView(plan),
     failed: run?.status === "failed",
     error: run?.status === "failed" ? run.error : null,
-    stage: run?.status === "failed" ? run.currentStep : null,
+    stage: run?.currentStep ?? null,
   };
 }
 

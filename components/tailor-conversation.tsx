@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowUp } from "lucide-react";
+import { Slider } from "@base-ui/react/slider";
+import { ArrowUp, ChevronDown, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { Inline } from "@/components/workspace/prose";
+import type { ReasoningEffort } from "@/lib/model";
 
 export type Turn = { from: "learner" | "tutor" | "tailor"; text: string };
 
@@ -18,6 +25,8 @@ export type PlanOperation = {
 
 export type PlanView = { id: string; operations: PlanOperation[] };
 
+const EFFORTS = ["low", "medium", "high"] as const satisfies readonly ReasoningEffort[];
+
 export function Conversation({
   turns,
   onAsk,
@@ -28,10 +37,15 @@ export function Conversation({
   sendLabel,
   pendingText,
   failedText,
+  empty,
   scrollport = true,
 }: {
   turns: Turn[];
-  onAsk?: (text: string, onDelta: (chunk: string) => void) => Promise<boolean>;
+  onAsk?: (
+    text: string,
+    effort: ReasoningEffort,
+    onDelta: (chunk: string) => void,
+  ) => Promise<boolean>;
   below?: ReactNode;
   replyFrom?: "tutor" | "tailor";
   placeholder: string;
@@ -39,11 +53,14 @@ export function Conversation({
   sendLabel: string;
   pendingText: string;
   failedText?: string;
+  empty?: ReactNode;
   scrollport?: boolean;
 }) {
   const [thread, setThread] = useState<Turn[]>(turns);
   const [failed, setFailed] = useState(false);
   const [draft, setDraft] = useState("");
+  const [effort, setEffort] = useState<ReasoningEffort>("low");
+  const [effortOpen, setEffortOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [restored, setRestored] = useState(turns);
@@ -73,7 +90,7 @@ export function Conversation({
     setStreaming(false);
 
     let seen = false;
-    const ok = await onAsk(text, (chunk) => {
+    const ok = await onAsk(text, effort, (chunk) => {
       if (chunk.length > 0) {
         if (!seen) {
           seen = true;
@@ -111,16 +128,20 @@ export function Conversation({
         }
       >
         <div className="space-y-4">
+          {thread.length === 0 ? empty : null}
           {thread.map((turn, i) =>
             turn.from === "learner" ? (
               <p
                 key={i}
-                className="ml-6 rounded-md bg-raised px-3 py-2 text-[0.8125rem] leading-[1.55] text-fg"
+                className="ml-6 rounded-md bg-raised px-3 py-2 text-[0.8125rem] leading-[1.55] text-fg [overflow-wrap:anywhere]"
               >
                 {turn.text}
               </p>
             ) : (
-              <p key={i} className="text-[0.8125rem] leading-[1.66] text-fg-2">
+              <p
+                key={i}
+                className="text-[0.8125rem] leading-[1.66] text-fg-2 [overflow-wrap:anywhere]"
+              >
                 <Inline text={turn.text} />
               </p>
             ),
@@ -148,7 +169,7 @@ export function Conversation({
           if (text && !pending && connected) ask(text);
         }}
       >
-        <div className="flex items-end gap-2 rounded-md bg-canvas px-2.5 py-2 transition-colors focus-within:bg-raised">
+        <div className="rounded-md bg-canvas px-2.5 py-2 transition-colors focus-within:bg-raised">
           <Textarea
             rows={2}
             value={draft}
@@ -163,17 +184,87 @@ export function Conversation({
             placeholder={placeholder}
             aria-label={composerLabel}
             disabled={!connected}
-            className="min-h-[2.5rem] flex-1 bg-transparent px-0 py-0 focus:bg-transparent disabled:opacity-60"
+            className="min-h-[2.5rem] w-full bg-transparent px-0 py-0 focus:bg-transparent disabled:opacity-60"
           />
-          <Button
-            type="submit"
-            variant="icon-raised"
-            disabled={!draft.trim() || pending || !connected}
-            aria-label={sendLabel}
-            className="mb-0.5 disabled:opacity-40"
-          >
-            <ArrowUp className="h-4 w-4" strokeWidth={2} />
-          </Button>
+          <div className="mt-1 flex items-center justify-between">
+            <DropdownMenu open={effortOpen} onOpenChange={setEffortOpen}>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="quiet"
+                    aria-label={`Reasoning effort: ${effort}`}
+                    title="Gemini 3.7 Flash reasoning effort"
+                    className="-ml-1 h-8 gap-1.5 px-1 text-[0.75rem] capitalize"
+                  >
+                    <Zap className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    {effort}
+                    <ChevronDown className="h-3 w-3" strokeWidth={1.75} />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent
+                side="top"
+                align="start"
+                className="w-60 p-3"
+                onKeyDown={(event) => {
+                  if (
+                    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(
+                      event.key,
+                    )
+                  )
+                    event.stopPropagation();
+                }}
+              >
+                <div className="flex items-center gap-2 text-[0.8125rem] text-fg">
+                  <Zap className="h-3.5 w-3.5 text-fg-3" strokeWidth={1.75} />
+                  <span className="font-medium">Gemini 3.7 Flash</span>
+                  <span className="ml-auto capitalize text-fg-3">{effort}</span>
+                </div>
+                <Slider.Root
+                  value={EFFORTS.indexOf(effort)}
+                  min={0}
+                  max={2}
+                  step={1}
+                  onValueChange={(value) => setEffort(EFFORTS[value])}
+                  onValueCommitted={() => setEffortOpen(false)}
+                  className="mt-4"
+                >
+                  <Slider.Control className="relative mx-2.5 flex h-6 touch-none items-center">
+                    <Slider.Track className="relative h-1.5 w-full overflow-hidden bg-raised">
+                      <Slider.Indicator className="h-full bg-fg-3" />
+                    </Slider.Track>
+                    {EFFORTS.map((value, index) => (
+                      <span
+                        key={value}
+                        className="pointer-events-none absolute h-1.5 w-1.5 -translate-x-1/2 bg-panel ring-1 ring-fg-3"
+                        style={{ left: `${index * 50}%` }}
+                      />
+                    ))}
+                    <Slider.Thumb
+                      getAriaLabel={() => "Reasoning effort"}
+                      getAriaValueText={(_, value) => EFFORTS[value]}
+                      className="h-5 w-5 bg-fg outline-none ring-canvas focus-visible:ring-2"
+                    />
+                  </Slider.Control>
+                </Slider.Root>
+                <div className="mt-1 flex justify-between text-[0.6875rem] capitalize text-fg-dim">
+                  {EFFORTS.map((value) => (
+                    <span key={value}>{value}</span>
+                  ))}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              type="submit"
+              variant="icon-raised"
+              disabled={!draft.trim() || pending || !connected}
+              aria-label={sendLabel}
+              className="disabled:opacity-40"
+            >
+              <ArrowUp className="h-4 w-4" strokeWidth={2} />
+            </Button>
+          </div>
         </div>
       </form>
     </div>
@@ -187,21 +278,27 @@ export function TailorConversation({
   onAccept,
   onDiscard,
   onRestore,
+  empty,
   applySlot,
   publishedSlot,
   scrollport = true,
-  stagedFailedSlot,
+  revisionSlot,
 }: {
   turns: Turn[];
-  onAsk?: (text: string, onDelta: (chunk: string) => void) => Promise<boolean>;
+  onAsk?: (
+    text: string,
+    effort: ReasoningEffort,
+    onDelta: (chunk: string) => void,
+  ) => Promise<boolean>;
   plan?: PlanView;
   onAccept: (operationId: string) => void;
   onDiscard: (operationId: string) => void;
   onRestore: (operationId: string) => void;
+  empty?: ReactNode;
   applySlot?: ReactNode;
   publishedSlot?: ReactNode;
   scrollport?: boolean;
-  stagedFailedSlot?: ReactNode;
+  revisionSlot?: ReactNode;
 }) {
   const open = plan?.operations ?? [];
   const acceptedCount = open.filter((o) => o.status === "accepted").length;
@@ -215,9 +312,11 @@ export function TailorConversation({
       composerLabel="Tell the Tailor what to change"
       sendLabel="Tell the Tailor"
       pendingText="Working on a plan…"
+      empty={empty}
       scrollport={scrollport}
       below={
         <>
+          {revisionSlot}
           {open.length > 0 ? (
             <div className="mt-5">
               <p className="label text-fg-3">Change plan</p>
@@ -278,7 +377,6 @@ export function TailorConversation({
               {applySlot && acceptedCount > 0 ? <div className="mt-4">{applySlot}</div> : null}
             </div>
           ) : null}
-          {stagedFailedSlot ? <div className="mt-4">{stagedFailedSlot}</div> : null}
           {publishedSlot}
         </>
       }
