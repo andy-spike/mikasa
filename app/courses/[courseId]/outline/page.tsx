@@ -27,7 +27,7 @@ function domainOf(url: string) {
   }
 }
 
-export default async function OutlinePage({ params }: PageProps<"/courses/[courseId]/outline">) {
+export default async function OutlinePage({ params }: { params: Promise<{ courseId: string }> }) {
   const { user } = await requireLearner();
   const { courseId } = await params;
   const course = await findOwnedCourse(db, user.id, courseId);

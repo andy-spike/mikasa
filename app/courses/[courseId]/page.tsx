@@ -13,7 +13,7 @@ import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
 import { turnViews } from "@/lib/course/tutor";
 import { requireLearner } from "@/lib/session";
 
-export default async function CoursePage({ params }: PageProps<"/courses/[courseId]">) {
+export default async function CoursePage({ params }: { params: Promise<{ courseId: string }> }) {
   const { user } = await requireLearner();
   const { courseId } = await params;
   const course = await findOwnedCourse(db, user.id, courseId);

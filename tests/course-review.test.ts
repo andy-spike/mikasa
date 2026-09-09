@@ -13,11 +13,8 @@ import { makeTestDb } from "./helpers/test-db";
 import { makeOutline, makeSpec } from "./helpers/fixtures";
 import type { LessonContent } from "@/lib/course/content";
 
-const {
-  correctLesson,
-  MAX_CORRECTION_ROUNDS,
-  structuralFindings,
-} = await import("@/lib/course/review");
+const { correctLesson, MAX_CORRECTION_ROUNDS, structuralFindings } =
+  await import("@/lib/course/review");
 const { parseLessonContent } = await import("@/lib/course/content");
 const {
   currentRevision,
