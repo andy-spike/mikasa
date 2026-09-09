@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { createAuth, type Auth } from "@/lib/auth";
+import { signedOutHref } from "@/lib/access";
 
 export const auth: Auth = createAuth(db);
 
@@ -12,6 +13,6 @@ export async function requireLearner(): Promise<
   NonNullable<Awaited<ReturnType<Auth["api"]["getSession"]>>>
 > {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/");
+  if (!session) redirect(signedOutHref());
   return session;
 }

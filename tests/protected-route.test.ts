@@ -37,7 +37,7 @@ afterEach(() => {
 
 describe("requireLearner", () => {
   it("sends a signed-out visitor to sign in", async () => {
-    await expect(requireLearner()).rejects.toThrow("NEXT_REDIRECT:/");
+    await expect(requireLearner()).rejects.toThrow("NEXT_REDIRECT:/?signedOut=1");
   });
 
   it("ignores a stale cookie once the session is gone", async () => {
@@ -47,7 +47,7 @@ describe("requireLearner", () => {
     );
 
     setRequestCookie(cookie);
-    await expect(requireLearner()).rejects.toThrow("NEXT_REDIRECT:/");
+    await expect(requireLearner()).rejects.toThrow("NEXT_REDIRECT:/?signedOut=1");
   });
 
   it("hands the session to a signed-in Learner", async () => {
