@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { CourseRowMenu } from "@/components/course-row-menu";
 import { DoneCheck, LiveMark, UnsetMark } from "@/components/workspace/marks";
 import { Button } from "@/components/ui/button";
 import { listOwnedCoursesWithCompletion } from "@/lib/db/courses";
@@ -35,15 +36,7 @@ export default async function CoursesPage() {
   const owned = await listOwnedCoursesWithCompletion(db, user.id);
 
   return (
-    <AppShell
-      section="Courses"
-      actions={
-        <Button variant="compact" render={<Link href="/courses/new" />} className="mr-1">
-          <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
-          New Course
-        </Button>
-      }
-    >
+    <AppShell section="Courses">
       <div className="mx-auto w-full max-w-[52rem] px-5 pt-10 pb-24 sm:px-8">
         <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
           Courses
@@ -66,10 +59,10 @@ export default async function CoursesPage() {
               const { href, label, reading } = rowFor(c);
               const complete = reading && c.completion && c.completion.done >= c.completion.total;
               return (
-                <li key={c.id} className="border-b border-hair">
+                <li key={c.id} className="group relative border-b border-hair hover:bg-panel">
                   <Link
                     href={href}
-                    className="row grid grid-cols-[0.75rem_1fr_auto] items-start gap-x-4 px-2 py-5 hover:bg-panel"
+                    className="row grid grid-cols-[0.75rem_1fr_auto] items-start gap-x-4 px-2 py-5"
                   >
                     <span className="flex h-5 w-3 items-center justify-center">
                       {reading ? (
@@ -94,18 +87,35 @@ export default async function CoursesPage() {
                       </span>
                     </span>
 
-                    <span className="tnum shrink-0 text-[0.8125rem] text-fg-3">
+                    <span className="tnum shrink-0 pr-10 text-[0.8125rem] text-fg-3">
                       {reading && c.completion
                         ? `${c.completion.done} / ${c.completion.total}`
                         : label}
                     </span>
                   </Link>
+
+                  <div className="absolute top-4 right-2">
+                    <CourseRowMenu courseId={c.id} topic={c.topic} />
+                  </div>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+
+      {owned.length > 0 ? (
+        <Button
+          variant="hero"
+          render={<Link href="/courses/new" />}
+          aria-label="New Course"
+          title="New Course"
+          className="new-course-button fixed right-5 bottom-5 z-20 h-11 gap-0 px-3 sm:right-8 sm:bottom-8"
+        >
+          <Plus className="h-4 w-4" strokeWidth={1.75} />
+          <span className="new-course-label">New Course</span>
+        </Button>
+      ) : null}
     </AppShell>
   );
 }

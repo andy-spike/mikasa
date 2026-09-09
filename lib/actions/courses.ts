@@ -8,8 +8,9 @@ import { failDesignRun, latestDesignRun, startDesignRun } from "@/lib/db/design"
 import { failGenerationRun, latestGenerationRun } from "@/lib/db/outline";
 import { cancelGenerationRun, resetGenerationRun, currentRevision } from "@/lib/db/review";
 import { searchIsIncomplete } from "@/lib/db/fragments";
-import { deleteOwnedDesigningCourse, findOwnedCourse } from "@/lib/db/courses";
+import { deleteOwnedCourse, deleteOwnedDesigningCourse, findOwnedCourse } from "@/lib/db/courses";
 import { requireLearner } from "@/lib/session";
+import { revalidatePath } from "next/cache";
 import { validateCourseInput, type CourseInput, type CourseInputErrors } from "@/lib/course/limits";
 import { designCourseWorkflow } from "@/workflows/course-design";
 import { generateCourseWorkflow } from "@/workflows/course-generation";
@@ -132,6 +133,19 @@ export type CancelResult = { ok: true } | { ok: false; reason: "not-found" | "to
 export async function cancelDesignAction(courseId: string): Promise<CancelResult> {
   const { user } = await requireLearner();
   return deleteOwnedDesigningCourse(db, user.id, courseId);
+}
+
+export type DeleteCourseResult = { ok: boolean };
+
+/**
+ * Deletes a Course in any state, with everything it owns. An in-flight
+ * workflow stops at its next step boundary when its data is gone.
+ */
+export async function deleteCourseAction(courseId: string): Promise<DeleteCourseResult> {
+  const { user } = await requireLearner();
+  const ok = await deleteOwnedCourse(db, user.id, courseId);
+  if (ok) revalidatePath("/courses");
+  return { ok };
 }
 
 /**

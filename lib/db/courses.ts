@@ -73,3 +73,16 @@ export async function deleteOwnedDesigningCourse(
   if (deleted.length === 0) return { ok: false, reason: "too-late" };
   return { ok: true };
 }
+
+/**
+ * Deletes a Course in any state. Runs, Sources, Outline, Lessons and
+ * review work go with it through foreign-key cascades; an in-flight
+ * workflow stops at its next step boundary when its data is gone.
+ */
+export async function deleteOwnedCourse(db: Db, ownerId: string, id: string): Promise<boolean> {
+  const deleted = await db
+    .delete(courses)
+    .where(and(eq(courses.ownerId, ownerId), eq(courses.id, id)))
+    .returning({ id: courses.id });
+  return deleted.length > 0;
+}
