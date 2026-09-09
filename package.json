@@ -12,9 +12,9 @@
     "format:check": "oxfmt --check",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:generate": "DATABASE_URL=\"$DATABASE_URL_DEV\" bun --bun drizzle-kit generate",
-    "db:migrate": "DATABASE_URL=\"$DATABASE_URL_DEV\" bun --bun drizzle-kit migrate",
-    "db:migrate:main": "DATABASE_URL=\"$DATABASE_URL_MAIN\" bun --bun drizzle-kit migrate",
+    "db:generate": "DATABASE_TARGET=dev bun --bun drizzle-kit generate",
+    "db:migrate": "DATABASE_TARGET=dev bun --bun drizzle-kit migrate",
+    "db:migrate:main": "DATABASE_TARGET=main bun --bun drizzle-kit migrate",
     "dev:reset": "bun run scripts/dev-reset.ts"
   },
   "dependencies": {
