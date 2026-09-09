@@ -40,12 +40,8 @@ export type CourseSpecification = {
     premise: string;
     runningExample: string;
     vocabulary: string[];
-    /**
-     * The running example's concrete artifacts, pinned before any Lesson is
-     * written: the exact markup skeleton with every class name, and the exact
-     * shared values (thresholds, sizes, units). Lessons copy these verbatim.
-     * Empty when the Topic has no cumulative example.
-     */
+    // The running example's concrete artifacts, pinned before any Lesson is
+    // written. Empty when the Topic has no cumulative example.
     exampleContract?: string;
   };
   learningGraph: {

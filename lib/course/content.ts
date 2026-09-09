@@ -7,17 +7,6 @@ export type ContentBlock =
   | { kind: "note"; title: string; text: string; sourceRefs?: string[] }
   | { kind: "table"; head: string[]; rows: string[][]; caption: string };
 
-export type LessonContent = {
-  lessonId: string;
-  title: string;
-  body: ContentBlock[];
-  workedExample: ContentBlock[];
-  recallPrompt: string;
-  selfExplanationPrompt: string;
-  exercise: { task: string; check: string };
-  bridge: string;
-};
-
 const blockSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("p"),
@@ -52,6 +41,11 @@ export const lessonContentSchema = z.object({
   exercise: z.object({ task: z.string().min(1), check: z.string().min(1) }),
   bridge: z.string().min(1),
 });
+
+export type LessonContent = z.infer<typeof lessonContentSchema> & {
+  lessonId: string;
+  title: string;
+};
 
 export function parseLessonContent(lessonId: string, title: string, value: unknown): LessonContent {
   const parsed = lessonContentSchema.parse(value);

@@ -3,6 +3,7 @@ import type { LanguageModel } from "ai";
 import { z } from "zod";
 import { designProviderOptions } from "@/lib/model";
 import { DesignError } from "./design";
+import { outlineLessonsWithModule } from "./spec-graph";
 import type { CourseSpecification, LessonAdjustment, OutlineData } from "./types";
 
 const reconcileSchema = z.object({
@@ -36,7 +37,7 @@ export async function reconcileSpecification(
   adjustments: LessonAdjustment[] = [],
   validationErrors?: string[],
 ): Promise<CourseSpecification> {
-  const lessons = outline.modules.flatMap((m) => m.lessons.map((l) => ({ ...l, module: m.title })));
+  const lessons = outlineLessonsWithModule(outline);
   const titleFor = new Map(lessons.map((l) => [l.id, l.title]));
   const lessonIds = new Set(lessons.map((l) => l.id));
   const live = adjustments.filter((a) => lessonIds.has(a.lessonId));
@@ -71,7 +72,7 @@ export async function reconcileSpecification(
       "The Outline is now frozen. Use exactly these lesson ids:",
       ...lessons.map((l) => `- ${l.id} — Module "${l.module}", "${l.title}": ${l.summary}`),
       "",
-      ...(validationErrors && validationErrors.length > 0
+      ...(validationErrors?.length
         ? [
             "The previous attempt failed validation with these errors. Fix every one;",
             "do not reorder the Outline or drop references silently:",
@@ -84,13 +85,14 @@ export async function reconcileSpecification(
             "The learner also set concrete demands for specific Lessons. Honor",
             "them exactly, and reflect them in the alignment you produce:",
             ...live.map((a) => {
-              const parts: string[] = [];
-              if (a.prose) parts.push(`its prose must: ${a.prose}`);
-              if (a.exercise)
-                parts.push(
+              const text = [
+                a.prose && `its prose must: ${a.prose}`,
+                a.exercise &&
                   `its Exercise becomes: "${a.exercise.task}", done when: ${a.exercise.check}`,
-                );
-              return `- ${a.lessonId} ("${titleFor.get(a.lessonId) ?? a.lessonId}"): ${parts.join("; ")}`;
+              ]
+                .filter(Boolean)
+                .join("; ");
+              return `- ${a.lessonId} ("${titleFor.get(a.lessonId) ?? a.lessonId}"): ${text}`;
             }),
             "",
           ]
@@ -120,7 +122,8 @@ export async function reconcileSpecification(
   // Fail loudly on holes or bad ids instead of filtering them away. The
   // caller validates against stored Sources and retries once with errors.
   const lessonSet = new Set(lessons.map((l) => l.id));
-  const missing = lessons.filter((l) => !output.alignment.some((a) => a.lessonId === l.id));
+  const alignedIds = new Set(output.alignment.map((a) => a.lessonId));
+  const missing = lessons.filter((l) => !alignedIds.has(l.id));
   if (missing.length > 0) {
     throw new DesignError(
       `The reconciled specification skipped ${missing.length} Lesson(s): ${missing
@@ -169,8 +172,9 @@ export function specNeedsReconciliation(
   outline: OutlineData,
   adjustments: LessonAdjustment[],
 ): boolean {
-  const lessons = outline.modules.flatMap((m) => m.lessons);
-  if (lessons.some((l) => !spec.alignment.some((a) => a.lessonId === l.id))) return true;
-  if (spec.learningGraph.some((n) => !lessons.some((l) => l.id === n.lessonId))) return true;
+  const lessonIds = new Set(outline.modules.flatMap((m) => m.lessons.map((l) => l.id)));
+  const alignedIds = new Set(spec.alignment.map((a) => a.lessonId));
+  if ([...lessonIds].some((id) => !alignedIds.has(id))) return true;
+  if (spec.learningGraph.some((n) => !lessonIds.has(n.lessonId))) return true;
   return !sameAdjustments(spec.adjustments ?? [], adjustments);
 }

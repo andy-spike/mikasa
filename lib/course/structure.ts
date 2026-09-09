@@ -52,16 +52,22 @@ function findModule(data: OutlineData, moduleId: string): OutlineModule {
   return mod;
 }
 
+function findModuleIndex(modules: OutlineModule[], moduleId: string): number {
+  const index = modules.findIndex((m) => m.id === moduleId);
+  if (index === -1) throw new StructureError("That Module does not exist.");
+  return index;
+}
+
 function findLesson(
   data: OutlineData,
   lessonId: string,
 ): { module: OutlineModule; lesson: OutlineLesson; lessonIndex: number; moduleIndex: number } {
-  for (let mi = 0; mi < data.modules.length; mi++) {
-    const li = data.modules[mi].lessons.findIndex((l) => l.id === lessonId);
+  for (const [mi, mod] of data.modules.entries()) {
+    const li = mod.lessons.findIndex((l) => l.id === lessonId);
     if (li !== -1) {
       return {
-        module: data.modules[mi],
-        lesson: data.modules[mi].lessons[li],
+        module: mod,
+        lesson: mod.lessons[li],
         lessonIndex: li,
         moduleIndex: mi,
       };
@@ -82,9 +88,7 @@ function renumber(modules: OutlineModule[]): OutlineData {
   };
 }
 
-export function renumberOutline(modules: OutlineModule[]): OutlineData {
-  return renumber(modules);
-}
+export const renumberOutline = renumber;
 
 function clone(data: OutlineData): OutlineModule[] {
   return data.modules.map((m) => ({ ...m, lessons: m.lessons.map((l) => ({ ...l })) }));
@@ -118,8 +122,7 @@ export function applyOutlineOp(
     }
 
     case "removeModule": {
-      const index = modules.findIndex((m) => m.id === op.moduleId);
-      if (index === -1) throw new StructureError("That Module does not exist.");
+      const index = findModuleIndex(modules, op.moduleId);
       if (modules.length === 1) {
         throw new StructureError("A Course needs at least one Module.");
       }
@@ -128,8 +131,7 @@ export function applyOutlineOp(
     }
 
     case "moveModule": {
-      const index = modules.findIndex((m) => m.id === op.moduleId);
-      if (index === -1) throw new StructureError("That Module does not exist.");
+      const index = findModuleIndex(modules, op.moduleId);
       const to = Math.floor(op.toIndex);
       if (to < 0 || to > modules.length - 1) {
         throw new StructureError("A Module cannot move there.");
@@ -160,7 +162,7 @@ export function applyOutlineOp(
 
     case "removeLesson": {
       const { module: mod, lessonIndex } = findLesson({ modules }, op.lessonId);
-      const total = modules.reduce((n, m) => n + m.lessons.length, 0);
+      const total = modules.reduce((total, mod) => total + mod.lessons.length, 0);
       if (total === 1) {
         throw new StructureError("A Course needs at least one Lesson.");
       }
@@ -195,25 +197,20 @@ export function applyOutlineOp(
 
     case "mergeLesson": {
       const { module: mod, lesson, lessonIndex } = findLesson({ modules }, op.lessonId);
-      if (op.direction === "next") {
-        const next = mod.lessons[lessonIndex + 1];
-        if (!next) {
-          throw new StructureError("There is no next Lesson in this Module to merge into it.");
-        }
-        lesson.title = checkTitle(lesson.title, "Lesson");
-        lesson.summary = [lesson.summary, next.summary].filter(Boolean).join(" ");
-        lesson.minutes += next.minutes;
-        mod.lessons.splice(lessonIndex + 1, 1);
-      } else {
-        const previous = mod.lessons[lessonIndex - 1];
-        if (!previous) {
-          throw new StructureError("There is no previous Lesson in this Module to merge into.");
-        }
-        previous.title = checkTitle(previous.title, "Lesson");
-        previous.summary = [previous.summary, lesson.summary].filter(Boolean).join(" ");
-        previous.minutes += lesson.minutes;
-        mod.lessons.splice(lessonIndex, 1);
+      const neighbor = mod.lessons[op.direction === "next" ? lessonIndex + 1 : lessonIndex - 1];
+      if (!neighbor) {
+        throw new StructureError(
+          op.direction === "next"
+            ? "There is no next Lesson in this Module to merge into it."
+            : "There is no previous Lesson in this Module to merge into.",
+        );
       }
+      const keeper = op.direction === "next" ? lesson : neighbor;
+      const dropped = op.direction === "next" ? neighbor : lesson;
+      keeper.title = checkTitle(keeper.title, "Lesson");
+      keeper.summary = [keeper.summary, dropped.summary].filter(Boolean).join(" ");
+      keeper.minutes += dropped.minutes;
+      mod.lessons.splice(mod.lessons.indexOf(dropped), 1);
       return renumber(modules);
     }
   }
@@ -232,10 +229,10 @@ export function applyOutlineOps(
 export function outlineApprovalProblems(data: OutlineData): string[] {
   const problems: string[] = [];
   if (data.modules.length === 0) problems.push("The Outline has no Modules.");
-  for (const mod of data.modules) {
-    if (mod.lessons.length === 0) {
-      problems.push(`Module "${mod.title}" has no Lessons.`);
-    }
-  }
+  problems.push(
+    ...data.modules
+      .filter((mod) => mod.lessons.length === 0)
+      .map((mod) => `Module "${mod.title}" has no Lessons.`),
+  );
   return problems;
 }

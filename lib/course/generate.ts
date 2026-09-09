@@ -10,12 +10,7 @@ import {
 } from "./content";
 import type { CourseSpecification, OutlineData, OutlineLesson } from "./types";
 import { findCyclePath, introducedAtMap, outlinePosition } from "./spec-graph";
-import {
-  contractWriteBlock,
-  finalExerciseLines,
-  languageName,
-  sourceLine,
-} from "./prompt-blocks";
+import { contractWriteBlock, finalExerciseLines, languageName, sourceLine } from "./prompt-blocks";
 
 export type PromptSource = {
   ref: string;
@@ -162,8 +157,9 @@ export async function generateLesson(
   const introducedSkills = input.spec.learningGraph
     .filter((n) => n.lessonId === input.lesson.id)
     .map((n) => n.skill);
+  const skillById = new Map(input.spec.learningGraph.map((n) => [n.id, n.skill]));
   const assumedSkills = alignment.prerequisiteNodes
-    .map((id) => input.spec.learningGraph.find((n) => n.id === id)?.skill)
+    .map((id) => skillById.get(id))
     .filter((s): s is string => Boolean(s));
   const adjustment = input.spec.adjustments?.find((a) => a.lessonId === input.lesson.id);
   const relevantSources =
@@ -270,18 +266,16 @@ export async function generateLesson(
 type BlockWithRefs = ContentBlock & { sourceRefs?: string[] };
 
 function stripUnknownRefs(known: Set<string>) {
-  return (block: unknown): BlockWithRefs => {
-    const b = block as BlockWithRefs;
-    if (b.sourceRefs) {
-      return { ...b, sourceRefs: b.sourceRefs.filter((r) => known.has(r)) };
-    }
-    return b;
+  return (block: ContentBlock): BlockWithRefs => {
+    const refs = (block as BlockWithRefs).sourceRefs;
+    return refs
+      ? { ...(block as BlockWithRefs), sourceRefs: refs.filter((r) => known.has(r)) }
+      : block;
   };
 }
 
 export function candidateIsComplete(outline: OutlineData, writtenLessonIds: Set<string>): boolean {
-  const planned = outline.modules.flatMap((m) => m.lessons.map((l) => l.id));
-  return planned.every((id) => writtenLessonIds.has(id));
+  return outline.modules.every((m) => m.lessons.every((l) => writtenLessonIds.has(l.id)));
 }
 
 // Replay-safe ordering helpers are gone: generation writes one Lesson at a

@@ -18,13 +18,13 @@ export function dedupeCorrectionQueries(
 ): string[] {
   const seen = new Set<string>();
   const queries: string[] = [];
-  for (const f of findings) {
-    const q = f.sourceQuery?.trim();
-    if (!q || f.kind !== "factual") continue;
-    const key = q.toLowerCase();
+  for (const finding of findings) {
+    const query = finding.sourceQuery?.trim();
+    if (!query || finding.kind !== "factual") continue;
+    const key = query.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    queries.push(q);
+    queries.push(query);
     if (queries.length >= cap) break;
   }
   return queries;

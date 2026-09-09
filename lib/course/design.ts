@@ -5,6 +5,8 @@ import { z } from "zod";
 import { designProviderOptions, groundingProviderOptions } from "@/lib/model";
 import { depthBounds, type CourseInput, type DepthId } from "./limits";
 import { languageName as courseLanguageName } from "./prompt-blocks";
+import { outlineLessonsWithModule } from "./spec-graph";
+import { validateSpecification } from "./spec-validate";
 import type { CourseSpecification, GatheredSource, OutlineData, OutlineModule } from "./types";
 
 export class DesignError extends Error {
@@ -45,24 +47,34 @@ export function firecrawlSearcher(): SourceSearcher {
     const pages: FetchedPage[] = [];
     const fetchedAt = new Date().toISOString();
     for (const doc of results.web ?? []) {
-      const url = "url" in doc ? doc.url : undefined;
-      if (!url) continue;
-      const metadata = "metadata" in doc ? doc.metadata : undefined;
-      const content =
-        "markdown" in doc && typeof doc.markdown === "string"
-          ? doc.markdown
-          : "description" in doc && typeof doc.description === "string"
-            ? doc.description
-            : "";
+      if (!("url" in doc) || !doc.url) continue;
       pages.push({
-        title: metadata?.title || ("title" in doc && doc.title) || url,
-        url,
+        title: docTitle(doc, doc.url),
+        url: doc.url,
         fetchedAt,
-        content,
+        content: docContent(doc),
       });
     }
     return pages;
   };
+}
+
+function docContent(doc: object): string {
+  if ("markdown" in doc && typeof doc.markdown === "string") return doc.markdown;
+  if ("description" in doc && typeof doc.description === "string") return doc.description;
+  return "";
+}
+
+function docTitle(doc: object, url: string): string {
+  if (
+    "metadata" in doc &&
+    doc.metadata &&
+    typeof doc.metadata === "object" &&
+    "title" in doc.metadata
+  )
+    return (doc.metadata.title as string) || url;
+  if ("title" in doc && doc.title) return doc.title as string;
+  return url;
 }
 
 export async function gatherSources(
@@ -91,7 +103,6 @@ export async function selectExcerpts(
   const fallback = (page: FetchedPage) => page.content.slice(0, EXCERPT_MAX_CHARS).trim();
 
   if (pages.length === 0) return new Map();
-  const byUrl = new Map(pages.map((p) => [p.url, p]));
 
   let chosen: Map<string, string | undefined>;
   try {
@@ -116,7 +127,9 @@ export async function selectExcerpts(
     });
 
     chosen = new Map(
-      (output?.excerpts ?? []).map((e) => [e.url, e.excerpt.trim().slice(0, EXCERPT_MAX_CHARS)] as const),
+      (output?.excerpts ?? []).map(
+        (e) => [e.url, e.excerpt.trim().slice(0, EXCERPT_MAX_CHARS)] as const,
+      ),
     );
   } catch {
     chosen = new Map();
@@ -124,18 +137,9 @@ export async function selectExcerpts(
 
   const result = new Map<string, string>();
   for (const page of pages) {
-    if (!chosen.has(page.url)) {
-      result.set(page.url, fallback(page));
-      continue;
-    }
     const picked = (chosen.get(page.url) ?? "").trim().slice(0, EXCERPT_MAX_CHARS);
-    if (!picked) {
-      result.set(page.url, "");
-      continue;
-    }
-    result.set(page.url, picked);
+    result.set(page.url, chosen.has(page.url) ? picked : fallback(page));
   }
-  void byUrl;
   return result;
 }
 
@@ -203,10 +207,11 @@ function describeBounds(depth: string): string {
 }
 
 function exactOutlineCounts(depth: string): { modules: number; lessonsPerModule: number } {
-  const b = depthBounds(depth);
-  const modules = Math.round((b.minModules + b.maxModules) / 2);
-  const lessonsPerModule = Math.round((b.minLessonsPerModule + b.maxLessonsPerModule) / 2);
-  return { modules, lessonsPerModule };
+  const { minModules, maxModules, minLessonsPerModule, maxLessonsPerModule } = depthBounds(depth);
+  return {
+    modules: Math.round((minModules + maxModules) / 2),
+    lessonsPerModule: Math.round((minLessonsPerModule + maxLessonsPerModule) / 2),
+  };
 }
 
 function describeExactCounts(depth: string): string {
@@ -361,7 +366,7 @@ export async function designSpecification(
   draft: OutlineDraft,
   sources: GatheredSource[],
 ): Promise<CourseSpecification> {
-  const lessons = outline.modules.flatMap((m) => m.lessons.map((l) => ({ ...l, module: m.title })));
+  const lessons = outlineLessonsWithModule(outline);
 
   const { output } = await generateText({
     model,
@@ -408,7 +413,6 @@ export async function designSpecification(
 
   if (!output) throw new DesignError("The model returned no specification.");
 
-  const { validateSpecification } = await import("./spec-validate");
   const sourceRefSet = new Set(sources.map((s) => s.ref));
   const candidate: CourseSpecification = {
     contract: {

@@ -48,11 +48,10 @@ export function validateSpecification(
     byPerformance.set(key, holders);
   }
   for (const [performance, holders] of byPerformance) {
-    if (holders.length > 1) {
-      throw new GenerationError(
-        `Lessons ${holders.map((id) => `"${titleOf.get(id) ?? id}"`).join(" and ")} all claim the same performance "${performance}". Give each Lesson a distinct performance, or the Course reads as duplicate Lessons the correction loop cannot merge.`,
-      );
-    }
+    if (holders.length < 2) continue;
+    throw new GenerationError(
+      `Lessons ${holders.map((id) => `"${titleOf.get(id) ?? id}"`).join(" and ")} all claim the same performance "${performance}". Give each Lesson a distinct performance, or the Course reads as duplicate Lessons the correction loop cannot merge.`,
+    );
   }
   // exampleStart/exampleEnd may be empty when the Topic has no cumulative
   // example; sourceRefs may be empty. Types enforce presence, values may be empty.
@@ -65,12 +64,11 @@ export function validateSpecification(
     if (!Array.isArray(a.sourceRefs)) {
       throw new GenerationError(`Lesson "${a.lessonId}" needs a sourceRefs array (empty is fine).`);
     }
-    for (const ref of a.sourceRefs) {
-      if (!availableSourceRefs.has(ref)) {
-        throw new GenerationError(
-          `Lesson "${a.lessonId}" cites Source "${ref}", which the Course does not have. Use a stored Source ref or leave sourceRefs empty.`,
-        );
-      }
+    const unknownRef = a.sourceRefs.find((ref) => !availableSourceRefs.has(ref));
+    if (unknownRef) {
+      throw new GenerationError(
+        `Lesson "${a.lessonId}" cites Source "${unknownRef}", which the Course does not have. Use a stored Source ref or leave sourceRefs empty.`,
+      );
     }
   }
 

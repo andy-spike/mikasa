@@ -4,10 +4,18 @@
 // keeps its own error text.
 import type { CourseSpecification, OutlineData, OutlineLesson } from "./types";
 
-export function outlinePosition(outline: OutlineData): {
+export type OutlinePositions = {
   lessons: OutlineLesson[];
   position: Map<string, number>;
-} {
+};
+
+export function outlineLessonsWithModule(
+  outline: OutlineData,
+): (OutlineLesson & { module: string })[] {
+  return outline.modules.flatMap((m) => m.lessons.map((l) => ({ ...l, module: m.title })));
+}
+
+export function outlinePosition(outline: OutlineData): OutlinePositions {
   const lessons = outline.modules.flatMap((m) => m.lessons);
   return { lessons, position: new Map(lessons.map((l, i) => [l.id, i])) };
 }

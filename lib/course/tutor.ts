@@ -101,11 +101,10 @@ export function tutorSystemPrompt(context: TutorContext): string {
 export function tutorPrompt(history: TutorTurnRow[], message: string): ModelMessage[] {
   const recent = history.slice(-HISTORY_WINDOW);
   return [
-    ...recent.map((turn): ModelMessage =>
-      turn.role === "learner"
-        ? { role: "user", content: turn.content }
-        : { role: "assistant", content: turn.content },
-    ),
+    ...recent.map((turn): ModelMessage => ({
+      role: turn.role === "learner" ? "user" : "assistant",
+      content: turn.content,
+    })),
     { role: "user", content: message },
   ];
 }

@@ -23,61 +23,66 @@ export type ExerciseOp = {
 
 export type ChangePlanOp = OutlineOp | LessonProseOp | ExerciseOp;
 
+const title = z.string().min(1).max(200);
+const summary = z.string().max(500);
+const lessonId = z.string().min(1);
+const moduleId = z.string().min(1);
+
 export const changePlanOpSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("addModule"),
-    title: z.string().min(1).max(200),
-    moduleId: z.string().min(1).optional(),
+    title,
+    moduleId: moduleId.optional(),
   }),
   z.object({
     kind: z.literal("renameModule"),
-    moduleId: z.string().min(1),
-    title: z.string().min(1).max(200),
+    moduleId,
+    title,
   }),
-  z.object({ kind: z.literal("removeModule"), moduleId: z.string().min(1) }),
+  z.object({ kind: z.literal("removeModule"), moduleId }),
   z.object({
     kind: z.literal("moveModule"),
-    moduleId: z.string().min(1),
+    moduleId,
     toIndex: z.number().int().min(0),
   }),
   z.object({
     kind: z.literal("addLesson"),
-    moduleId: z.string().min(1),
-    title: z.string().min(1).max(200),
-    summary: z.string().max(500),
+    moduleId,
+    title,
+    summary,
   }),
   z.object({
     kind: z.literal("renameLesson"),
-    lessonId: z.string().min(1),
-    title: z.string().min(1).max(200),
-    summary: z.string().max(500),
+    lessonId,
+    title,
+    summary,
   }),
-  z.object({ kind: z.literal("removeLesson"), lessonId: z.string().min(1) }),
+  z.object({ kind: z.literal("removeLesson"), lessonId }),
   z.object({
     kind: z.literal("moveLesson"),
-    lessonId: z.string().min(1),
+    lessonId,
     toModuleId: z.string().min(1),
     toIndex: z.number().int().min(0),
   }),
   z.object({
     kind: z.literal("splitLesson"),
-    lessonId: z.string().min(1),
+    lessonId,
     secondTitle: z.string().min(1).max(200),
     secondSummary: z.string().max(500),
   }),
   z.object({
     kind: z.literal("mergeLesson"),
-    lessonId: z.string().min(1),
+    lessonId,
     direction: z.enum(["next", "previous"]),
   }),
   z.object({
     kind: z.literal("lessonProse"),
-    lessonId: z.string().min(1),
+    lessonId,
     instruction: z.string().min(1).max(2000),
   }),
   z.object({
     kind: z.literal("exercise"),
-    lessonId: z.string().min(1),
+    lessonId,
     task: z.string().min(1).max(2000),
     check: z.string().min(1).max(2000),
   }),
@@ -122,8 +127,7 @@ export function validatePlanOps(data: OutlineData, ops: ChangePlanOp[]): void {
       continue;
     }
     flush();
-    const lessonId = op.kind === "lessonProse" || op.kind === "exercise" ? op.lessonId : null;
-    if (lessonId && !current.modules.some((m) => m.lessons.some((l) => l.id === lessonId))) {
+    if (!current.modules.some((m) => m.lessons.some((l) => l.id === op.lessonId))) {
       throw new StructureError("That Lesson is not in the Outline.");
     }
   }
@@ -135,62 +139,30 @@ export function validatePlanOps(data: OutlineData, ops: ChangePlanOp[]): void {
   }
 }
 
+const OP_VERBS: Record<ChangePlanOp["kind"], string> = {
+  addModule: "add",
+  renameModule: "rename",
+  removeModule: "remove",
+  moveModule: "move",
+  addLesson: "add",
+  renameLesson: "rename",
+  removeLesson: "remove",
+  moveLesson: "move",
+  splitLesson: "split",
+  mergeLesson: "merge",
+  lessonProse: "rewrite",
+  exercise: "reexercise",
+};
+
 export function opVerb(op: ChangePlanOp): string {
-  switch (op.kind) {
-    case "addModule":
-      return "add";
-    case "renameModule":
-      return "rename";
-    case "removeModule":
-      return "remove";
-    case "moveModule":
-      return "move";
-    case "addLesson":
-      return "add";
-    case "renameLesson":
-      return "rename";
-    case "removeLesson":
-      return "remove";
-    case "moveLesson":
-      return "move";
-    case "splitLesson":
-      return "split";
-    case "mergeLesson":
-      return "merge";
-    case "lessonProse":
-      return "rewrite";
-    case "exercise":
-      return "reexercise";
-  }
+  return OP_VERBS[op.kind];
 }
 
 export function opEntry(op: ChangePlanOp): string {
-  switch (op.kind) {
-    case "addModule":
-      return op.title;
-    case "renameModule":
-      return op.title;
-    case "removeModule":
-      return op.moduleId;
-    case "moveModule":
-      return op.moduleId;
-    case "addLesson":
-      return op.title;
-    case "renameLesson":
-      return op.title;
-    case "removeLesson":
-      return op.lessonId;
-    case "moveLesson":
-      return op.lessonId;
-    case "splitLesson":
-      return op.secondTitle;
-    case "mergeLesson":
-      return op.lessonId;
-    case "lessonProse":
-      return op.lessonId;
-    case "exercise":
-      return op.lessonId;
-  }
+  if ("title" in op) return op.title;
+  if (op.kind === "splitLesson") return op.secondTitle;
+  if ("lessonId" in op) return op.lessonId;
+  return op.moduleId;
 }
 
 export function opDetail(op: ChangePlanOp): string {
@@ -223,39 +195,13 @@ export function opDetail(op: ChangePlanOp): string {
 }
 
 export function opLessonIds(op: ChangePlanOp): string[] {
-  switch (op.kind) {
-    case "renameLesson":
-    case "removeLesson":
-    case "moveLesson":
-    case "splitLesson":
-    case "mergeLesson":
-    case "lessonProse":
-    case "exercise":
-      return [op.lessonId];
-    case "addLesson":
-    case "addModule":
-    case "renameModule":
-    case "removeModule":
-    case "moveModule":
-      return [];
-  }
+  return "lessonId" in op ? [op.lessonId] : [];
 }
 
 export function opModuleIds(op: ChangePlanOp): string[] {
-  switch (op.kind) {
-    case "addModule":
-    case "renameModule":
-    case "removeModule":
-    case "moveModule":
-      if (op.kind === "addModule") return [];
-      return [op.moduleId];
-    case "addLesson":
-      return [op.moduleId];
-    case "moveLesson":
-      return [op.toModuleId];
-    default:
-      return [];
-  }
+  if (op.kind === "moveLesson") return [op.toModuleId];
+  if (op.kind === "addModule") return [];
+  return "moduleId" in op ? [op.moduleId] : [];
 }
 
 export type AffectedLessonSets = {
@@ -264,15 +210,20 @@ export type AffectedLessonSets = {
   removed: string[];
 };
 
+function titlesById(outline: OutlineData): Map<string, string> {
+  const titles = new Map<string, string>();
+  for (const mod of outline.modules)
+    for (const lesson of mod.lessons) titles.set(lesson.id, lesson.title);
+  return titles;
+}
+
 export function affectedLessonSets(
   base: OutlineData,
   next: OutlineData,
   accepted: ChangePlanOp[],
 ): AffectedLessonSets {
-  const oldTitles = new Map<string, string>();
-  for (const m of base.modules) for (const l of m.lessons) oldTitles.set(l.id, l.title);
-  const newTitles = new Map<string, string>();
-  for (const m of next.modules) for (const l of m.lessons) newTitles.set(l.id, l.title);
+  const oldTitles = titlesById(base);
+  const newTitles = titlesById(next);
 
   const regenerate = new Set<string>();
   for (const op of accepted) {
@@ -312,11 +263,10 @@ function mergeAbsorbedId(
   op: Extract<ChangePlanOp, { kind: "mergeLesson" }>,
   base: OutlineData,
 ): string | null {
-  for (const m of base.modules) {
-    const index = m.lessons.findIndex((l) => l.id === op.lessonId);
+  for (const mod of base.modules) {
+    const index = mod.lessons.findIndex((l) => l.id === op.lessonId);
     if (index === -1) continue;
-    const neighbor = op.direction === "next" ? m.lessons[index + 1] : m.lessons[index - 1];
-    return neighbor?.id ?? null;
+    return mod.lessons[op.direction === "next" ? index + 1 : index - 1]?.id ?? null;
   }
   return null;
 }
@@ -348,11 +298,10 @@ export function touchedIdentities(
       const absorbed = mergeAbsorbedId(op, base);
       if (absorbed) lessons.add(absorbed);
     }
-  }
-  for (const op of accepted) {
-    if (op.kind !== "removeModule") continue;
-    const removed = base.modules.find((m) => m.id === op.moduleId);
-    if (removed) for (const l of removed.lessons) lessons.add(l.id);
+    if (op.kind === "removeModule") {
+      const removed = base.modules.find((m) => m.id === op.moduleId);
+      if (removed) for (const l of removed.lessons) lessons.add(l.id);
+    }
   }
   return { lessons: [...lessons], modules: [...modules] };
 }
@@ -366,46 +315,42 @@ export function undoOutline(
   const lessons = new Set(touchedLessons);
   const modules = new Set(touchedModules);
   const baseLessons = new Map<string, { module: string; index: number; lesson: OutlineLesson }>();
-  for (const m of base.modules) {
-    for (const [index, l] of m.lessons.entries()) {
-      baseLessons.set(l.id, { module: m.id, index, lesson: l });
+  for (const mod of base.modules) {
+    for (const [index, lesson] of mod.lessons.entries()) {
+      baseLessons.set(lesson.id, { module: mod.id, index, lesson });
     }
   }
-  const baseModules = new Map(base.modules.map((m) => [m.id, m]));
+  const baseModules = new Map(base.modules.map((mod) => [mod.id, mod]));
 
   let working: OutlineModule[] = current.modules
-    .filter((m) => !(modules.has(m.id) && !baseModules.has(m.id)))
-    .map((m) => ({
-      ...m,
-      lessons: m.lessons.filter((l) => !lessons.has(l.id)),
+    .filter((mod) => !(modules.has(mod.id) && !baseModules.has(mod.id)))
+    .map((mod) => ({
+      ...mod,
+      lessons: mod.lessons.filter((lesson) => !lessons.has(lesson.id)),
     }));
 
-  working = working.map((m) => {
-    if (!modules.has(m.id)) return m;
-    const baseModule = baseModules.get(m.id);
-    return baseModule ? { ...m, title: baseModule.title } : m;
+  working = working.map((mod) => {
+    if (!modules.has(mod.id)) return mod;
+    const baseModule = baseModules.get(mod.id);
+    return baseModule ? { ...mod, title: baseModule.title } : mod;
   });
 
-  for (const m of base.modules) {
-    if (!modules.has(m.id) || working.some((w) => w.id === m.id)) continue;
-    const baseIndex = base.modules.findIndex((b) => b.id === m.id);
+  for (const mod of base.modules) {
+    if (!modules.has(mod.id) || working.some((w) => w.id === mod.id)) continue;
+    const baseIndex = base.modules.findIndex((b) => b.id === mod.id);
     working.splice(Math.min(baseIndex, working.length), 0, {
-      ...m,
-      lessons: m.lessons.map((l) => ({ ...l })),
+      ...mod,
+      lessons: mod.lessons.map((lesson) => ({ ...lesson })),
     });
   }
 
   for (const [id, at] of baseLessons) {
     if (!lessons.has(id)) continue;
-    const targetIndex = working.findIndex((m) => m.id === at.module);
+    const targetIndex = working.findIndex((mod) => mod.id === at.module);
     if (targetIndex === -1) continue;
     working[targetIndex] = {
       ...working[targetIndex],
-      lessons: [
-        ...working[targetIndex].lessons.slice(0, at.index),
-        { ...at.lesson },
-        ...working[targetIndex].lessons.slice(at.index),
-      ],
+      lessons: working[targetIndex].lessons.toSpliced(at.index, 0, { ...at.lesson }),
     };
   }
 

@@ -37,27 +37,29 @@ export function buildLessonFragments(row: FragmentSource): FragmentInput[] {
   const fragments: FragmentInput[] = [];
   let ordinal = 0;
 
-  const push = (lessonRef: string, text: string) => {
-    fragments.push({ lessonRef, ordinal: ordinal++, content: text });
+  const prefix = `Lesson: ${row.title}`;
+  const push = (text: string) => {
+    fragments.push({ lessonRef: row.lessonRef, ordinal: ordinal++, content: text });
   };
 
-  push(row.lessonRef, `Lesson: ${row.title}`);
+  push(prefix);
   for (const block of blocks) {
-    push(row.lessonRef, `Lesson: ${row.title}\n${blockText(block)}`);
+    push(`${prefix}\n${blockText(block)}`);
   }
+  push(`${prefix}\nExercise: ${row.exercise.task}\nDone when: ${row.exercise.check}`);
   push(
-    row.lessonRef,
-    `Lesson: ${row.title}\nExercise: ${row.exercise.task}\nDone when: ${row.exercise.check}`,
-  );
-  push(
-    row.lessonRef,
-    `Lesson: ${row.title}\nRecall from memory: ${row.recallPrompt}\nExplain why: ${row.selfExplanationPrompt}`,
+    `${prefix}\nRecall from memory: ${row.recallPrompt}\nExplain why: ${row.selfExplanationPrompt}`,
   );
   return fragments;
 }
 
 export function buildCourseFragments(rows: FragmentSource[]): FragmentInput[] {
-  return rows.flatMap((row) => buildLessonFragments(row));
+  return rows.flatMap(buildLessonFragments);
+}
+
+async function loadLessonsForVersion(db: Db, courseId: string, outlineVersion: number) {
+  const { getLessonsForVersion } = await import("@/lib/db/lessons");
+  return getLessonsForVersion(db, courseId, outlineVersion);
 }
 
 export async function embedCourseFragments(
@@ -66,8 +68,7 @@ export async function embedCourseFragments(
   courseId: string,
   outlineVersion: number,
 ): Promise<number> {
-  const { getLessonsForVersion } = await import("@/lib/db/lessons");
-  const rows = await getLessonsForVersion(db, courseId, outlineVersion);
+  const rows = await loadLessonsForVersion(db, courseId, outlineVersion);
   const fragments = buildCourseFragments(rows);
   if (fragments.length === 0) return 0;
   const embeddings = await embedTexts(fragments.map((f) => f.content));
@@ -82,14 +83,17 @@ export async function embedLessonFragments(
   outlineVersion: number,
   lessonRefs: string[],
 ): Promise<number> {
-  const { getLessonsForVersion } = await import("@/lib/db/lessons");
   const { replaceLessonFragments } = await import("@/lib/db/fragments");
   const wanted = new Set(lessonRefs);
-  const rows = (await getLessonsForVersion(db, courseId, outlineVersion)).filter((r) =>
+  const rows = (await loadLessonsForVersion(db, courseId, outlineVersion)).filter((r) =>
     wanted.has(r.lessonRef),
   );
   const fragments = buildCourseFragments(rows);
-  const embeddings = fragments.length ? await embedTexts(fragments.map((f) => f.content)) : [];
+  if (fragments.length === 0) {
+    await replaceLessonFragments(db, courseId, lessonRefs, fragments, []);
+    return 0;
+  }
+  const embeddings = await embedTexts(fragments.map((f) => f.content));
   await replaceLessonFragments(db, courseId, lessonRefs, fragments, embeddings);
   return fragments.length;
 }

@@ -41,6 +41,33 @@ function composeBody(row: LessonRow): ReadingBlock[] {
   ];
 }
 
+function toReadingLesson(
+  l: { id: string; title: string; summary: string; minutes: number },
+  row: LessonRow | undefined,
+  done: Date | undefined,
+): ReadingLesson {
+  if (!row) {
+    return {
+      id: l.id,
+      title: l.title,
+      summary: l.summary,
+      minutes: l.minutes,
+      status: "unset",
+      body: [],
+    };
+  }
+  return {
+    id: l.id,
+    title: row.title,
+    summary: l.summary,
+    minutes: l.minutes,
+    status: done ? "done" : "set",
+    stampedOn: done ? formatDayStamp(done) : undefined,
+    body: composeBody(row),
+    exercise: row.exercise,
+  };
+}
+
 export function toReadingCourse(
   course: Course,
   outline: OutlineData,
@@ -55,36 +82,9 @@ export function toReadingCourse(
     modules: outline.modules.map((m) => ({
       numeral: m.numeral,
       title: m.title,
-      lessons: m.lessons.map((l): ReadingLesson => {
-        const row = byRef.get(l.id);
-        const done = completions.get(l.id);
-        if (!row) {
-          return {
-            id: l.id,
-            title: l.title,
-            summary: l.summary,
-            minutes: l.minutes,
-            status: "unset",
-            body: [],
-          };
-        }
-        return {
-          id: l.id,
-          title: row.title,
-          summary: l.summary,
-          minutes: l.minutes,
-          status: done ? "done" : "set",
-          stampedOn: done ? stampOf(done) : undefined,
-          body: composeBody(row),
-          exercise: row.exercise,
-        };
-      }),
+      lessons: m.lessons.map((l) => toReadingLesson(l, byRef.get(l.id), completions.get(l.id))),
     })),
   };
-}
-
-function stampOf(date: Date): string {
-  return formatDayStamp(date);
 }
 
 export function toSourceLinks(rows: SourceRow[]): Map<string, SourceLink> {

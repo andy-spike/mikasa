@@ -3,7 +3,7 @@ import type { LanguageModel } from "ai";
 import { z } from "zod";
 import { designProviderOptions, generationProviderOptions } from "@/lib/model";
 import { GenerationError } from "./generate";
-import { lessonContentSchema, type LessonContent } from "./content";
+import { lessonContentSchema, parseLessonContent, type LessonContent } from "./content";
 import {
   contractCorrectBlock,
   contractReviewBlock,
@@ -14,7 +14,11 @@ import {
 import { introducedAtMap, outlinePosition } from "./spec-graph";
 import type { CourseSpecification, OutlineData } from "./types";
 
-export { CORRECTION_SOURCE_QUERY_CAP, dedupeCorrectionQueries, MAX_CORRECTION_ROUNDS } from "./review-policy";
+export {
+  CORRECTION_SOURCE_QUERY_CAP,
+  dedupeCorrectionQueries,
+  MAX_CORRECTION_ROUNDS,
+} from "./review-policy";
 
 export type FindingKind = "structural" | "factual";
 
@@ -64,7 +68,7 @@ export type StructuralInput = {
 
 export function structuralFindings(input: StructuralInput): Finding[] {
   const findings: Finding[] = [];
-  const { lessons: planned } = outlinePosition(input.outline);
+  const { lessons: planned, position } = outlinePosition(input.outline);
   const byId = new Map(input.lessons.map((l) => [l.lessonId, l]));
   // Stored Sources are the authority; the specification's original evidence
   // entries alone are not enough. A stored Source absent from evidence passes.
@@ -134,23 +138,20 @@ export function structuralFindings(input: StructuralInput): Finding[] {
     }
 
     for (const block of [...content.body, ...content.workedExample]) {
-      const refs = (block as { sourceRefs?: string[] }).sourceRefs;
-      if (refs) {
-        for (const ref of refs) {
-          if (!knownRefs.has(ref)) {
-            findings.push({
-              kind: "structural",
-              lessonRef: lesson.id,
-              detail: `Lesson "${lesson.title}" cites Source "${ref}", which the Course does not have.`,
-              correction: `Remove or replace the citation.`,
-            });
-          }
+      const refs = (block as { sourceRefs?: string[] }).sourceRefs ?? [];
+      for (const ref of refs) {
+        if (!knownRefs.has(ref)) {
+          findings.push({
+            kind: "structural",
+            lessonRef: lesson.id,
+            detail: `Lesson "${lesson.title}" cites Source "${ref}", which the Course does not have.`,
+            correction: `Remove or replace the citation.`,
+          });
         }
       }
     }
   }
 
-  const { position } = outlinePosition(input.outline);
   const introducedAt = introducedAtMap(input.spec.learningGraph, position);
   for (const alignment of input.spec.alignment) {
     const at = position.get(alignment.lessonId);
@@ -186,6 +187,7 @@ export async function combinedFindings(
 ): Promise<Finding[]> {
   const byId = new Map(spec.alignment.map((a) => [a.lessonId, a.performance]));
   const knownIds = new Set(outline.modules.flatMap((m) => m.lessons.map((l) => l.id)));
+  const contentById = new Map(lessons.map((l) => [l.lessonId, l]));
 
   const { output } = await generateText({
     model,
@@ -203,9 +205,7 @@ export async function combinedFindings(
       "",
       `Topic: ${course.topic}`,
       `Goal: ${course.goal}`,
-      spec.throughline.exampleContract
-        ? contractReviewBlock(spec.throughline.exampleContract)
-        : "",
+      spec.throughline.exampleContract ? contractReviewBlock(spec.throughline.exampleContract) : "",
       "",
       "Sources (with refs):",
       ...(sources.length ? sources.map((s) => sourceLine(s)) : ["- (none)"]),
@@ -213,7 +213,7 @@ export async function combinedFindings(
       "The complete candidate, Lesson by Lesson, in reading order:",
       ...outline.modules.flatMap((m) =>
         m.lessons.map((l) => {
-          const content = lessons.find((x) => x.lessonId === l.id);
+          const content = contentById.get(l.id);
           if (!content) return `LESSON ${l.id} — "${l.title}" (missing)`;
           return [
             `LESSON ${l.id} — "${l.title}" (teaches: ${byId.get(l.id) ?? "?"})`,
@@ -234,11 +234,14 @@ export async function combinedFindings(
 
   if (!output) throw new GenerationError("The combined review returned nothing.");
   const textById = new Map(
-    lessons.map((l) =>
-      [
-        l.lessonId,
-        [...l.body.map(renderBlockForReview), ...l.workedExample.map(renderBlockForReview)].join("\n"),
-      ] as const,
+    lessons.map(
+      (l) =>
+        [
+          l.lessonId,
+          [...l.body.map(renderBlockForReview), ...l.workedExample.map(renderBlockForReview)].join(
+            "\n",
+          ),
+        ] as const,
     ),
   );
   const expanded: Finding[] = [];
@@ -248,6 +251,7 @@ export async function combinedFindings(
         `The review returned a finding with no target Lesson: ${f.detail}. A finding must name at least one Lesson.`,
       );
     }
+    const quote = f.quote.trim();
     for (const ref of f.lessonRefs) {
       if (!knownIds.has(ref)) {
         throw new GenerationError(
@@ -255,7 +259,7 @@ export async function combinedFindings(
         );
       }
       const text = textById.get(ref) ?? "";
-      if (!f.quote.trim() || !text.includes(f.quote.trim())) {
+      if (!quote || !text.includes(quote)) {
         throw new GenerationError(
           `The review quotes text that Lesson "${ref}" does not contain: ${f.quote}. Quote the Lesson exactly.`,
         );
@@ -265,7 +269,7 @@ export async function combinedFindings(
       expanded.push({
         kind: "factual" as const,
         lessonRef: ref,
-        detail: `"${f.quote.trim()}" — ${f.detail}`,
+        detail: `"${quote}" — ${f.detail}`,
         correction: f.correction,
         ...(f.sourceQuery?.trim() ? { sourceQuery: f.sourceQuery.trim() } : {}),
       });
@@ -288,7 +292,7 @@ export function lessonContextExcerpt(lesson: LessonContent): string {
     `BRIDGE: ${lesson.bridge}`,
   ];
   const text = parts.join("\n").trim();
-  return text.length > SIBLING_CONTEXT_MAX_CHARS ? text.slice(0, SIBLING_CONTEXT_MAX_CHARS) : text;
+  return text.slice(0, SIBLING_CONTEXT_MAX_CHARS);
 }
 
 function renderBlockForReview(block: unknown): string {
@@ -326,7 +330,6 @@ export async function correctLesson(
   },
 ): Promise<LessonContent> {
   const alignment = spec.alignment.find((a) => a.lessonId === lesson.lessonId);
-  const { parseLessonContent } = await import("./content");
 
   const { output } = await generateText({
     model,
@@ -388,8 +391,5 @@ export async function correctLesson(
     throw new GenerationError(`The correction for "${lesson.title}" returned nothing.`);
   }
   const corrected = parseLessonContent(lesson.lessonId, lesson.title, output);
-  if (options?.preserveExercise) {
-    return { ...corrected, exercise: lesson.exercise };
-  }
-  return corrected;
+  return options?.preserveExercise ? { ...corrected, exercise: lesson.exercise } : corrected;
 }
