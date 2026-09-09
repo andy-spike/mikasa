@@ -45,40 +45,52 @@ const GOOGLE_AI_STUDIO_FLEX: OpenRouterChatSettings = {
   extraBody: { service_tier: "flex" },
 };
 
-export function designProviderOptions(
-  effort: ReasoningEffort = MODEL_PROFILES.design.reasoning.effort,
-): { openrouter: OpenRouterProviderOptions } {
+export function reasoningOptions(effort: ReasoningEffort): {
+  openrouter: OpenRouterProviderOptions;
+} {
   return { openrouter: { reasoning: { effort } } };
 }
 
+export function designProviderOptions(
+  effort: ReasoningEffort = MODEL_PROFILES.design.reasoning.effort,
+): { openrouter: OpenRouterProviderOptions } {
+  return reasoningOptions(effort);
+}
+
 export function groundingProviderOptions(): { openrouter: OpenRouterProviderOptions } {
-  return { openrouter: { reasoning: { ...MODEL_PROFILES.grounding.reasoning } } };
+  return reasoningOptions(MODEL_PROFILES.grounding.reasoning.effort);
 }
 
 export function generationProviderOptions(): { openrouter: OpenRouterProviderOptions } {
-  return { openrouter: { reasoning: { ...MODEL_PROFILES.generation.reasoning } } };
+  return reasoningOptions(MODEL_PROFILES.generation.reasoning.effort);
+}
+
+type ModelProfile = "design" | "grounding" | "generation" | "tutor";
+
+function modelFor(profile: ModelProfile): LanguageModel {
+  return openrouter()(MODEL_PROFILES[profile].model, GOOGLE_AI_STUDIO_FLEX);
 }
 
 export function designModel(): LanguageModel {
-  return openrouter()(MODEL_PROFILES.design.model, GOOGLE_AI_STUDIO_FLEX);
+  return modelFor("design");
 }
 
 export function groundingModel(): LanguageModel {
-  return openrouter()(MODEL_PROFILES.grounding.model, GOOGLE_AI_STUDIO_FLEX);
+  return modelFor("grounding");
 }
 
 export function generationModel(): LanguageModel {
-  return openrouter()(MODEL_PROFILES.generation.model, GOOGLE_AI_STUDIO_FLEX);
+  return modelFor("generation");
 }
 
 export function tutorModel(): LanguageModel {
-  return openrouter()(MODEL_PROFILES.tutor.model, GOOGLE_AI_STUDIO_FLEX);
+  return modelFor("tutor");
 }
 
 export function tutorProviderOptions(
   effort: ReasoningEffort = MODEL_PROFILES.tutor.reasoning.effort,
 ): { openrouter: OpenRouterProviderOptions } {
-  return { openrouter: { reasoning: { effort } } };
+  return reasoningOptions(effort);
 }
 
 // 1536-dimensional by construction: the model and the embedding column agree, so no negotiation happens.

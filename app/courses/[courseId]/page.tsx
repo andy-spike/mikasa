@@ -10,6 +10,7 @@ import { loadTailorHistory } from "@/lib/db/tailor";
 import { markLessonDoneAction, markLessonUndoneAction } from "@/lib/actions/completion";
 import { findProposedPlanAction, findStagedPlanAction } from "@/lib/actions/tailor";
 import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
+import { turnViews } from "@/lib/course/tutor";
 import { requireLearner } from "@/lib/session";
 
 export default async function CoursePage({ params }: PageProps<"/courses/[courseId]">) {
@@ -33,14 +34,12 @@ export default async function CoursePage({ params }: PageProps<"/courses/[course
   const stored = await loadTutorHistory(db, user.id, courseId);
   const tutorHistory: Record<string, { from: "learner" | "tutor"; text: string }[]> = {};
   for (const [lessonRef, turns] of stored) {
-    tutorHistory[lessonRef] = turns.map((t) => ({ from: t.role, text: t.content }));
+    tutorHistory[lessonRef] = turnViews(turns);
   }
 
-  const tailorTurns = (await loadTailorHistory(db, user.id, courseId)).map((t) => ({
-    from: t.role,
-    text: t.content,
-  }));
+  const tailorTurns = turnViews(await loadTailorHistory(db, user.id, courseId));
   const proposedPlan = await findProposedPlanAction(courseId);
+  const stagedPlan = await findStagedPlanAction(courseId);
 
   const searchStale = await searchIsIncomplete(db, courseId);
 
@@ -53,7 +52,7 @@ export default async function CoursePage({ params }: PageProps<"/courses/[course
       tutorHistory={tutorHistory}
       tailorTurns={tailorTurns}
       tailorPlan={proposedPlan}
-      stagedPlan={await findStagedPlanAction(courseId)}
+      stagedPlan={stagedPlan}
       searchStale={searchStale}
       onRefreshPlan={findProposedPlanAction.bind(null, courseId)}
     />

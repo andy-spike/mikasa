@@ -29,12 +29,159 @@ import { Resizer } from "./resizer";
 import { CommandPalette, type Command } from "./palette";
 import { ThemeToggle } from "./theme-toggle";
 import type { ReasoningEffort } from "@/lib/model";
+import { postStream } from "@/lib/api/post";
+import { useSyncedState } from "@/hooks/use-synced-state";
 
 const OUTLINE_MIN = 16;
 const OUTLINE_MAX = 24;
 const PANEL_MIN = 18;
 const PANEL_MAX = 26;
 const COMPACT_PANEL_MAX = 21;
+
+const STAGE_MESSAGES: Record<string, string> = {
+  lessons: "Writing the changed Lessons…",
+  review: "Reviewing the Course revision…",
+  publish: "Publishing the Course revision…",
+};
+
+function stageWords(stage: string | null): string {
+  if (stage?.startsWith("corrections")) return "Correcting the changed Lessons…";
+  return (stage && STAGE_MESSAGES[stage]) ?? "Preparing the Course revision…";
+}
+
+function revisionStatusText(
+  staged: boolean,
+  stagedRevision: StagedPlanView | null | undefined,
+  pollFailed: boolean,
+): string | null {
+  if (stagedRevision?.failed) {
+    return `${stageWords(stagedRevision.stage).replace("…", ":")} ${stagedRevision.error ?? "The revision did not finish."}`;
+  }
+  if (!staged && !stagedRevision) return null;
+  return (
+    stageWords(stagedRevision?.stage ?? null) +
+    (pollFailed ? " Its status could not refresh just now — still trying." : "")
+  );
+}
+
+function SearchStaleNotice({
+  rebuilding,
+  onRebuild,
+}: {
+  rebuilding: boolean;
+  onRebuild: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-hair px-3.5 py-2">
+      <p className="text-[0.75rem] leading-[1.5] text-fg-3">Course search is out of date.</p>
+      <Button variant="quiet" onClick={onRebuild} disabled={rebuilding} className="shrink-0">
+        Rebuild
+      </Button>
+    </div>
+  );
+}
+
+function PublishedList({
+  rows,
+  failed,
+  onRetry,
+  onUndo,
+}: {
+  rows: PublishedPlanRow[];
+  failed: boolean;
+  onRetry: () => void;
+  onUndo: (planId: string) => void;
+}) {
+  if (rows.length === 0) {
+    if (!failed) return null;
+    return (
+      <div className="mt-5">
+        <p className="label text-fg-3">Published changes</p>
+        <p className="mt-3 text-[0.8125rem] leading-[1.5] text-fg-2">
+          Published changes could not load.
+        </p>
+        <Button variant="quiet" onClick={onRetry} className="mt-1 -ml-1">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-5">
+      <p className="label text-fg-3">Published changes</p>
+      <ul className="mt-3 space-y-3.5">
+        {rows.map((row) => (
+          <li key={row.plan.id} className="text-[0.8125rem] leading-[1.5]">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-fg-2">
+                Revision {row.publishedRevisionNumber} · {row.plan.operations.length}{" "}
+                {row.plan.operations.length === 1 ? "change" : "changes"}
+              </span>
+              {row.canUndo ? (
+                <Button variant="quiet" onClick={() => onUndo(row.plan.id)} className="shrink-0">
+                  Undo
+                </Button>
+              ) : (
+                <span className="text-[0.75rem] text-fg-3">{row.blockedReason}</span>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {failed && (
+        <Button variant="quiet" onClick={onRetry} className="mt-2 -ml-1">
+          Retry
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function RevisionBanner({
+  status,
+  failed,
+  onRetry,
+  onDiscard,
+}: {
+  status: string;
+  failed: boolean;
+  onRetry: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="-mx-3.5 mb-5 border-y border-hair bg-canvas px-3.5 py-3"
+    >
+      <div className="flex items-start gap-2.5">
+        <span
+          aria-hidden
+          className={`mt-1.5 h-1.5 w-1.5 shrink-0 bg-fg-3 ${failed ? "" : "animate-pulse"}`}
+        />
+        <div className="min-w-0">
+          <p className="text-[0.8125rem] leading-[1.5] font-medium text-fg">{status}</p>
+          {!failed && (
+            <p className="mt-1 text-[0.75rem] leading-[1.5] text-fg-3">
+              You can keep navigating the Course while this finishes.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {failed && (
+        <div className="mt-3 flex items-center gap-2 pl-4">
+          <Button onClick={onRetry} className="min-w-0 flex-1">
+            Retry the revision
+          </Button>
+          <Button variant="quiet" onClick={onDiscard} className="shrink-0">
+            Discard
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Props = {
   course: ReadingCourse;
@@ -201,23 +348,11 @@ export function Workspace({
     effort: ReasoningEffort,
     onDelta: (chunk: string) => void,
   ): Promise<boolean> {
-    try {
-      const response = await fetch(`/api/courses/${course.id}/tutor`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lessonId, message: text, effort }),
-      });
-      if (!response.ok || !response.body) return false;
-
-      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) return true;
-        if (value) onDelta(value);
-      }
-    } catch {
-      return false;
-    }
+    return postStream(
+      `/api/courses/${course.id}/tutor`,
+      { lessonId, message: text, effort },
+      onDelta,
+    );
   }
 
   const tutorTurnsFor = useMemo<Turn[]>(
@@ -230,55 +365,27 @@ export function Workspace({
     effort: ReasoningEffort,
     onDelta: (chunk: string) => void,
   ): Promise<boolean> {
-    try {
-      const response = await fetch(`/api/courses/${course.id}/tailor`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message: text, effort }),
-      });
-      if (!response.ok || !response.body) return false;
-
-      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) {
-          const fresh = await onRefreshPlan();
-          setPlan(fresh);
-          return true;
-        }
-        if (value) onDelta(value);
-      }
-    } catch {
-      return false;
-    }
+    const done = await postStream(
+      `/api/courses/${course.id}/tailor`,
+      { message: text, effort },
+      onDelta,
+    );
+    if (!done) return false;
+    const fresh = await onRefreshPlan();
+    setPlan(fresh);
+    return true;
   }
 
-  const [plan, setPlan] = useState<PlanView | null | undefined>(tailorPlan);
-  const [restoredPlan, setRestoredPlan] = useState(tailorPlan);
-  if (tailorPlan !== restoredPlan) {
-    setRestoredPlan(tailorPlan);
-    setPlan(tailorPlan);
-  }
+  const [plan, setPlan] = useSyncedState(tailorPlan);
 
   const [staged, setStaged] = useState(false);
-  const [stagedRevision, setStagedRevision] = useState(stagedPlan);
-  const [restoredStagedRevision, setRestoredStagedRevision] = useState(stagedPlan);
-  if (stagedPlan !== restoredStagedRevision) {
-    setRestoredStagedRevision(stagedPlan);
-    setStagedRevision(stagedPlan);
-  }
-  const [, startStaging] = useTransition();
+  const [stagedRevision, setStagedRevision] = useSyncedState(stagedPlan);
 
-  const [searchStaleNow, setSearchStaleNow] = useState(searchStale ?? false);
-  const [restoredStale, setRestoredStale] = useState(searchStale);
-  if (searchStale !== restoredStale) {
-    setRestoredStale(searchStale);
-    setSearchStaleNow(searchStale ?? false);
-  }
+  const [searchStaleNow, setSearchStaleNow] = useSyncedState(searchStale ?? false);
   const [rebuilding, setRebuilding] = useState(false);
 
   function rebuildSearch() {
-    startStaging(async () => {
+    startTransition(async () => {
       const result = await rebuildFragmentsAction(course.id);
       if (result.ok) {
         setRebuilding(true);
@@ -301,7 +408,7 @@ export function Workspace({
       }
     }, 3000);
     return () => clearInterval(timer);
-  }, [rebuilding, course.id, router]);
+  }, [rebuilding, course.id, router, setSearchStaleNow]);
 
   const [published, setPublished] = useState<PublishedPlanRow[]>([]);
   const [publishedFailed, setPublishedFailed] = useState(false);
@@ -323,7 +430,7 @@ export function Workspace({
   }, [course.id, publishedKey]);
 
   function undoPlan(planId: string) {
-    startStaging(async () => {
+    startTransition(async () => {
       const result = await undoPlanRevisionAction(course.id, planId);
       if (result.ok) {
         setStaged(false);
@@ -340,7 +447,7 @@ export function Workspace({
 
   function discardStaged() {
     if (!stagedRevision) return;
-    startStaging(async () => {
+    startTransition(async () => {
       const result = await discardStagedRevisionAction(course.id, stagedRevision.plan.id);
       if (result.ok) {
         setStaged(false);
@@ -354,7 +461,7 @@ export function Workspace({
     setPlan(null);
     setStaged(true);
     setStagedRevision(null);
-    startStaging(async () => {
+    startTransition(async () => {
       const result = await stagePlanRevisionAction(course.id, planId);
       if (!result.ok) {
         setStaged(false);
@@ -391,21 +498,19 @@ export function Workspace({
     }
   }
 
-  const stageWords = (stage: string | null): string => {
-    if (stage === "lessons") return "Writing the changed Lessons…";
-    if (stage?.startsWith("corrections")) return "Correcting the changed Lessons…";
-    if (stage === "review") return "Reviewing the Course revision…";
-    if (stage === "publish") return "Publishing the Course revision…";
-    return "Preparing the Course revision…";
-  };
-
   const [stagedPollFailed, setStagedPollFailed] = useState(false);
-  const revisionStatus = stagedRevision?.failed
-    ? `${stageWords(stagedRevision.stage).replace("…", ":")} ${stagedRevision.error ?? "The revision did not finish."}`
-    : staged || stagedRevision
-      ? stageWords(stagedRevision?.stage ?? null) +
-        (stagedPollFailed ? " Its status could not refresh just now — still trying." : "")
-      : null;
+  const revisionStatus = revisionStatusText(staged, stagedRevision, stagedPollFailed);
+
+  function retryStagedRevision() {
+    if (!stagedRevision) return;
+    setStagedRevision({ ...stagedRevision, failed: false, error: null, stage: "queued" });
+    startTransition(async () => {
+      const result = await retryPlanRevisionAction(course.id, stagedRevision.plan.id);
+      if (result.ok) {
+        setStagedRevision(await findStagedPlanAction(course.id));
+      }
+    });
+  }
 
   useEffect(() => {
     if (!stagedRevision || stagedRevision.failed) return;
@@ -423,7 +528,7 @@ export function Workspace({
         .catch(() => setStagedPollFailed(true));
     }, 4000);
     return () => clearInterval(timer);
-  }, [course.id, router, stagedRevision]);
+  }, [course.id, router, stagedRevision, setStagedRevision]);
 
   const tailorTurnsStable = useMemo<Turn[]>(() => tailorTurns ?? [], [tailorTurns]);
 
@@ -492,17 +597,16 @@ export function Workspace({
         group: "Actions",
         run: () => router.push(`/courses/${course.id}/outline`),
       },
+      ...flat
+        .filter((l) => l.status !== "unset")
+        .map((l) => ({
+          id: `go-${l.id}`,
+          label: `${l.n}. ${l.title}`,
+          hint: `${l.moduleNumeral}. ${l.moduleTitle}`,
+          group: "Lessons",
+          run: () => openLesson(l.id),
+        })),
     );
-    for (const l of flat) {
-      if (l.status === "unset") continue;
-      list.push({
-        id: `go-${l.id}`,
-        label: `${l.n}. ${l.title}`,
-        hint: `${l.moduleNumeral}. ${l.moduleTitle}`,
-        group: "Lessons",
-        run: () => openLesson(l.id),
-      });
-    }
     return list;
     // oxlint-disable-next-line react/exhaustive-deps
   }, [flat, open.id, open.exercise, doneAt, railOpen, router]);
@@ -653,128 +757,25 @@ export function Workspace({
           onRestore={(id) => reviewOperation(id, "proposed")}
           tutorNotice={
             searchStaleNow ? (
-              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-hair px-3.5 py-2">
-                <p className="text-[0.75rem] leading-[1.5] text-fg-3">
-                  Course search is out of date.
-                </p>
-                <Button
-                  variant="quiet"
-                  onClick={rebuildSearch}
-                  disabled={rebuilding}
-                  className="shrink-0"
-                >
-                  Rebuild
-                </Button>
-              </div>
+              <SearchStaleNotice rebuilding={rebuilding} onRebuild={rebuildSearch} />
             ) : null
           }
           publishedSlot={
-            publishedFailed && published.length === 0 ? (
-              <div className="mt-5">
-                <p className="label text-fg-3">Published changes</p>
-                <p className="mt-3 text-[0.8125rem] leading-[1.5] text-fg-2">
-                  Published changes could not load.
-                </p>
-                <Button
-                  variant="quiet"
-                  onClick={() => setPublishedKey((k) => k + 1)}
-                  className="mt-1 -ml-1"
-                >
-                  Retry
-                </Button>
-              </div>
-            ) : published.length > 0 ? (
-              <div className="mt-5">
-                <p className="label text-fg-3">Published changes</p>
-                <ul className="mt-3 space-y-3.5">
-                  {published.map((row) => (
-                    <li key={row.plan.id} className="text-[0.8125rem] leading-[1.5]">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-fg-2">
-                          Revision {row.publishedRevisionNumber} · {row.plan.operations.length}{" "}
-                          {row.plan.operations.length === 1 ? "change" : "changes"}
-                        </span>
-                        {row.canUndo ? (
-                          <Button
-                            variant="quiet"
-                            onClick={() => undoPlan(row.plan.id)}
-                            className="shrink-0"
-                          >
-                            Undo
-                          </Button>
-                        ) : (
-                          <span className="text-[0.75rem] text-fg-3">{row.blockedReason}</span>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                {publishedFailed ? (
-                  <Button
-                    variant="quiet"
-                    onClick={() => setPublishedKey((k) => k + 1)}
-                    className="mt-2 -ml-1"
-                  >
-                    Retry
-                  </Button>
-                ) : null}
-              </div>
-            ) : null
+            <PublishedList
+              rows={published}
+              failed={publishedFailed}
+              onRetry={() => setPublishedKey((k) => k + 1)}
+              onUndo={undoPlan}
+            />
           }
           revisionSlot={
             revisionStatus ? (
-              <div
-                role="status"
-                aria-live="polite"
-                className="-mx-3.5 mb-5 border-y border-hair bg-canvas px-3.5 py-3"
-              >
-                <div className="flex items-start gap-2.5">
-                  <span
-                    aria-hidden
-                    className={`mt-1.5 h-1.5 w-1.5 shrink-0 bg-fg-3 ${stagedRevision?.failed ? "" : "animate-pulse"}`}
-                  />
-                  <div className="min-w-0">
-                    <p className="text-[0.8125rem] leading-[1.5] font-medium text-fg">
-                      {revisionStatus}
-                    </p>
-                    {!stagedRevision?.failed ? (
-                      <p className="mt-1 text-[0.75rem] leading-[1.5] text-fg-3">
-                        You can keep navigating the Course while this finishes.
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                {stagedRevision?.failed ? (
-                  <div className="mt-3 flex items-center gap-2 pl-4">
-                    <Button
-                      onClick={() => {
-                        setStagedRevision({
-                          ...stagedRevision,
-                          failed: false,
-                          error: null,
-                          stage: "queued",
-                        });
-                        startStaging(async () => {
-                          const result = await retryPlanRevisionAction(
-                            course.id,
-                            stagedRevision.plan.id,
-                          );
-                          if (result.ok) {
-                            setStagedRevision(await findStagedPlanAction(course.id));
-                          }
-                        });
-                      }}
-                      className="min-w-0 flex-1"
-                    >
-                      Retry the revision
-                    </Button>
-                    <Button variant="quiet" onClick={discardStaged} className="shrink-0">
-                      Discard
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
+              <RevisionBanner
+                status={revisionStatus}
+                failed={stagedRevision?.failed ?? false}
+                onRetry={retryStagedRevision}
+                onDiscard={discardStaged}
+              />
             ) : null
           }
           resizer={

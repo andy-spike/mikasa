@@ -16,6 +16,15 @@ import {
 export type PanelMode = "tutor" | "tailor";
 export type { PlanView, Turn } from "@/components/tailor-conversation";
 
+function EmptyCopy({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="max-w-[15rem] py-8">
+      <p className="text-[0.875rem] font-medium text-fg">{title}</p>
+      <p className="mt-2 text-[0.8125rem] leading-[1.6] text-fg-3">{body}</p>
+    </div>
+  );
+}
+
 type Props = {
   mode: PanelMode;
   lessonTitle: string;
@@ -64,6 +73,8 @@ export function Panel({
   resizer,
 }: Props) {
   const { isMobile } = useSidebar();
+  const subtitle =
+    mode === "tutor" ? `This Lesson · ${lessonTitle}` : "Course · Changes require your approval.";
 
   return (
     <Sidebar
@@ -90,7 +101,7 @@ export function Panel({
               Tailor
             </ToggleGroupItem>
           </ToggleGroup>
-          {isMobile ? (
+          {isMobile && (
             <Button
               variant="icon"
               onClick={onClose}
@@ -99,13 +110,9 @@ export function Panel({
             >
               <X className="h-4 w-4" strokeWidth={1.75} />
             </Button>
-          ) : null}
+          )}
         </div>
-        <p className="mt-2.5 truncate text-[0.75rem] leading-[1.5] text-fg-3">
-          {mode === "tutor"
-            ? `This Lesson · ${lessonTitle}`
-            : "Course · Changes require your approval."}
-        </p>
+        <p className="mt-2.5 truncate text-[0.75rem] leading-[1.5] text-fg-3">{subtitle}</p>
       </SidebarHeader>
 
       <SidebarContent className="gap-0 overflow-hidden">
@@ -120,12 +127,10 @@ export function Panel({
             pendingText="Working on an answer…"
             failedText="The Tutor could not answer just now — ask again."
             empty={
-              <div className="max-w-[15rem] py-8">
-                <p className="text-[0.875rem] font-medium text-fg">Ask about this Lesson</p>
-                <p className="mt-2 text-[0.8125rem] leading-[1.6] text-fg-3">
-                  Clarify an idea, work through the Exercise, or check your understanding.
-                </p>
-              </div>
+              <EmptyCopy
+                title="Ask about this Lesson"
+                body="Clarify an idea, work through the Exercise, or check your understanding."
+              />
             }
           />
         </div>
@@ -138,12 +143,10 @@ export function Panel({
             onDiscard={onDiscard}
             onRestore={onRestore}
             empty={
-              <div className="max-w-[15rem] py-8">
-                <p className="text-[0.875rem] font-medium text-fg">Shape the Course</p>
-                <p className="mt-2 text-[0.8125rem] leading-[1.6] text-fg-3">
-                  Ask for a change. The Tailor prepares a Change plan for you to review.
-                </p>
-              </div>
+              <EmptyCopy
+                title="Shape the Course"
+                body="Ask for a change. The Tailor prepares a Change plan for you to review."
+              />
             }
             applySlot={tailorApply}
             revisionSlot={revisionSlot}

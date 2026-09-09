@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import type { ReadingBlock, SourceLink } from "@/lib/course/reading";
 
 export function SourceLinks({ sources }: { sources: SourceLink[] }) {
@@ -68,10 +69,8 @@ const SQL_TOKEN =
 function highlightSql(code: string): ReactNode[] {
   const out: ReactNode[] = [];
   let last = 0;
-  let m: RegExpExecArray | null;
-  SQL_TOKEN.lastIndex = 0;
   let key = 0;
-  while ((m = SQL_TOKEN.exec(code)) !== null) {
+  for (const m of code.matchAll(SQL_TOKEN)) {
     if (m.index > last) out.push(code.slice(last, m.index));
     if (m[1]) {
       out.push(
@@ -192,10 +191,10 @@ export function LessonBlock({
                 {row.map((cell, j) => (
                   <td
                     key={j}
-                    className={
-                      "py-[0.4rem] pr-6 last:pr-0 " +
-                      (j === row.length - 1 ? "font-medium text-fg" : "text-fg-2")
-                    }
+                    className={cn(
+                      "py-[0.4rem] pr-6 last:pr-0",
+                      j === row.length - 1 ? "font-medium text-fg" : "text-fg-2",
+                    )}
                   >
                     {cell}
                   </td>

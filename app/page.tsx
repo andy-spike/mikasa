@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,38 +9,76 @@ import { ThemeToggle } from "@/components/workspace/theme-toggle";
 import { authClient } from "@/lib/auth-client";
 
 const steps = [
-  [
-    "Start with your Goal",
-    "Tell Mikasa what you want to learn and what you want to do with it. Add your Background, choose the Depth, and set your Course Language.",
-  ],
-  [
-    "Make the Outline yours",
-    "Review the Modules and Lessons before generation starts. Edit the Outline yourself or ask the Tailor to propose changes. You decide when it is ready.",
-  ],
-  [
-    "Learn through a complete Course",
-    "Approve the Outline. Mikasa writes and reviews the Course as a whole, with connected examples and Exercises that build toward your Goal.",
-  ],
+  {
+    title: "Start with your Goal",
+    body: "Tell Mikasa what you want to learn and what you want to do with it. Add your Background, choose the Depth, and set your Course Language.",
+  },
+  {
+    title: "Make the Outline yours",
+    body: "Review the Modules and Lessons before generation starts. Edit the Outline yourself or ask the Tailor to propose changes. You decide when it is ready.",
+  },
+  {
+    title: "Learn through a complete Course",
+    body: "Approve the Outline. Mikasa writes and reviews the Course as a whole, with connected examples and Exercises that build toward your Goal.",
+  },
 ];
 
 const capabilities = [
-  [
-    "Lessons that build on each other",
-    "Each Lesson includes an explanation, a worked example, recall and self-explanation prompts, and one Exercise. Mark the Exercise done when you finish.",
-  ],
-  [
-    "A Tutor for your questions",
-    "Ask about the Lesson you have open or revisit an earlier idea. The Tutor uses your Course and can search the web for Sources. It answers questions without changing your Course.",
-  ],
-  [
-    "A Tailor for changes",
-    "Need another example or a different sequence? The Tailor proposes a Change plan. Review what will change, then accept or discard it. Your current Course stays readable while an approved Course revision is prepared.",
-  ],
-  [
-    "Sources when you need them",
-    "Keep Grounding on to use current Sources when creating your Course. Lessons and Tutor answers link to relevant Sources so you can read further.",
-  ],
+  {
+    title: "Lessons that build on each other",
+    body: "Each Lesson includes an explanation, a worked example, recall and self-explanation prompts, and one Exercise. Mark the Exercise done when you finish.",
+  },
+  {
+    title: "A Tutor for your questions",
+    body: "Ask about the Lesson you have open or revisit an earlier idea. The Tutor uses your Course and can search the web for Sources. It answers questions without changing your Course.",
+  },
+  {
+    title: "A Tailor for changes",
+    body: "Need another example or a different sequence? The Tailor proposes a Change plan. Review what will change, then accept or discard it. Your current Course stays readable while an approved Course revision is prepared.",
+  },
+  {
+    title: "Sources when you need them",
+    body: "Keep Grounding on to use current Sources when creating your Course. Lessons and Tutor answers link to relevant Sources so you can read further.",
+  },
 ];
+
+const exampleOutline = [
+  {
+    title: "Get to know your camera",
+    lessons: ["Aperture and depth of field", "Shutter speed and ISO"],
+  },
+  {
+    title: "Find and shape natural light",
+    lessons: ["Window light and open shade", "Position your subject"],
+  },
+  {
+    title: "Make a portrait",
+    lessons: ["Compose and guide a portrait", "Shoot and review a portrait series"],
+  },
+];
+
+function StartCourseButton({
+  signingIn,
+  onSignIn,
+  className,
+  children,
+}: {
+  signingIn: boolean;
+  onSignIn: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      variant="hero"
+      onClick={onSignIn}
+      disabled={signingIn}
+      className={className ?? "focus-visible:outline-2 focus-visible:outline-offset-2"}
+    >
+      {children}
+    </Button>
+  );
+}
 
 export default function Landing() {
   const [signingIn, setSigningIn] = useState(false);
@@ -52,10 +90,7 @@ export default function Landing() {
     setFailed(false);
     authClient.signIn
       .social({ provider: "google", callbackURL: "/courses" })
-      .then(
-        () => {},
-        () => setFailed(true),
-      )
+      .catch(() => setFailed(true))
       .finally(() => setSigningIn(false));
   }
 
@@ -111,15 +146,10 @@ export default function Landing() {
             Exercises around what you want to learn and what you already know.
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <Button
-              variant="hero"
-              onClick={signIn}
-              disabled={signingIn}
-              className="focus-visible:outline-2 focus-visible:outline-offset-2"
-            >
+            <StartCourseButton signingIn={signingIn} onSignIn={signIn}>
               <GoogleMark />
               {signingIn ? "Connecting to Google…" : "Start a Course"}
-            </Button>
+            </StartCourseButton>
             <a
               href="#example"
               className="flex min-h-11 items-center gap-2 text-[0.8125rem] text-fg-2 hover:text-fg"
@@ -130,11 +160,11 @@ export default function Landing() {
           <p className="mt-3 text-xs leading-normal text-fg-3">
             Continue with Google. Your Courses are private and self-paced.
           </p>
-          {failed ? (
+          {failed && (
             <p role="alert" className="mt-3 text-[0.8125rem] text-fg-2">
               Sign in did not complete. Try again.
             </p>
-          ) : null}
+          )}
         </section>
 
         <section id="example" aria-labelledby="example-title" className="scroll-mt-8 bg-panel">
@@ -171,33 +201,19 @@ export default function Landing() {
             <div className="bg-raised p-5 sm:p-7">
               <p className="mb-5 text-xs text-fg-3">Example Outline before approval</p>
               <ol className="space-y-5">
-                <li>
-                  <h3 className="text-[0.8125rem] font-medium">
-                    <span className="mr-3 font-mono text-fg-3">01</span>Get to know your camera
-                  </h3>
-                  <ul className="ml-7 mt-2 space-y-1.5 text-[0.8125rem] leading-[1.55] text-fg-2">
-                    <li>Aperture and depth of field</li>
-                    <li>Shutter speed and ISO</li>
-                  </ul>
-                </li>
-                <li>
-                  <h3 className="text-[0.8125rem] font-medium">
-                    <span className="mr-3 font-mono text-fg-3">02</span>Find and shape natural light
-                  </h3>
-                  <ul className="ml-7 mt-2 space-y-1.5 text-[0.8125rem] leading-[1.55] text-fg-2">
-                    <li>Window light and open shade</li>
-                    <li>Position your subject</li>
-                  </ul>
-                </li>
-                <li>
-                  <h3 className="text-[0.8125rem] font-medium">
-                    <span className="mr-3 font-mono text-fg-3">03</span>Make a portrait
-                  </h3>
-                  <ul className="ml-7 mt-2 space-y-1.5 text-[0.8125rem] leading-[1.55] text-fg-2">
-                    <li>Compose and guide a portrait</li>
-                    <li>Shoot and review a portrait series</li>
-                  </ul>
-                </li>
+                {exampleOutline.map((module, index) => (
+                  <li key={module.title}>
+                    <h3 className="text-[0.8125rem] font-medium">
+                      <span className="mr-3 font-mono text-fg-3">0{index + 1}</span>
+                      {module.title}
+                    </h3>
+                    <ul className="ml-7 mt-2 space-y-1.5 text-[0.8125rem] leading-[1.55] text-fg-2">
+                      {module.lessons.map((lesson) => (
+                        <li key={lesson}>{lesson}</li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
               </ol>
               <p className="mt-6 border-t border-rule pt-4 text-xs leading-normal text-fg-3">
                 You can change the Outline before any Lesson is written.
@@ -220,18 +236,18 @@ export default function Landing() {
             You approve the Course.
           </h2>
           <ol className="mt-8">
-            {steps.map(([title, description], index) => (
+            {steps.map((step, index) => (
               <li
-                key={title}
+                key={step.title}
                 className="grid grid-cols-[2rem_1fr] gap-3 border-t border-hair py-6 sm:gap-6"
               >
                 <span className="pt-1 font-mono text-[0.8125rem] text-fg-3">0{index + 1}</span>
                 <div>
                   <h3 className="text-base leading-[1.72] font-semibold tracking-[-0.011em]">
-                    {title}
+                    {step.title}
                   </h3>
                   <p className="mt-2 max-w-[36rem] text-[0.9375rem] leading-[1.66] text-fg-2">
-                    {description}
+                    {step.body}
                   </p>
                 </div>
               </li>
@@ -256,13 +272,13 @@ export default function Landing() {
             Ask for help. Make changes.
           </h2>
           <dl className="mt-8">
-            {capabilities.map(([title, description]) => (
-              <div key={title} className="border-t border-hair py-6">
+            {capabilities.map((capability) => (
+              <div key={capability.title} className="border-t border-hair py-6">
                 <dt className="text-base leading-[1.72] font-semibold tracking-[-0.011em]">
-                  {title}
+                  {capability.title}
                 </dt>
                 <dd className="mt-2 max-w-[36rem] text-[0.9375rem] leading-[1.66] text-fg-2">
-                  {description}
+                  {capability.body}
                 </dd>
               </div>
             ))}
@@ -306,18 +322,17 @@ export default function Landing() {
           <p className="mt-5 max-w-[36rem] text-base leading-[1.72] text-fg-2">
             Bring a Topic and a Goal. Shape the Outline. Then work through a Course made for you.
           </p>
-          <Button
-            variant="hero"
-            onClick={signIn}
-            disabled={signingIn}
+          <StartCourseButton
+            signingIn={signingIn}
+            onSignIn={signIn}
             className="mt-7 focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             {signingIn ? "Connecting to Google…" : "Start a Course"}
             <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
-          </Button>
-          {failed ? (
+          </StartCourseButton>
+          {failed && (
             <p className="mt-3 text-[0.8125rem] text-fg-2">Sign in did not complete. Try again.</p>
-          ) : null}
+          )}
         </section>
       </main>
 

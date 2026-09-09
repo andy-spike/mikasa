@@ -16,7 +16,12 @@ import {
   tailorConversations,
   tailorMessages,
 } from "./schema";
-import { applyOutlineOps, StructureError } from "@/lib/course/structure";
+import {
+  applyOutlineOps,
+  outlineApprovalProblems,
+  outlineLessonRefs,
+  StructureError,
+} from "@/lib/course/structure";
 import {
   validatePlanOps,
   isStructureOp,
@@ -27,10 +32,11 @@ import {
 } from "@/lib/course/change-plan";
 import type { ChangePlanOp } from "@/lib/course/change-plan";
 import { applyOutlineChange } from "./outline";
+import { findOwnedCourse } from "./courses";
+import { latestOutline } from "./design";
 import type { LessonAdjustment, OutlineData } from "@/lib/course/types";
 import { currentRevision, resetGenerationRun } from "./review";
 import { recomputeCourseCompletion } from "./completion";
-import { outlineApprovalProblems } from "@/lib/course/structure";
 
 export type TailorTurnRow = {
   id: string;
@@ -62,7 +68,7 @@ export type ChangePlanRow = {
   createdAt: Date;
 };
 
-export async function findTailorConversation(
+async function findTailorConversationId(
   db: Db,
   ownerId: string,
   courseId: string,
@@ -76,25 +82,40 @@ export async function findTailorConversation(
   return row?.id;
 }
 
+export async function findTailorConversation(
+  db: Db,
+  ownerId: string,
+  courseId: string,
+): Promise<string | undefined> {
+  return findTailorConversationId(db, ownerId, courseId);
+}
+
+function toTailorTurnRow(r: {
+  id: string;
+  seq: number;
+  role: string;
+  content: string;
+  createdAt: Date;
+}): TailorTurnRow {
+  return {
+    id: r.id,
+    seq: r.seq,
+    role: r.role as TailorTurnRow["role"],
+    content: r.content,
+    createdAt: r.createdAt,
+  };
+}
+
 export async function getOrCreateTailorConversation(
   db: Db,
   ownerId: string,
   courseId: string,
 ): Promise<string | undefined> {
-  const [course] = await db
-    .select({ id: courses.id })
-    .from(courses)
-    .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-    .limit(1);
+  const course = await findOwnedCourse(db, ownerId, courseId);
   if (!course) return undefined;
 
-  const [existing] = await db
-    .select()
-    .from(tailorConversations)
-    .where(eq(tailorConversations.courseId, courseId))
-    .limit(1);
-  if (existing) return existing.id;
-
+  // Parallel calls can create the row twice: the unique index decides the
+  // winner, and the loser rereads the winning row instead of failing.
   const [created] = await db
     .insert(tailorConversations)
     .values({ courseId })
@@ -116,13 +137,7 @@ export async function listTailorMessages(db: Db, conversationId: string): Promis
     .from(tailorMessages)
     .where(eq(tailorMessages.conversationId, conversationId))
     .orderBy(asc(tailorMessages.seq));
-  return rows.map((r) => ({
-    id: r.id,
-    seq: r.seq,
-    role: r.role as "learner" | "tailor",
-    content: r.content,
-    createdAt: r.createdAt,
-  }));
+  return rows.map(toTailorTurnRow);
 }
 
 export async function loadTailorHistory(
@@ -130,14 +145,9 @@ export async function loadTailorHistory(
   ownerId: string,
   courseId: string,
 ): Promise<TailorTurnRow[]> {
-  const [conversation] = await db
-    .select({ id: tailorConversations.id })
-    .from(tailorConversations)
-    .innerJoin(courses, eq(courses.id, tailorConversations.courseId))
-    .where(and(eq(tailorConversations.courseId, courseId), eq(courses.ownerId, ownerId)))
-    .limit(1);
-  if (!conversation) return [];
-  return listTailorMessages(db, conversation.id);
+  const conversationId = await findTailorConversationId(db, ownerId, courseId);
+  if (!conversationId) return [];
+  return listTailorMessages(db, conversationId);
 }
 
 export async function appendTailorTurn(
@@ -170,19 +180,10 @@ export async function createChangePlan(
   | { ok: true; plan: ChangePlanRow }
   | { ok: false; reason: "not-found" | "invalid"; message: string }
 > {
-  const [course] = await db
-    .select()
-    .from(courses)
-    .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-    .limit(1);
+  const course = await findOwnedCourse(db, ownerId, courseId);
   if (!course) return { ok: false, reason: "not-found", message: "Course not found." };
 
-  const [outline] = await db
-    .select()
-    .from(outlines)
-    .where(eq(outlines.courseId, courseId))
-    .orderBy(desc(outlines.version))
-    .limit(1);
+  const outline = await latestOutline(db, courseId);
   if (!outline) {
     return { ok: false, reason: "invalid", message: "This Course has no Outline yet." };
   }
@@ -226,27 +227,11 @@ export async function createChangePlan(
     return row;
   });
 
-  const operations = await db
-    .select()
-    .from(changeOperations)
-    .where(eq(changeOperations.planId, plan.id))
-    .orderBy(asc(changeOperations.position));
+  const operations = await loadOperations(db, plan.id);
 
   return {
     ok: true,
-    plan: {
-      id: plan.id,
-      status: plan.status,
-      baseOutlineVersion: plan.baseOutlineVersion,
-      baseRevisionNumber: plan.baseRevisionNumber,
-      stagedOutlineVersion: plan.stagedOutlineVersion,
-      publishedRevisionNumber: plan.publishedRevisionNumber,
-      touchedLessons: plan.touchedLessons,
-      touchedModules: plan.touchedModules,
-      regeneratedLessons: plan.regeneratedLessons,
-      createdAt: plan.createdAt,
-      operations: operations.map(toOperationRow),
-    },
+    plan: toChangePlanRow(plan, operations),
   };
 }
 
@@ -258,6 +243,49 @@ function toOperationRow(row: typeof changeOperations.$inferSelect): ChangeOperat
     payload: row.payload as ChangePlanOp,
     status: row.status as ChangeOperationRow["status"],
   };
+}
+
+type PlanFields = Pick<
+  typeof changePlans.$inferSelect,
+  | "id"
+  | "status"
+  | "baseOutlineVersion"
+  | "baseRevisionNumber"
+  | "stagedOutlineVersion"
+  | "publishedRevisionNumber"
+  | "touchedLessons"
+  | "touchedModules"
+  | "regeneratedLessons"
+  | "createdAt"
+>;
+
+function toChangePlanRow(plan: PlanFields, operations: ChangeOperationRow[]): ChangePlanRow {
+  return {
+    id: plan.id,
+    status: plan.status,
+    baseOutlineVersion: plan.baseOutlineVersion,
+    baseRevisionNumber: plan.baseRevisionNumber,
+    stagedOutlineVersion: plan.stagedOutlineVersion,
+    publishedRevisionNumber: plan.publishedRevisionNumber,
+    touchedLessons: plan.touchedLessons,
+    touchedModules: plan.touchedModules,
+    regeneratedLessons: plan.regeneratedLessons,
+    createdAt: plan.createdAt,
+    operations,
+  };
+}
+
+async function loadOperations(db: Db, planId: string): Promise<ChangeOperationRow[]> {
+  const operations = await db
+    .select()
+    .from(changeOperations)
+    .where(eq(changeOperations.planId, planId))
+    .orderBy(asc(changeOperations.position));
+  return operations.map(toOperationRow);
+}
+
+function acceptedOps(operations: { status: string; payload: unknown }[]): ChangePlanOp[] {
+  return operations.filter((o) => o.status === "accepted").map((o) => o.payload as ChangePlanOp);
 }
 
 export async function findProposedPlan(
@@ -279,24 +307,8 @@ export async function findProposedPlan(
     .orderBy(desc(changePlans.createdAt))
     .limit(1);
   if (!plan) return undefined;
-  const operations = await db
-    .select()
-    .from(changeOperations)
-    .where(eq(changeOperations.planId, plan.change_plans.id))
-    .orderBy(asc(changeOperations.position));
-  return {
-    id: plan.change_plans.id,
-    status: plan.change_plans.status,
-    baseOutlineVersion: plan.change_plans.baseOutlineVersion,
-    baseRevisionNumber: plan.change_plans.baseRevisionNumber,
-    stagedOutlineVersion: plan.change_plans.stagedOutlineVersion,
-    publishedRevisionNumber: plan.change_plans.publishedRevisionNumber,
-    touchedLessons: plan.change_plans.touchedLessons,
-    touchedModules: plan.change_plans.touchedModules,
-    regeneratedLessons: plan.change_plans.regeneratedLessons,
-    createdAt: plan.change_plans.createdAt,
-    operations: operations.map(toOperationRow),
-  };
+  const operations = await loadOperations(db, plan.change_plans.id);
+  return toChangePlanRow(plan.change_plans, operations);
 }
 
 export async function setOperationStatus(
@@ -338,24 +350,8 @@ export async function findPlan(
     .where(and(eq(changePlans.id, planId), eq(courses.ownerId, ownerId)))
     .limit(1);
   if (!plan) return undefined;
-  const operations = await db
-    .select()
-    .from(changeOperations)
-    .where(eq(changeOperations.planId, planId))
-    .orderBy(asc(changeOperations.position));
-  return {
-    id: plan.change_plans.id,
-    status: plan.change_plans.status,
-    baseOutlineVersion: plan.change_plans.baseOutlineVersion,
-    baseRevisionNumber: plan.change_plans.baseRevisionNumber,
-    stagedOutlineVersion: plan.change_plans.stagedOutlineVersion,
-    publishedRevisionNumber: plan.change_plans.publishedRevisionNumber,
-    touchedLessons: plan.change_plans.touchedLessons,
-    touchedModules: plan.change_plans.touchedModules,
-    regeneratedLessons: plan.change_plans.regeneratedLessons,
-    createdAt: plan.change_plans.createdAt,
-    operations: operations.map(toOperationRow),
-  };
+  const operations = await loadOperations(db, planId);
+  return toChangePlanRow(plan.change_plans, operations);
 }
 
 export async function listPlansWithOperations(db: Db, courseId: string): Promise<ChangePlanRow[]> {
@@ -364,28 +360,9 @@ export async function listPlansWithOperations(db: Db, courseId: string): Promise
     .from(changePlans)
     .where(eq(changePlans.courseId, courseId))
     .orderBy(asc(changePlans.createdAt));
-  const all: ChangePlanRow[] = [];
-  for (const plan of plans) {
-    const operations = await db
-      .select()
-      .from(changeOperations)
-      .where(eq(changeOperations.planId, plan.id))
-      .orderBy(asc(changeOperations.position));
-    all.push({
-      id: plan.id,
-      status: plan.status,
-      baseOutlineVersion: plan.baseOutlineVersion,
-      baseRevisionNumber: plan.baseRevisionNumber,
-      stagedOutlineVersion: plan.stagedOutlineVersion,
-      publishedRevisionNumber: plan.publishedRevisionNumber,
-      touchedLessons: plan.touchedLessons,
-      touchedModules: plan.touchedModules,
-      regeneratedLessons: plan.regeneratedLessons,
-      createdAt: plan.createdAt,
-      operations: operations.map(toOperationRow),
-    });
-  }
-  return all;
+  return Promise.all(
+    plans.map(async (plan) => toChangePlanRow(plan, await loadOperations(db, plan.id))),
+  );
 }
 
 export async function applyPlanToOutline(
@@ -402,11 +379,7 @@ export async function applyPlanToOutline(
     }
 > {
   return db.transaction(async (tx) => {
-    const [course] = await tx
-      .select()
-      .from(courses)
-      .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-      .limit(1);
+    const course = await findOwnedCourse(tx, ownerId, courseId);
     if (!course) {
       return { ok: false, reason: "not-found", message: "Course not found." };
     }
@@ -435,9 +408,7 @@ export async function applyPlanToOutline(
       .from(changeOperations)
       .where(eq(changeOperations.planId, planId))
       .orderBy(asc(changeOperations.position));
-    const accepted = operations
-      .filter((o) => o.status === "accepted")
-      .map((o) => o.payload as ChangePlanOp);
+    const accepted = acceptedOps(operations);
     if (accepted.length === 0) {
       return {
         ok: false,
@@ -476,6 +447,19 @@ export async function applyPlanToOutline(
   });
 }
 
+function mergeAdjustment(byLesson: Map<string, LessonAdjustment>, op: ChangePlanOp): void {
+  if (op.kind === "lessonProse") {
+    const existing = byLesson.get(op.lessonId) ?? { lessonId: op.lessonId };
+    byLesson.set(op.lessonId, { ...existing, prose: op.instruction });
+  } else if (op.kind === "exercise") {
+    const existing = byLesson.get(op.lessonId) ?? { lessonId: op.lessonId };
+    byLesson.set(op.lessonId, {
+      ...existing,
+      exercise: { task: op.task, check: op.check },
+    });
+  }
+}
+
 export async function activeContentAdjustments(
   db: Db,
   courseId: string,
@@ -487,20 +471,10 @@ export async function activeContentAdjustments(
     if (plan.status !== "applied") continue;
     for (const operation of plan.operations) {
       if (operation.status !== "accepted") continue;
-      const op = operation.payload;
-      if (op.kind === "lessonProse") {
-        const existing = byLesson.get(op.lessonId) ?? { lessonId: op.lessonId };
-        byLesson.set(op.lessonId, { ...existing, prose: op.instruction });
-      } else if (op.kind === "exercise") {
-        const existing = byLesson.get(op.lessonId) ?? { lessonId: op.lessonId };
-        byLesson.set(op.lessonId, {
-          ...existing,
-          exercise: { task: op.task, check: op.check },
-        });
-      }
+      mergeAdjustment(byLesson, operation.payload);
     }
   }
-  const live = new Set(outline.modules.flatMap((m) => m.lessons.map((l) => l.id)));
+  const live = new Set(outlineLessonRefs(outline));
   return [...byLesson.values()].filter((a) => live.has(a.lessonId));
 }
 
@@ -513,17 +487,7 @@ export async function planContentAdjustments(db: Db, planId: string): Promise<Le
   const byLesson = new Map<string, LessonAdjustment>();
   for (const operation of operations) {
     if (operation.status !== "accepted") continue;
-    const op = operation.payload as ChangePlanOp;
-    if (op.kind === "lessonProse") {
-      const existing = byLesson.get(op.lessonId) ?? { lessonId: op.lessonId };
-      byLesson.set(op.lessonId, { ...existing, prose: op.instruction });
-    } else if (op.kind === "exercise") {
-      const existing = byLesson.get(op.lessonId) ?? { lessonId: op.lessonId };
-      byLesson.set(op.lessonId, {
-        ...existing,
-        exercise: { task: op.task, check: op.check },
-      });
-    }
+    mergeAdjustment(byLesson, operation.payload as ChangePlanOp);
   }
   return [...byLesson.values()];
 }
@@ -573,11 +537,7 @@ export async function stagePlanRevision(
   planId: string,
 ): Promise<StageRevisionResult> {
   return db.transaction(async (tx) => {
-    const [course] = await tx
-      .select()
-      .from(courses)
-      .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-      .limit(1);
+    const course = await findOwnedCourse(tx, ownerId, courseId);
     if (!course) {
       return { ok: false, reason: "not-found", message: "Course not found." };
     }
@@ -610,12 +570,7 @@ export async function stagePlanRevision(
           "The Course has a newer revision than this plan was drawn against. Review the Course as it is now and ask again.",
       };
     }
-    const [baseOutline] = await tx
-      .select()
-      .from(outlines)
-      .where(eq(outlines.courseId, courseId))
-      .orderBy(desc(outlines.version))
-      .limit(1);
+    const baseOutline = await latestOutline(tx, courseId);
     if (!baseOutline || plan.baseOutlineVersion !== baseOutline.version) {
       return {
         ok: false,
@@ -643,9 +598,7 @@ export async function stagePlanRevision(
       .from(changeOperations)
       .where(eq(changeOperations.planId, planId))
       .orderBy(asc(changeOperations.position));
-    const accepted = operations
-      .filter((o) => o.status === "accepted")
-      .map((o) => o.payload as ChangePlanOp);
+    const accepted = acceptedOps(operations);
     if (accepted.length === 0) {
       return {
         ok: false,
@@ -751,12 +704,14 @@ export async function stagePlanRevision(
       .returning();
 
     const touched = touchedIdentities(accepted, baseOutline.data);
-    for (const m of nextData.modules)
-      for (const l of m.lessons)
-        if (!baseOutline.data.modules.some((bm) => bm.lessons.some((bl) => bl.id === l.id)))
-          touched.lessons.push(l.id);
-    for (const m of nextData.modules)
-      if (!baseOutline.data.modules.some((base) => base.id === m.id)) touched.modules.push(m.id);
+    const baseLessonIds = new Set(outlineLessonRefs(baseOutline.data));
+    for (const id of outlineLessonRefs(nextData)) {
+      if (!baseLessonIds.has(id)) touched.lessons.push(id);
+    }
+    const baseModuleIds = new Set(baseOutline.data.modules.map((m) => m.id));
+    for (const m of nextData.modules) {
+      if (!baseModuleIds.has(m.id)) touched.modules.push(m.id);
+    }
 
     await tx
       .update(changePlans)
@@ -801,24 +756,8 @@ export async function findStagedPlan(
     .orderBy(desc(changePlans.updatedAt))
     .limit(1);
   if (!plan) return undefined;
-  const operations = await db
-    .select()
-    .from(changeOperations)
-    .where(eq(changeOperations.planId, plan.change_plans.id))
-    .orderBy(asc(changeOperations.position));
-  return {
-    id: plan.change_plans.id,
-    status: plan.change_plans.status,
-    baseOutlineVersion: plan.change_plans.baseOutlineVersion,
-    baseRevisionNumber: plan.change_plans.baseRevisionNumber,
-    stagedOutlineVersion: plan.change_plans.stagedOutlineVersion,
-    publishedRevisionNumber: plan.change_plans.publishedRevisionNumber,
-    touchedLessons: plan.change_plans.touchedLessons,
-    touchedModules: plan.change_plans.touchedModules,
-    regeneratedLessons: plan.change_plans.regeneratedLessons,
-    createdAt: plan.change_plans.createdAt,
-    operations: operations.map(toOperationRow),
-  };
+  const operations = await loadOperations(db, plan.change_plans.id);
+  return toChangePlanRow(plan.change_plans, operations);
 }
 
 export type ResumeStagedRevision =
@@ -838,11 +777,7 @@ export async function resumeStagedRevision(
   courseId: string,
   planId: string,
 ): Promise<ResumeStagedRevision> {
-  const [course] = await db
-    .select({ id: courses.id })
-    .from(courses)
-    .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-    .limit(1);
+  const course = await findOwnedCourse(db, ownerId, courseId);
   if (!course) return { ok: false, reason: "not-found", message: "Course not found." };
 
   const plan = await findPlan(db, ownerId, planId);
@@ -875,17 +810,15 @@ export async function resumeStagedRevision(
   // Retry retains the expanded correction set: corrections may have reached
   // related Lessons beyond the original regenerate list. Union the stored
   // touched set so Undo overlap checks and embeddings see the full set.
-  const storedTouched = new Set([
-    ...(plan.touchedLessons ?? []),
-    ...(plan.regeneratedLessons ?? []),
-  ]);
+  const touchedLessons = plan.touchedLessons ?? [];
+  const storedTouched = new Set([...touchedLessons, ...(plan.regeneratedLessons ?? [])]);
   const regenerate = [
     ...new Set([
       ...affected.regenerate,
-      ...[...storedTouched].filter((r) => (plan.touchedLessons ?? []).includes(r)),
+      ...[...storedTouched].filter((r) => touchedLessons.includes(r)),
     ]),
   ];
-  const embed = [...new Set([...affected.embed, ...(plan.touchedLessons ?? [])])];
+  const embed = [...new Set([...affected.embed, ...touchedLessons])];
 
   const [run] = await db
     .select()
@@ -927,11 +860,7 @@ export async function discardStagedRevision(
   courseId: string,
   planId: string,
 ): Promise<DiscardStagedRevision> {
-  const [course] = await db
-    .select({ id: courses.id })
-    .from(courses)
-    .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-    .limit(1);
+  const course = await findOwnedCourse(db, ownerId, courseId);
   if (!course) return { ok: false, reason: "not-found", message: "Course not found." };
 
   const plan = await findPlan(db, ownerId, planId);
@@ -1002,9 +931,7 @@ export async function markRevisionPublished(
       .from(changeOperations)
       .where(eq(changeOperations.planId, planId))
       .orderBy(asc(changeOperations.position));
-    const accepted = operations
-      .filter((o) => o.status === "accepted")
-      .map((o) => o.payload as ChangePlanOp);
+    const accepted = acceptedOps(operations);
 
     const [baseOutline] = await tx
       .select()
@@ -1069,11 +996,7 @@ export async function undoPlanRevision(
   planId: string,
 ): Promise<UndoResult> {
   return db.transaction(async (tx) => {
-    const [course] = await tx
-      .select()
-      .from(courses)
-      .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-      .limit(1);
+    const course = await findOwnedCourse(tx, ownerId, courseId);
     if (!course) {
       return { ok: false, reason: "not-found", message: "Course not found." };
     }
@@ -1113,22 +1036,18 @@ export async function undoPlanRevision(
       .select()
       .from(changePlans)
       .where(and(eq(changePlans.courseId, courseId), eq(changePlans.status, "published")));
+    const isLater = (q: (typeof later)[number]) =>
+      q.id !== planId &&
+      q.publishedRevisionNumber !== null &&
+      q.publishedRevisionNumber > plan.publishedRevisionNumber!;
     const overlapping = later
       .filter(
-        (q) =>
-          q.id !== planId &&
-          q.publishedRevisionNumber !== null &&
-          q.publishedRevisionNumber > plan.publishedRevisionNumber! &&
-          (q.touchedLessons ?? []).some((l) => plan.touchedLessons!.includes(l)),
+        (q) => isLater(q) && (q.touchedLessons ?? []).some((l) => plan.touchedLessons!.includes(l)),
       )
       .map((q) => q.id);
     const overlappingModules = later
       .filter(
-        (q) =>
-          q.id !== planId &&
-          q.publishedRevisionNumber !== null &&
-          q.publishedRevisionNumber > plan.publishedRevisionNumber! &&
-          (q.touchedModules ?? []).some((m) => plan.touchedModules!.includes(m)),
+        (q) => isLater(q) && (q.touchedModules ?? []).some((m) => plan.touchedModules!.includes(m)),
       )
       .map((q) => q.id);
     if (overlapping.length > 0 || overlappingModules.length > 0) {
@@ -1206,37 +1125,35 @@ export async function undoPlanRevision(
     const undoVersion = currentOutline.version + 1;
     await tx.insert(outlines).values({ courseId, version: undoVersion, data: inverted });
 
-    const undoRefs = new Set(inverted.modules.flatMap((m) => m.lessons.map((l) => l.id)));
+    const undoRefs = new Set(outlineLessonRefs(inverted));
     const removedLessons = [...currentByRef.values()]
       .map((r) => r.lessonRef)
       .filter((ref) => !undoRefs.has(ref));
 
     const restoredLessons: string[] = [];
     const rows: (typeof lessons.$inferInsert)[] = [];
-    for (const m of inverted.modules) {
-      for (const l of m.lessons) {
-        const source = restored.has(l.id) ? baseByRef.get(l.id) : currentByRef.get(l.id);
-        if (!source) {
-          return {
-            ok: false,
-            reason: "invalid",
-            message: `The Lesson "${l.title}" has no content to restore.`,
-          };
-        }
-        if (restored.has(l.id)) restoredLessons.push(l.id);
-        rows.push({
-          courseId,
-          outlineVersion: undoVersion,
-          lessonRef: source.lessonRef,
-          title: l.title,
-          body: source.body,
-          workedExample: source.workedExample,
-          recallPrompt: source.recallPrompt,
-          selfExplanationPrompt: source.selfExplanationPrompt,
-          exercise: source.exercise,
-          bridge: source.bridge,
-        });
+    for (const l of inverted.modules.flatMap((m) => m.lessons)) {
+      const source = restored.has(l.id) ? baseByRef.get(l.id) : currentByRef.get(l.id);
+      if (!source) {
+        return {
+          ok: false,
+          reason: "invalid",
+          message: `The Lesson "${l.title}" has no content to restore.`,
+        };
       }
+      if (restored.has(l.id)) restoredLessons.push(l.id);
+      rows.push({
+        courseId,
+        outlineVersion: undoVersion,
+        lessonRef: source.lessonRef,
+        title: l.title,
+        body: source.body,
+        workedExample: source.workedExample,
+        recallPrompt: source.recallPrompt,
+        selfExplanationPrompt: source.selfExplanationPrompt,
+        exercise: source.exercise,
+        bridge: source.bridge,
+      });
     }
     if (rows.length > 0) await tx.insert(lessons).values(rows);
 

@@ -15,7 +15,17 @@ import { latestGenerationRun } from "@/lib/db/outline";
 import { loadTailorHistory } from "@/lib/db/tailor";
 import { findProposedPlanAction } from "@/lib/actions/tailor";
 import { outlineToEditorCourse } from "@/lib/course/view";
+import { turnViews } from "@/lib/course/tutor";
 import { requireLearner } from "@/lib/session";
+import type { ReactNode } from "react";
+
+function domainOf(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
 
 export default async function OutlinePage({ params }: PageProps<"/courses/[courseId]/outline">) {
   const { user } = await requireLearner();
@@ -25,34 +35,31 @@ export default async function OutlinePage({ params }: PageProps<"/courses/[cours
   if (course.status === "ready") {
     redirect(`/courses/${courseId}`);
   }
+  const shell = (node: ReactNode) => <AppShell section={course.topic}>{node}</AppShell>;
 
   if (course.status === "failed") {
     const outline = await latestOutline(db, courseId);
     const generation = outline ? await latestGenerationRun(db, courseId) : undefined;
     if (outline && generation) {
-      return (
-        <AppShell section={course.topic}>
-          <CourseFailed
-            courseId={course.id}
-            topic={course.topic}
-            goal={course.goal}
-            error={generation.error}
-          />
-        </AppShell>
-      );
-    }
-    const run = await latestDesignRun(db, courseId);
-    return (
-      <AppShell section={course.topic}>
-        <CourseDesignProgress
+      return shell(
+        <CourseFailed
           courseId={course.id}
           topic={course.topic}
           goal={course.goal}
-          status="failed"
-          step={run?.currentStep ?? "sources"}
-          error={run?.error ?? null}
-        />
-      </AppShell>
+          error={generation.error}
+        />,
+      );
+    }
+    const run = await latestDesignRun(db, courseId);
+    return shell(
+      <CourseDesignProgress
+        courseId={course.id}
+        topic={course.topic}
+        goal={course.goal}
+        status="failed"
+        step={run?.currentStep ?? "sources"}
+        error={run?.error ?? null}
+      />,
     );
   }
 
@@ -63,49 +70,40 @@ export default async function OutlinePage({ params }: PageProps<"/courses/[cours
       listCourseSources(db, courseId),
       latestOutline(db, courseId),
     ]);
-    const domainOf = (url: string) => {
-      try {
-        return new URL(url).hostname.replace(/^www\./, "");
-      } catch {
-        return url;
-      }
-    };
-    return (
-      <AppShell section={course.topic}>
-        <CourseDesignProgress
-          courseId={course.id}
-          topic={course.topic}
-          goal={course.goal}
-          status="designing"
-          step={run?.currentStep ?? "sources"}
-          error={run?.error ?? null}
-          startedAt={run?.startedAt.toISOString() ?? course.createdAt.toISOString()}
-          events={events.map((e) => ({
-            kind: e.kind,
-            message: e.message,
-            createdAt: e.createdAt.toISOString(),
-          }))}
-          sources={sourceRows.map((s) => ({ title: s.title, url: s.url, domain: domainOf(s.url) }))}
-          preview={
-            preview
-              ? {
-                  modules: preview.data.modules.map((m) => ({
-                    numeral: m.numeral,
-                    title: m.title,
-                    lessons: m.lessons.map((l) => ({
-                      title: l.title,
-                      summary: l.summary,
-                      minutes: l.minutes,
-                    })),
+    return shell(
+      <CourseDesignProgress
+        courseId={course.id}
+        topic={course.topic}
+        goal={course.goal}
+        status="designing"
+        step={run?.currentStep ?? "sources"}
+        error={run?.error ?? null}
+        startedAt={run?.startedAt.toISOString() ?? course.createdAt.toISOString()}
+        events={events.map((e) => ({
+          kind: e.kind,
+          message: e.message,
+          createdAt: e.createdAt.toISOString(),
+        }))}
+        sources={sourceRows.map((s) => ({ title: s.title, url: s.url, domain: domainOf(s.url) }))}
+        preview={
+          preview
+            ? {
+                modules: preview.data.modules.map((m) => ({
+                  numeral: m.numeral,
+                  title: m.title,
+                  lessons: m.lessons.map((l) => ({
+                    title: l.title,
+                    summary: l.summary,
+                    minutes: l.minutes,
                   })),
-                  terminalPerformances: preview.draft?.terminalPerformances ?? [],
-                  premise: preview.draft?.throughline.premise ?? null,
-                  runningExample: preview.draft?.throughline.runningExample ?? null,
-                }
-              : null
-          }
-        />
-      </AppShell>
+                })),
+                terminalPerformances: preview.draft?.terminalPerformances ?? [],
+                premise: preview.draft?.throughline.premise ?? null,
+                runningExample: preview.draft?.throughline.runningExample ?? null,
+              }
+            : null
+        }
+      />,
     );
   }
 
@@ -114,35 +112,23 @@ export default async function OutlinePage({ params }: PageProps<"/courses/[cours
 
   if (course.status === "generating" || course.status === "reviewing") {
     const run = await latestGenerationRun(db, courseId);
-    return (
-      <AppShell section={course.topic}>
-        <OutlineEditor
-          course={outlineToEditorCourse(
-            course,
-            outline.version,
-            outline.data,
-            course.status === "generating" ? "generating" : "reviewing",
-          )}
-          key={course.status}
-          runStep={run?.currentStep ?? null}
-        />
-      </AppShell>
+    return shell(
+      <OutlineEditor
+        course={outlineToEditorCourse(course, outline.version, outline.data, course.status)}
+        key={course.status}
+        runStep={run?.currentStep ?? null}
+      />,
     );
   }
 
   if (course.status !== "awaiting-outline-approval") notFound();
 
-  return (
-    <AppShell section={course.topic}>
-      <OutlineEditor
-        course={outlineToEditorCourse(course, outline.version, outline.data)}
-        tailorTurns={(await loadTailorHistory(db, user.id, courseId)).map((t) => ({
-          from: t.role,
-          text: t.content,
-        }))}
-        tailorPlan={await findProposedPlanAction(courseId)}
-        onRefreshPlan={findProposedPlanAction.bind(null, courseId)}
-      />
-    </AppShell>
+  return shell(
+    <OutlineEditor
+      course={outlineToEditorCourse(course, outline.version, outline.data)}
+      tailorTurns={turnViews(await loadTailorHistory(db, user.id, courseId))}
+      tailorPlan={await findProposedPlanAction(courseId)}
+      onRefreshPlan={findProposedPlanAction.bind(null, courseId)}
+    />,
   );
 }

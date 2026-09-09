@@ -4,6 +4,7 @@ import { courses, courseSpecs, generationRuns, lessons, outlines, sources } from
 import type { LessonContent, ContentBlock } from "../course/content";
 import { parseLessonContent } from "../course/content";
 import type { CourseSpecification } from "../course/types";
+import { outlineLessonRefs } from "../course/structure";
 import { newLessonSourceRef, type PromptSource } from "../course/generate";
 
 export type GenerationContext = {
@@ -61,24 +62,12 @@ export async function loadGenerationContext(
     .from(lessons)
     .where(and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)));
 
+  const { id, topic, goal, background, language, depth, grounding } = course;
   return {
-    course: {
-      id: course.id,
-      topic: course.topic,
-      goal: course.goal,
-      background: course.background,
-      language: course.language,
-      depth: course.depth,
-      grounding: course.grounding,
-    },
+    course: { id, topic, goal, background, language, depth, grounding },
     spec: specRow.spec,
     outline: { version: outline.version, data: outline.data },
-    sources: sourceRows.map((s) => ({
-      ref: s.ref,
-      title: s.title,
-      url: s.url,
-      excerpt: s.excerpt,
-    })),
+    sources: sourceRows.map(({ ref, title, url, excerpt }) => ({ ref, title, url, excerpt })),
     written: written.map((w) => w.lessonRef),
   };
 }
@@ -103,32 +92,13 @@ export async function saveLessonContent(
     if (!run) {
       throw new Error("The generation run is gone; discarding this Lesson write.");
     }
+    const { lessonId: lessonRef, ...fields } = content;
     await tx
       .insert(lessons)
-      .values({
-        courseId,
-        outlineVersion,
-        lessonRef: content.lessonId,
-        title: content.title,
-        body: content.body,
-        workedExample: content.workedExample,
-        recallPrompt: content.recallPrompt,
-        selfExplanationPrompt: content.selfExplanationPrompt,
-        exercise: content.exercise,
-        bridge: content.bridge,
-      })
+      .values({ courseId, outlineVersion, lessonRef, ...fields })
       .onConflictDoUpdate({
         target: [lessons.courseId, lessons.outlineVersion, lessons.lessonRef],
-        set: {
-          title: content.title,
-          body: content.body,
-          workedExample: content.workedExample,
-          recallPrompt: content.recallPrompt,
-          selfExplanationPrompt: content.selfExplanationPrompt,
-          exercise: content.exercise,
-          bridge: content.bridge,
-          updatedAt: new Date(),
-        },
+        set: { ...fields, updatedAt: new Date() },
       });
 
     /* Corrections must not move the run marker back to a Lesson: the
@@ -193,7 +163,7 @@ export async function finishGeneration(
     .limit(1);
   if (!outline) return { ok: false, missing: -1 };
 
-  const planned = outline.data.modules.flatMap((m) => m.lessons.map((l) => l.id));
+  const planned = outlineLessonRefs(outline.data);
   const written = await db
     .select({ lessonRef: lessons.lessonRef })
     .from(lessons)
@@ -283,16 +253,27 @@ export async function getLessonsForVersion(
     .select()
     .from(lessons)
     .where(and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)));
-  return rows.map((r) => ({
-    lessonRef: r.lessonRef,
-    title: r.title,
-    body: r.body,
-    workedExample: r.workedExample,
-    recallPrompt: r.recallPrompt,
-    selfExplanationPrompt: r.selfExplanationPrompt,
-    exercise: r.exercise,
-    bridge: r.bridge,
-  }));
+  return rows.map(
+    ({
+      lessonRef,
+      title,
+      body,
+      workedExample,
+      recallPrompt,
+      selfExplanationPrompt,
+      exercise,
+      bridge,
+    }) => ({
+      lessonRef,
+      title,
+      body,
+      workedExample,
+      recallPrompt,
+      selfExplanationPrompt,
+      exercise,
+      bridge,
+    }),
+  );
 }
 
 export async function getLessonContentsForVersion(
@@ -312,19 +293,21 @@ export async function getLessonContentsForVersion(
     .from(lessons)
     .where(and(eq(lessons.courseId, courseId), eq(lessons.outlineVersion, outlineVersion)));
   const byRef = new Map(rows.map((r) => [r.lessonRef, r]));
-  const planned = outline.data.modules.flatMap((m) => m.lessons.map((l) => l.id));
+  const planned = outlineLessonRefs(outline.data);
 
-  return planned
-    .map((ref) => byRef.get(ref))
-    .filter((r): r is NonNullable<typeof r> => Boolean(r))
-    .map((r) =>
-      parseLessonContent(r.lessonRef, r.title, {
-        body: r.body,
-        workedExample: r.workedExample,
-        recallPrompt: r.recallPrompt,
-        selfExplanationPrompt: r.selfExplanationPrompt,
-        exercise: r.exercise,
-        bridge: r.bridge,
-      }),
-    );
+  return planned.flatMap((ref) => {
+    const r = byRef.get(ref);
+    return r
+      ? [
+          parseLessonContent(r.lessonRef, r.title, {
+            body: r.body,
+            workedExample: r.workedExample,
+            recallPrompt: r.recallPrompt,
+            selfExplanationPrompt: r.selfExplanationPrompt,
+            exercise: r.exercise,
+            bridge: r.bridge,
+          }),
+        ]
+      : [];
+  });
 }

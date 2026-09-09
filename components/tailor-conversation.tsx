@@ -25,6 +25,21 @@ export type PlanOperation = {
 
 export type PlanView = { id: string; operations: PlanOperation[] };
 
+function TurnBubble({ turn }: { turn: Turn }) {
+  if (turn.from === "learner") {
+    return (
+      <p className="ml-6 rounded-md bg-raised px-3 py-2 text-[0.8125rem] leading-[1.55] text-fg [overflow-wrap:anywhere]">
+        {turn.text}
+      </p>
+    );
+  }
+  return (
+    <p className="text-[0.8125rem] leading-[1.66] text-fg-2 [overflow-wrap:anywhere]">
+      <Inline text={turn.text} />
+    </p>
+  );
+}
+
 const EFFORTS = ["low", "medium", "high"] as const satisfies readonly ReasoningEffort[];
 
 export function Conversation({
@@ -82,6 +97,30 @@ export function Conversation({
 
   const connected = Boolean(onAsk);
 
+  function appendChunk(chunk: string) {
+    setThread((t) => {
+      const copy = [...t];
+      const last = copy[copy.length - 1];
+      if (last && last.from === replyFrom)
+        copy[copy.length - 1] = { ...last, text: last.text + chunk };
+      return copy;
+    });
+  }
+
+  function dropEmptyReply() {
+    setThread((t) => {
+      const copy = [...t];
+      const last = copy[copy.length - 1];
+      if (last && last.from === replyFrom && last.text === "") copy.pop();
+      return copy;
+    });
+  }
+
+  function trySend() {
+    const text = draft.trim();
+    if (text && !pending && connected) ask(text);
+  }
+
   async function ask(text: string) {
     if (!onAsk) return;
     setThread((t) => [...t, { from: "learner", text }, { from: replyFrom, text: "" }]);
@@ -97,25 +136,14 @@ export function Conversation({
           setPending(false);
           setStreaming(true);
         }
-        setThread((t) => {
-          const copy = [...t];
-          const last = copy[copy.length - 1];
-          if (last && last.from === replyFrom)
-            copy[copy.length - 1] = { ...last, text: last.text + chunk };
-          return copy;
-        });
+        appendChunk(chunk);
       }
     });
 
     setPending(false);
     setStreaming(false);
     if (!ok) {
-      setThread((t) => {
-        const copy = [...t];
-        const last = copy[copy.length - 1];
-        if (last && last.from === replyFrom && last.text === "") copy.pop();
-        return copy;
-      });
+      dropEmptyReply();
       if (failedText) setFailed(true);
     }
   }
@@ -128,34 +156,20 @@ export function Conversation({
         }
       >
         <div className="space-y-4">
-          {thread.length === 0 ? empty : null}
-          {thread.map((turn, i) =>
-            turn.from === "learner" ? (
-              <p
-                key={i}
-                className="ml-6 rounded-md bg-raised px-3 py-2 text-[0.8125rem] leading-[1.55] text-fg [overflow-wrap:anywhere]"
-              >
-                {turn.text}
-              </p>
-            ) : (
-              <p
-                key={i}
-                className="text-[0.8125rem] leading-[1.66] text-fg-2 [overflow-wrap:anywhere]"
-              >
-                <Inline text={turn.text} />
-              </p>
-            ),
-          )}
-          {pending ? (
+          {thread.length === 0 && empty}
+          {thread.map((turn, i) => (
+            <TurnBubble key={i} turn={turn} />
+          ))}
+          {pending && (
             <p className="text-[0.8125rem] text-fg-3" aria-live="polite">
               {pendingText}
             </p>
-          ) : null}
-          {failed ? (
+          )}
+          {failed && (
             <p className="text-[0.8125rem] text-fg-3" aria-live="polite">
               {failedText}
             </p>
-          ) : null}
+          )}
         </div>
         {below}
         <div ref={foot} />
@@ -165,8 +179,7 @@ export function Conversation({
         className="shrink-0 border-t border-hair p-2.5"
         onSubmit={(e) => {
           e.preventDefault();
-          const text = draft.trim();
-          if (text && !pending && connected) ask(text);
+          trySend();
         }}
       >
         <div className="rounded-md bg-canvas px-2.5 py-2 transition-colors focus-within:bg-raised">
@@ -177,8 +190,7 @@ export function Conversation({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                const text = draft.trim();
-                if (text && !pending && connected) ask(text);
+                trySend();
               }
             }}
             placeholder={placeholder}
@@ -317,7 +329,7 @@ export function TailorConversation({
       below={
         <>
           {revisionSlot}
-          {open.length > 0 ? (
+          {open.length > 0 && (
             <div className="mt-5">
               <p className="label text-fg-3">Change plan</p>
               <ul className="-mx-3.5 mt-2 border-t border-hair">
@@ -334,29 +346,7 @@ export function TailorConversation({
                     </p>
 
                     <div className="mt-3 flex items-center gap-3">
-                      {operation.status === "accepted" ? (
-                        <>
-                          <span className="text-[0.75rem] text-fg-3">Accepted</span>
-                          <Button
-                            variant="quiet"
-                            onClick={() => onRestore(operation.id)}
-                            className="ml-auto"
-                          >
-                            Undo
-                          </Button>
-                        </>
-                      ) : operation.status === "discarded" ? (
-                        <>
-                          <span className="text-[0.75rem] text-fg-3">Discarded</span>
-                          <Button
-                            variant="quiet"
-                            onClick={() => onRestore(operation.id)}
-                            className="ml-auto"
-                          >
-                            Restore
-                          </Button>
-                        </>
-                      ) : (
+                      {operation.status === "proposed" ? (
                         <>
                           <Button variant="compact" onClick={() => onAccept(operation.id)}>
                             Accept
@@ -369,14 +359,27 @@ export function TailorConversation({
                             Discard
                           </Button>
                         </>
+                      ) : (
+                        <>
+                          <span className="text-[0.75rem] text-fg-3">
+                            {operation.status === "accepted" ? "Accepted" : "Discarded"}
+                          </span>
+                          <Button
+                            variant="quiet"
+                            onClick={() => onRestore(operation.id)}
+                            className="ml-auto"
+                          >
+                            {operation.status === "accepted" ? "Undo" : "Restore"}
+                          </Button>
+                        </>
                       )}
                     </div>
                   </li>
                 ))}
               </ul>
-              {applySlot && acceptedCount > 0 ? <div className="mt-4">{applySlot}</div> : null}
+              {applySlot && acceptedCount > 0 && <div className="mt-4">{applySlot}</div>}
             </div>
-          ) : null}
+          )}
           {publishedSlot}
         </>
       }

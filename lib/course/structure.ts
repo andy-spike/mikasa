@@ -94,6 +94,10 @@ function clone(data: OutlineData): OutlineModule[] {
   return data.modules.map((m) => ({ ...m, lessons: m.lessons.map((l) => ({ ...l })) }));
 }
 
+export function outlineLessonRefs(outline: OutlineData): string[] {
+  return outline.modules.flatMap((m) => m.lessons.map((l) => l.id));
+}
+
 export function applyOutlineOp(
   data: OutlineData,
   op: OutlineOp,

@@ -50,11 +50,11 @@ export function CourseFailed({
         <p className="mt-2 max-w-(--measure) text-[0.75rem] leading-[1.5] text-fg-3">
           Everything already written is kept. Retrying picks up where this run stopped.
         </p>
-        {message ? (
+        {message && (
           <p role="alert" className="mt-3 text-[0.8125rem] leading-[1.5] text-fg-2">
             {message}
           </p>
-        ) : null}
+        )}
         <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
           <Button onClick={retry} disabled={retrying}>
             {retrying ? "Starting again…" : "Retry"}

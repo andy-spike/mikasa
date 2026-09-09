@@ -99,12 +99,24 @@ export function tutorSystemPrompt(context: TutorContext): string {
 }
 
 export function tutorPrompt(history: TutorTurnRow[], message: string): ModelMessage[] {
-  const recent = history.slice(-HISTORY_WINDOW);
+  return historyMessages(history.slice(-HISTORY_WINDOW), message);
+}
+
+export function historyMessages(
+  turns: { role: string; content: string }[],
+  message: string,
+): ModelMessage[] {
   return [
-    ...recent.map((turn): ModelMessage => ({
+    ...turns.map((turn): ModelMessage => ({
       role: turn.role === "learner" ? "user" : "assistant",
       content: turn.content,
     })),
     { role: "user", content: message },
   ];
+}
+
+export function turnViews<R extends string>(
+  turns: { role: R; content: string }[],
+): { from: R; text: string }[] {
+  return turns.map((t) => ({ from: t.role, text: t.content }));
 }

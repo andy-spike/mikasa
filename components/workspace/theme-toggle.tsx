@@ -12,6 +12,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { readTheme, serverTheme, setTheme, subscribeTheme, type ThemeChoice } from "@/lib/theme";
 
+const THEMES = ["light", "dark", "system"] as const;
+
+function toggleTheme() {
+  setTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
+}
+
 export function ThemeToggle() {
   const [open, setOpen] = useState(false);
   const theme = useSyncExternalStore(subscribeTheme, readTheme, serverTheme);
@@ -30,9 +36,7 @@ export function ThemeToggle() {
             className="h-8 w-8 p-2"
             aria-label="Switch theme. Right-click for theme options"
             title="Switch theme · Right-click for options"
-            onClick={() =>
-              setTheme(document.documentElement.classList.contains("dark") ? "light" : "dark")
-            }
+            onClick={toggleTheme}
             onContextMenu={(event) => {
               event.preventDefault();
               setOpen(true);
@@ -54,7 +58,7 @@ export function ThemeToggle() {
           value={theme}
           onValueChange={(value) => setTheme(value as ThemeChoice)}
         >
-          {(["light", "dark", "system"] as const).map((value) => (
+          {THEMES.map((value) => (
             <DropdownMenuRadioItem
               key={value}
               value={value}

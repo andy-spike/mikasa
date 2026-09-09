@@ -16,6 +16,8 @@ import {
   StructureError,
   type OutlineOp,
 } from "../course/structure";
+import { findOwnedCourse } from "./courses";
+import { latestOutline } from "./design";
 
 export type OutlineRejection =
   | "not-found"
@@ -47,11 +49,7 @@ export async function applyOutlineChange(
   ops: OutlineOp[],
 ): Promise<OutlineChangeResult> {
   return db.transaction(async (tx) => {
-    const [course] = await tx
-      .select()
-      .from(courses)
-      .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-      .limit(1);
+    const course = await findOwnedCourse(tx, ownerId, courseId);
     if (!course) return reject("not-found", "Course not found.");
 
     if (course.status !== "awaiting-outline-approval") {
@@ -61,12 +59,7 @@ export async function applyOutlineChange(
       );
     }
 
-    const [current] = await tx
-      .select()
-      .from(outlines)
-      .where(eq(outlines.courseId, courseId))
-      .orderBy(desc(outlines.version))
-      .limit(1);
+    const current = await latestOutline(tx, courseId);
     if (!current) return reject("not-found", "This Course has no Outline yet.");
 
     if (current.version !== baseVersion) {
@@ -144,19 +137,10 @@ export async function openGenerationRun(
   baseVersion: number,
 ): Promise<ApprovalStart> {
   return db.transaction(async (tx) => {
-    const [course] = await tx
-      .select()
-      .from(courses)
-      .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-      .limit(1);
+    const course = await findOwnedCourse(tx, ownerId, courseId);
     if (!course) return reject("not-found", "Course not found.");
 
-    const [outline] = await tx
-      .select()
-      .from(outlines)
-      .where(eq(outlines.courseId, courseId))
-      .orderBy(desc(outlines.version))
-      .limit(1);
+    const outline = await latestOutline(tx, courseId);
     if (!outline) return reject("not-found", "This Course has no Outline yet.");
 
     if (outline.version !== baseVersion) {
@@ -167,16 +151,7 @@ export async function openGenerationRun(
     }
 
     if (course.status !== "awaiting-outline-approval") {
-      const [existing] = await tx
-        .select()
-        .from(generationRuns)
-        .where(
-          and(
-            eq(generationRuns.courseId, courseId),
-            eq(generationRuns.outlineVersion, baseVersion),
-          ),
-        )
-        .limit(1);
+      const existing = await findGenerationRun(tx, courseId, baseVersion);
       if (existing) return { ok: true, run: existing, duplicate: true };
       return reject("not-approvable", "This Course is not waiting for Outline approval.");
     }
@@ -193,17 +168,9 @@ export async function openGenerationRun(
       .returning();
 
     if (!run) {
-      const [existing] = await tx
-        .select()
-        .from(generationRuns)
-        .where(
-          and(
-            eq(generationRuns.courseId, courseId),
-            eq(generationRuns.outlineVersion, baseVersion),
-          ),
-        )
-        .limit(1);
-      return { ok: true, run: existing!, duplicate: true };
+      const existing = await findGenerationRun(tx, courseId, baseVersion);
+      if (!existing) throw new Error("The generation run vanished right after it was opened.");
+      return { ok: true, run: existing, duplicate: true };
     }
 
     await tx
@@ -287,27 +254,31 @@ export type ApprovalContext = {
   specRow: CourseSpecRow | undefined;
 };
 
+async function findGenerationRun(
+  tx: Db,
+  courseId: string,
+  outlineVersion: number,
+): Promise<GenerationRun | undefined> {
+  const [run] = await tx
+    .select()
+    .from(generationRuns)
+    .where(
+      and(eq(generationRuns.courseId, courseId), eq(generationRuns.outlineVersion, outlineVersion)),
+    )
+    .limit(1);
+  return run;
+}
+
 /** Read outside the run-opening transaction: the model call must not happen inside it. */
 export async function loadApprovalContext(
   db: Db,
   ownerId: string,
   courseId: string,
 ): Promise<ApprovalContext | undefined> {
-  const course = await db
-    .select()
-    .from(courses)
-    .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-    .limit(1)
-    .then((rows) => rows[0]);
+  const course = await findOwnedCourse(db, ownerId, courseId);
   if (!course) return undefined;
 
-  const outline = await db
-    .select()
-    .from(outlines)
-    .where(eq(outlines.courseId, courseId))
-    .orderBy(desc(outlines.version))
-    .limit(1)
-    .then((rows) => rows[0]);
+  const outline = await latestOutline(db, courseId);
   if (!outline) return undefined;
 
   const specRow = await findCourseSpecRow(db, courseId);

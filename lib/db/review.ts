@@ -2,7 +2,6 @@ import { and, desc, eq, max } from "drizzle-orm";
 import type { Db } from "./index";
 import {
   courses,
-  codeVerifications,
   generationRuns,
   lessons,
   outlines,
@@ -10,14 +9,13 @@ import {
   reviewRuns,
   revisions,
   sources,
-  type CodeVerification,
   type Course,
   type Revision,
   type ReviewFindingRow,
   type ReviewRun,
 } from "./schema";
 import type { Finding, FindingKind } from "../course/review";
-import { outlineApprovalProblems } from "@/lib/course/structure";
+import { outlineApprovalProblems, outlineLessonRefs } from "@/lib/course/structure";
 import { recomputeCourseCompletion } from "./completion";
 
 export async function openReviewRun(
@@ -51,26 +49,18 @@ export async function saveFindings(
   return db.transaction(async (tx) => {
     // A late review write must not recreate cancelled candidate data.
     // The generation run owns the candidate; if it is gone, drop the write.
-    if (options?.generationRunId) {
-      const [genRun] = await tx
-        .select({ id: generationRuns.id })
-        .from(generationRuns)
-        .where(eq(generationRuns.id, options.generationRunId))
-        .limit(1);
-      if (!genRun) return [];
-    } else {
-      const [genRun] = await tx
-        .select({ id: generationRuns.id })
-        .from(generationRuns)
-        .where(
-          and(
-            eq(generationRuns.courseId, courseId),
-            eq(generationRuns.outlineVersion, outlineVersion),
-          ),
-        )
-        .limit(1);
-      if (!genRun) return [];
-    }
+    const genCond = options?.generationRunId
+      ? eq(generationRuns.id, options.generationRunId)
+      : and(
+          eq(generationRuns.courseId, courseId),
+          eq(generationRuns.outlineVersion, outlineVersion),
+        );
+    const [genRun] = await tx
+      .select({ id: generationRuns.id })
+      .from(generationRuns)
+      .where(genCond)
+      .limit(1);
+    if (!genRun) return [];
     await tx
       .delete(reviewFindings)
       .where(and(eq(reviewFindings.reviewRunId, runId), eq(reviewFindings.round, round)));
@@ -125,6 +115,15 @@ export async function finishReviewRun(
 
 export type PublishResult = { ok: true; revision: Revision } | { ok: false; reason: string };
 
+async function ownedCourse(db: Db, ownerId: string, courseId: string): Promise<Course | undefined> {
+  const [course] = await db
+    .select()
+    .from(courses)
+    .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
+    .limit(1);
+  return course;
+}
+
 /**
  * Publication is one atomic transaction and idempotent per outline version:
  * a repeated retry reuses the existing revision instead of minting a second.
@@ -152,7 +151,7 @@ export async function publishRevision(
       return { ok: false as const, reason: `Refusing to publish: ${problems.join(" ")}` };
     }
 
-    const planned = outline.data.modules.flatMap((m) => m.lessons.map((l) => l.id));
+    const planned = outlineLessonRefs(outline.data);
     const written = await tx
       .select({ lessonRef: lessons.lessonRef })
       .from(lessons)
@@ -189,29 +188,19 @@ export async function publishRevision(
 
     // Run validity: the generation run must still exist for this candidate.
     // A cancelled run is gone, so publication refuses.
-    if (options?.generationRunId) {
-      const [genRun] = await tx
-        .select()
-        .from(generationRuns)
-        .where(eq(generationRuns.id, options.generationRunId))
-        .limit(1);
-      if (!genRun || genRun.courseId !== courseId || genRun.outlineVersion !== outlineVersion) {
-        return { ok: false as const, reason: "Refusing to publish: the generation run is gone." };
-      }
-    } else {
-      const [genRun] = await tx
-        .select({ id: generationRuns.id })
-        .from(generationRuns)
-        .where(
-          and(
-            eq(generationRuns.courseId, courseId),
-            eq(generationRuns.outlineVersion, outlineVersion),
-          ),
-        )
-        .limit(1);
-      if (!genRun) {
-        return { ok: false as const, reason: "Refusing to publish: the generation run is gone." };
-      }
+    const genCond = options?.generationRunId
+      ? eq(generationRuns.id, options.generationRunId)
+      : and(
+          eq(generationRuns.courseId, courseId),
+          eq(generationRuns.outlineVersion, outlineVersion),
+        );
+    const [genRun] = await tx.select().from(generationRuns).where(genCond).limit(1);
+    if (
+      !genRun ||
+      (options?.generationRunId &&
+        (genRun.courseId !== courseId || genRun.outlineVersion !== outlineVersion))
+    ) {
+      return { ok: false as const, reason: "Refusing to publish: the generation run is gone." };
     }
 
     // Staged base-revision check: the Course must not have moved since staging.
@@ -249,123 +238,19 @@ export async function publishRevision(
       .where(eq(courses.id, courseId));
     await recomputeCourseCompletion(tx, courseId);
     // The generation run succeeds only now, not when Lessons finished.
-    if (options?.generationRunId) {
-      await tx
-        .update(generationRuns)
-        .set({ status: "succeeded", currentStep: "complete", updatedAt: new Date() })
-        .where(eq(generationRuns.id, options.generationRunId));
-    } else {
-      await tx
-        .update(generationRuns)
-        .set({ status: "succeeded", currentStep: "complete", updatedAt: new Date() })
-        .where(
-          and(
-            eq(generationRuns.courseId, courseId),
-            eq(generationRuns.outlineVersion, outlineVersion),
-          ),
+    const runCond = options?.generationRunId
+      ? eq(generationRuns.id, options.generationRunId)
+      : and(
+          eq(generationRuns.courseId, courseId),
+          eq(generationRuns.outlineVersion, outlineVersion),
         );
-    }
+    await tx
+      .update(generationRuns)
+      .set({ status: "succeeded", currentStep: "complete", updatedAt: new Date() })
+      .where(runCond);
 
     return { ok: true as const, revision };
   });
-}
-
-/** Deprecated V1 leftover: the Sandbox verification lane is removed from the
- * workflow. Kept for the orphaned rows until a migration drops the table. */
-export async function saveCodeVerification(
-  db: Db,
-  courseId: string,
-  outlineVersion: number,
-  round: number,
-  result: { passed: boolean; evidence: unknown },
-  options?: { generationRunId?: string },
-): Promise<{ created: boolean }> {
-  // Late writes must not recreate cancelled candidate data.
-  if (options?.generationRunId) {
-    const [genRun] = await db
-      .select({ id: generationRuns.id })
-      .from(generationRuns)
-      .where(eq(generationRuns.id, options.generationRunId))
-      .limit(1);
-    if (!genRun) return { created: false };
-  }
-  const [existing] = await db
-    .select()
-    .from(codeVerifications)
-    .where(
-      and(
-        eq(codeVerifications.courseId, courseId),
-        eq(codeVerifications.outlineVersion, outlineVersion),
-        eq(codeVerifications.round, round),
-      ),
-    )
-    .limit(1);
-  if (existing) return { created: false };
-
-  await db.insert(codeVerifications).values({
-    courseId,
-    outlineVersion,
-    round,
-    status: result.passed ? "passed" : "failed",
-    evidence: result.evidence,
-  });
-  return { created: true };
-}
-
-export function verificationContentHash(
-  lessons: { lessonId: string; body: unknown; workedExample: unknown; exercise: unknown }[],
-): string {
-  const parts = [...lessons]
-    .sort((a, b) => (a.lessonId < b.lessonId ? -1 : 1))
-    .map(
-      (l) =>
-        `${l.lessonId}:${JSON.stringify(l.body)}:${JSON.stringify(l.workedExample)}:${JSON.stringify(l.exercise)}`,
-    );
-  let hash = 0;
-  const text = parts.join("|");
-  for (let i = 0; i < text.length; i++) {
-    hash = (hash * 31 + text.charCodeAt(i)) | 0;
-  }
-  return `h${(hash >>> 0).toString(16)}`;
-}
-
-export async function findCodeVerification(
-  db: Db,
-  courseId: string,
-  outlineVersion: number,
-  round: number,
-): Promise<CodeVerification | undefined> {
-  const [row] = await db
-    .select()
-    .from(codeVerifications)
-    .where(
-      and(
-        eq(codeVerifications.courseId, courseId),
-        eq(codeVerifications.outlineVersion, outlineVersion),
-        eq(codeVerifications.round, round),
-      ),
-    )
-    .limit(1);
-  return row;
-}
-
-export async function latestCodeVerification(
-  db: Db,
-  courseId: string,
-  outlineVersion: number,
-): Promise<CodeVerification | undefined> {
-  const [row] = await db
-    .select()
-    .from(codeVerifications)
-    .where(
-      and(
-        eq(codeVerifications.courseId, courseId),
-        eq(codeVerifications.outlineVersion, outlineVersion),
-      ),
-    )
-    .orderBy(desc(codeVerifications.round))
-    .limit(1);
-  return row;
 }
 
 export async function failReview(
@@ -475,11 +360,7 @@ export async function cancelGenerationRun(
   courseId: string,
 ): Promise<CancelGenerationResult> {
   return db.transaction(async (tx) => {
-    const [course] = await tx
-      .select()
-      .from(courses)
-      .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-      .limit(1);
+    const course = await ownedCourse(tx, ownerId, courseId);
     if (!course) return { ok: false as const, reason: "not-found" as const };
     if (course.status !== "generating" && course.status !== "reviewing") {
       return { ok: false as const, reason: "too-late" as const };
@@ -534,11 +415,7 @@ export async function findOwnedPublishedCourse(
   ownerId: string,
   courseId: string,
 ): Promise<PublishedCourse | undefined> {
-  const [course] = await db
-    .select()
-    .from(courses)
-    .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
-    .limit(1);
+  const course = await ownedCourse(db, ownerId, courseId);
   if (!course) return undefined;
 
   const revision = await currentRevision(db, courseId);

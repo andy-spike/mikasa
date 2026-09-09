@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonLines } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { CancelRunButton } from "@/components/cancel-run-button";
 import { DoneCheck, UnsetMark } from "@/components/workspace/marks";
@@ -101,9 +101,7 @@ export function CourseDesignProgress({
   }, [designing, startedAt]);
 
   const currentMessage = useMemo(() => {
-    const last = events.length > 0 ? events[events.length - 1] : null;
-    if (last?.message) return last.message;
-    return STEP_COPY[step] ?? "Designing the Course.";
+    return events[events.length - 1]?.message ?? STEP_COPY[step] ?? "Designing the Course.";
   }, [events, step]);
 
   const history = useMemo(() => events.slice(-4, -1).reverse(), [events]);
@@ -120,7 +118,7 @@ export function CourseDesignProgress({
       lessons: m.lessons.map((l) => ({ ...l, n: ++n })),
     }));
   }, [preview]);
-  const lessonTotal = numberedModules.reduce((n, m) => n + m.lessons.length, 0);
+  const lessonTotal = numberedModules.flatMap((m) => m.lessons).length;
 
   function retry() {
     setRetrying(true);
@@ -169,8 +167,8 @@ export function CourseDesignProgress({
 
       <p className="mt-6 text-[0.9375rem] leading-[1.66] text-fg-2">{currentMessage}</p>
       <p className="tnum mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
-        {startedAt ? `Working for ${formatElapsed(startedAt, now)}.` : null}
-        {startedAt ? " " : ""}You can leave this page. The Outline will be here when you come back.
+        {startedAt && `Working for ${formatElapsed(startedAt, now)}. `}
+        You can leave this page. The Outline will be here when you come back.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
@@ -221,7 +219,7 @@ export function CourseDesignProgress({
         })}
       </ol>
 
-      {history.length > 0 ? (
+      {history.length > 0 && (
         <ul className="mt-4 space-y-1">
           {history.map((e, i) => (
             <li key={`${e.createdAt}-${i}`} className="text-[0.75rem] leading-[1.5] text-fg-3">
@@ -229,7 +227,7 @@ export function CourseDesignProgress({
             </li>
           ))}
         </ul>
-      ) : null}
+      )}
 
       {preview && preview.modules.length > 0 ? (
         <div className="mt-10">
@@ -250,29 +248,25 @@ export function CourseDesignProgress({
                   </h2>
                 </div>
                 <ul>
-                  {m.lessons.map((l) => {
-                    return (
-                      <li
-                        key={`${m.numeral}-${l.n}-${l.title}`}
-                        className="grid grid-cols-[1.5rem_1fr_auto] items-start gap-x-2.5 border-b border-hair px-2 py-3"
-                      >
-                        <span className="tnum pt-px text-[0.75rem] leading-5 text-fg-dim">
-                          {l.n}
+                  {m.lessons.map((l) => (
+                    <li
+                      key={`${m.numeral}-${l.n}-${l.title}`}
+                      className="grid grid-cols-[1.5rem_1fr_auto] items-start gap-x-2.5 border-b border-hair px-2 py-3"
+                    >
+                      <span className="tnum pt-px text-[0.75rem] leading-5 text-fg-dim">{l.n}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[0.8125rem] leading-5 font-medium text-fg">
+                          {l.title}
                         </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-[0.8125rem] leading-5 font-medium text-fg">
-                            {l.title}
-                          </span>
-                          <span className="mt-1 block text-[0.8125rem] leading-[1.5] text-fg-3">
-                            {l.summary}
-                          </span>
+                        <span className="mt-1 block text-[0.8125rem] leading-[1.5] text-fg-3">
+                          {l.summary}
                         </span>
-                        <span className="tnum pt-0.5 text-[0.75rem] leading-5 text-fg-dim">
-                          {l.minutes}m
-                        </span>
-                      </li>
-                    );
-                  })}
+                      </span>
+                      <span className="tnum pt-0.5 text-[0.75rem] leading-5 text-fg-dim">
+                        {l.minutes}m
+                      </span>
+                    </li>
+                  ))}
                 </ul>
               </section>
             ))}
@@ -280,13 +274,7 @@ export function CourseDesignProgress({
         </div>
       ) : (
         <div className="mt-9 space-y-2.5" aria-hidden="true">
-          {[10, 6, 8, 5, 9, 7, 4].map((w, i) => (
-            <Skeleton
-              key={i}
-              className="h-4 rounded-sm bg-panel"
-              style={{ width: `${w * 8 + 12}%` }}
-            />
-          ))}
+          <SkeletonLines />
         </div>
       )}
 

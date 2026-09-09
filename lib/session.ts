@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { createAuth, type Auth } from "@/lib/auth";
 import { signedOutHref } from "@/lib/access";
+import { findOwnedCourse } from "@/lib/db/courses";
 
 export const auth: Auth = createAuth(db);
 
@@ -15,4 +16,10 @@ export async function requireLearner(): Promise<
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect(signedOutHref());
   return session;
+}
+
+export async function requireOwnedCourse(courseId: string) {
+  const { user } = await requireLearner();
+  const course = await findOwnedCourse(db, user.id, courseId);
+  return { user, course };
 }

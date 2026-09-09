@@ -14,8 +14,11 @@ import { Button } from "./ui/button";
 import { CancelRunButton } from "./cancel-run-button";
 import { DoneCheck, UnsetMark } from "./workspace/marks";
 import { field } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 import { Textarea } from "./ui/textarea";
 import { useStickyFollow } from "@/hooks/use-sticky-follow";
+import { useSyncedState } from "@/hooks/use-synced-state";
+import { postStream } from "@/lib/api/post";
 import type { ReasoningEffort } from "@/lib/model";
 import {
   Dialog,
@@ -27,6 +30,72 @@ import {
 } from "./ui/dialog";
 
 type Module = OutlineEditorCourse["modules"][number];
+
+function reviewStatusText(runStep: string | null | undefined): string {
+  if (runStep?.startsWith("corrections:")) {
+    return `Correction round ${runStep.slice("corrections:".length)}: fixing what the review found.`;
+  }
+  if (runStep === "publish") return "The review passed. Publishing the Course.";
+  if (runStep?.startsWith("lesson:")) return "Correcting what the review found.";
+  return "The review pass is running: structure, accuracy, learning design.";
+}
+
+function RowAction({
+  label,
+  title,
+  onClick,
+  disabled,
+  className,
+  children,
+}: {
+  label: string;
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  className: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      variant="icon-raised"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={title}
+      className={className}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function RenameInput({
+  initial,
+  label,
+  className,
+  onCommit,
+  onCancel,
+}: {
+  initial: string;
+  label: string;
+  className: string;
+  onCommit: (value: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <input
+      autoFocus
+      defaultValue={initial}
+      aria-label={label}
+      onBlur={(e) => onCommit(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onCommit(e.currentTarget.value);
+        if (e.key === "Escape") onCancel();
+      }}
+      className={className}
+    />
+  );
+}
 
 type Props = {
   course: OutlineEditorCourse;
@@ -51,12 +120,7 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
   );
   const [pending, startTransition] = useTransition();
 
-  const [plan, setPlan] = useState<PlanView | null | undefined>(tailorPlan);
-  const [restoredPlan, setRestoredPlan] = useState(tailorPlan);
-  if (tailorPlan !== restoredPlan) {
-    setRestoredPlan(tailorPlan);
-    setPlan(tailorPlan);
-  }
+  const [plan, setPlan] = useSyncedState(tailorPlan);
 
   const [adopted, setAdopted] = useState(course.version);
   if (course.version !== adopted) {
@@ -73,6 +137,10 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
   }
 
   const lessons = useMemo(() => modules.flatMap((m) => m.lessons), [modules]);
+  const numbered = useMemo(() => {
+    let n = 0;
+    return modules.map((m) => ({ ...m, lessons: m.lessons.map((l) => ({ ...l, n: ++n })) }));
+  }, [modules]);
 
   const polling = generating || course.phase !== "editing";
   useEffect(() => {
@@ -81,31 +149,37 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     return () => clearInterval(timer);
   }, [polling, router]);
 
-  function run(op: OutlineOp) {
+  function failWith(message: string, reason: string) {
+    setError(message);
+    if (reason === "conflict") router.refresh();
+  }
+
+  function submit(work: () => Promise<void>) {
     setError(null);
-    startTransition(async () => {
+    startTransition(work);
+  }
+
+  function run(op: OutlineOp) {
+    submit(async () => {
       const result = await applyOutlineOpAction(course.id, version, op);
       if (result.ok) {
         setModules(result.outline.data.modules);
         setVersion(result.outline.version);
         setEdits((n) => n + 1);
       } else {
-        setError(result.message);
-        if (result.reason === "conflict") router.refresh();
+        failWith(result.message, result.reason);
       }
     });
   }
 
   function approve() {
-    setError(null);
-    startTransition(async () => {
+    submit(async () => {
       const result = await approveOutlineAction(course.id, version);
       if (result.ok) {
         setGenerating(true);
         router.refresh();
       } else {
-        setError(result.message);
-        if (result.reason === "conflict") router.refresh();
+        failWith(result.message, result.reason);
       }
     });
   }
@@ -115,26 +189,14 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     effort: ReasoningEffort,
     onDelta: (chunk: string) => void,
   ): Promise<boolean> {
-    try {
-      const response = await fetch(`/api/courses/${course.id}/tailor`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message: text, effort }),
-      });
-      if (!response.ok || !response.body) return false;
-
-      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) {
-          if (onRefreshPlan) setPlan(await onRefreshPlan());
-          return true;
-        }
-        if (value) onDelta(value);
-      }
-    } catch {
-      return false;
-    }
+    const done = await postStream(
+      `/api/courses/${course.id}/tailor`,
+      { message: text, effort },
+      onDelta,
+    );
+    if (!done) return false;
+    if (onRefreshPlan) setPlan(await onRefreshPlan());
+    return true;
   }
 
   async function reviewOperation(
@@ -144,14 +206,12 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     if (!plan) return;
     const result = await reviewTailorOperationAction(plan.id, operationId, status);
     if (result.ok) {
-      setPlan((p) =>
-        p
-          ? {
-              ...p,
-              operations: p.operations.map((o) => (o.id === operationId ? { ...o, status } : o)),
-            }
-          : p,
-      );
+      setPlan({
+        ...plan,
+        operations: plan.operations.map((operation) =>
+          operation.id === operationId ? { ...operation, status } : operation,
+        ),
+      });
     } else {
       if (onRefreshPlan) setPlan(await onRefreshPlan());
     }
@@ -159,34 +219,31 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
 
   function applyPlan() {
     if (!plan) return;
-    setError(null);
-    startTransition(async () => {
+    submit(async () => {
       const result = await applyPlanToOutlineAction(course.id, plan.id);
       if (result.ok) {
         setEdits((n) => n + result.appliedCount);
         setPlan(null);
         router.refresh();
       } else {
-        setError(result.message);
-        if (result.reason === "conflict") router.refresh();
+        failWith(result.message, result.reason);
       }
     });
   }
 
-  function renameLesson(id: string, value: string) {
+  function commitRename(id: string, value: string) {
+    const next = value.trim();
+    setEditing(null);
+    if (!next) return;
     const lesson = lessons.find((l) => l.id === id);
-    const next = value.trim();
-    setEditing(null);
-    if (!lesson || !next || next === lesson.title) return;
-    run({ kind: "renameLesson", lessonId: id, title: next, summary: lesson.summary });
-  }
-
-  function renameModule(id: string, value: string) {
+    if (lesson) {
+      if (next !== lesson.title) {
+        run({ kind: "renameLesson", lessonId: id, title: next, summary: lesson.summary });
+      }
+      return;
+    }
     const mod = modules.find((m) => m.id === id);
-    const next = value.trim();
-    setEditing(null);
-    if (!mod || !next || next === mod.title) return;
-    run({ kind: "renameModule", moduleId: id, title: next });
+    if (mod && next !== mod.title) run({ kind: "renameModule", moduleId: id, title: next });
   }
 
   if (generating) {
@@ -199,15 +256,7 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     const doingIndex = reviewing || runStep === "complete" ? -1 : savedIndex + 1;
     const allDone = doingIndex < 0 || doingIndex >= lessons.length;
     const writingNumber = allDone ? lessons.length : doingIndex + 1;
-    const reviewStatus = !reviewing
-      ? null
-      : runStep?.startsWith("corrections:")
-        ? `Correction round ${runStep.slice("corrections:".length)}: fixing what the review found.`
-        : runStep === "publish"
-          ? "The review passed. Publishing the Course."
-          : runStep?.startsWith("lesson:")
-            ? "Correcting what the review found."
-            : "The review pass is running: structure, accuracy, learning design.";
+    const reviewStatus = reviewing ? reviewStatusText(runStep) : null;
     return (
       <div className="mx-auto w-full max-w-[38rem] px-5 pt-10 pb-24 sm:px-8" aria-live="polite">
         <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
@@ -218,13 +267,13 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
             ? `All ${lessons.length} Lessons are written. ${reviewStatus ?? ""}`
             : `Generating all ${lessons.length} Lessons in one pass, against the shape you just approved.`}
         </p>
-        {!reviewing ? (
+        {!reviewing && (
           <p className="tnum mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
             {runStep && !runStep.startsWith("lesson:") && runStep !== "complete"
               ? "Starting."
               : `Lesson ${Math.min(writingNumber, lessons.length)} of ${lessons.length}.`}
           </p>
-        ) : null}
+        )}
         <p className="mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
           You can leave this page. The Course will be here when you come back.
         </p>
@@ -251,11 +300,11 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
             Back to Courses
           </Button>
         </div>
-        {error ? (
+        {error && (
           <p role="alert" className="mt-3 text-[0.8125rem] leading-[1.5] text-fg-2">
             {error}
           </p>
-        ) : null}
+        )}
         <ol className="mt-6 border-t border-hair">
           {lessons.map((lesson, i) => {
             const done = allDone || i < doingIndex;
@@ -271,11 +320,10 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
                 </span>
                 <span className="min-w-0">
                   <span
-                    className={
-                      doing
-                        ? "block truncate text-[0.8125rem] leading-5 font-medium text-fg"
-                        : "block truncate text-[0.8125rem] leading-5 text-fg-2"
-                    }
+                    className={cn(
+                      "block truncate text-[0.8125rem] leading-5 text-fg-2",
+                      doing && "font-medium text-fg",
+                    )}
                   >
                     <span className="tnum mr-2 text-fg-3">{i + 1}</span>
                     {lesson.title}
@@ -304,20 +352,16 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
           </p>
 
           <div className="mt-10">
-            {modules.map((m, mi) => (
+            {numbered.map((m, mi) => (
               <section key={m.id} className="mb-7 last:mb-0">
                 <div className="group/mod flex items-center justify-between gap-3 border-b border-hair pb-2">
                   {editing === m.id ? (
-                    <input
-                      autoFocus
-                      defaultValue={m.title}
-                      aria-label="Module title"
-                      onBlur={(e) => renameModule(m.id, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") renameModule(m.id, e.currentTarget.value);
-                        if (e.key === "Escape") setEditing(null);
-                      }}
+                    <RenameInput
+                      initial={m.title}
+                      label="Module title"
                       className={`${field} flex-1 py-1`}
+                      onCommit={(value) => commitRename(m.id, value)}
+                      onCancel={() => setEditing(null)}
                     />
                   ) : (
                     <Button
@@ -331,36 +375,33 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
                   )}
 
                   <span className="flex shrink-0 items-center">
-                    <Button
-                      variant="icon-raised"
+                    <RowAction
+                      label={`Move ${m.title} up`}
+                      title="Move this Module up"
                       onClick={() => run({ kind: "moveModule", moduleId: m.id, toIndex: mi - 1 })}
                       disabled={mi === 0 || pending}
-                      aria-label={`Move ${m.title} up`}
-                      title="Move this Module up"
                       className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover/mod:opacity-100 disabled:opacity-20"
                     >
                       <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </Button>
-                    <Button
-                      variant="icon-raised"
-                      onClick={() => run({ kind: "moveModule", moduleId: m.id, toIndex: mi + 1 })}
-                      disabled={mi === modules.length - 1 || pending}
-                      aria-label={`Move ${m.title} down`}
+                    </RowAction>
+                    <RowAction
+                      label={`Move ${m.title} down`}
                       title="Move this Module down"
+                      onClick={() => run({ kind: "moveModule", moduleId: m.id, toIndex: mi + 1 })}
+                      disabled={mi === numbered.length - 1 || pending}
                       className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover/mod:opacity-100 disabled:opacity-20"
                     >
                       <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </Button>
-                    <Button
-                      variant="icon-raised"
+                    </RowAction>
+                    <RowAction
+                      label={`Remove ${m.title}`}
+                      title="Remove this Module and its Lessons"
                       onClick={() => run({ kind: "removeModule", moduleId: m.id })}
                       disabled={pending}
-                      aria-label={`Remove ${m.title}`}
-                      title="Remove this Module and its Lessons"
                       className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover/mod:opacity-100"
                     >
                       <X className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </Button>
+                    </RowAction>
                   </span>
                 </div>
 
@@ -370,22 +411,16 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
                       key={l.id}
                       className="group row grid grid-cols-[1.5rem_1fr_auto] items-start gap-x-2.5 border-b border-hair px-2 py-3 hover:bg-panel"
                     >
-                      <span className="tnum pt-px text-[0.75rem] leading-5 text-fg-3">
-                        {li + 1 + modules.slice(0, mi).reduce((n, m2) => n + m2.lessons.length, 0)}
-                      </span>
+                      <span className="tnum pt-px text-[0.75rem] leading-5 text-fg-3">{l.n}</span>
 
                       <span className="min-w-0">
                         {editing === l.id ? (
-                          <input
-                            autoFocus
-                            defaultValue={l.title}
-                            aria-label="Lesson title"
-                            onBlur={(e) => renameLesson(l.id, e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") renameLesson(l.id, e.currentTarget.value);
-                              if (e.key === "Escape") setEditing(null);
-                            }}
+                          <RenameInput
+                            initial={l.title}
+                            label="Lesson title"
                             className={`${field} py-1`}
+                            onCommit={(value) => commitRename(l.id, value)}
+                            onCancel={() => setEditing(null)}
                           />
                         ) : (
                           <Button
@@ -403,8 +438,9 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
                       </span>
 
                       <span className="flex items-center pt-0.5">
-                        <Button
-                          variant="icon-raised"
+                        <RowAction
+                          label={`Move ${l.title} up`}
+                          title="Move this Lesson up"
                           onClick={() =>
                             run({
                               kind: "moveLesson",
@@ -414,14 +450,13 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
                             })
                           }
                           disabled={li === 0 || pending}
-                          aria-label={`Move ${l.title} up`}
-                          title="Move this Lesson up"
                           className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-20"
                         >
                           <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </Button>
-                        <Button
-                          variant="icon-raised"
+                        </RowAction>
+                        <RowAction
+                          label={`Move ${l.title} down`}
+                          title="Move this Lesson down"
                           onClick={() =>
                             run({
                               kind: "moveLesson",
@@ -431,44 +466,39 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
                             })
                           }
                           disabled={li === m.lessons.length - 1 || pending}
-                          aria-label={`Move ${l.title} down`}
-                          title="Move this Lesson down"
                           className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-20"
                         >
                           <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </Button>
-                        <Button
-                          variant="icon-raised"
+                        </RowAction>
+                        <RowAction
+                          label={`Split ${l.title}`}
+                          title="Split this Lesson in two"
                           onClick={() => setSplitting(l)}
                           disabled={pending}
-                          aria-label={`Split ${l.title}`}
-                          title="Split this Lesson in two"
                           className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                         >
                           <Scissors className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </Button>
-                        <Button
-                          variant="icon-raised"
+                        </RowAction>
+                        <RowAction
+                          label={`Merge ${l.title} with the next Lesson`}
+                          title="Merge the next Lesson into this one"
                           onClick={() =>
                             run({ kind: "mergeLesson", lessonId: l.id, direction: "next" })
                           }
                           disabled={li === m.lessons.length - 1 || pending}
-                          aria-label={`Merge ${l.title} with the next Lesson`}
-                          title="Merge the next Lesson into this one"
                           className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-20"
                         >
                           <Combine className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </Button>
-                        <Button
-                          variant="icon-raised"
+                        </RowAction>
+                        <RowAction
+                          label={`Remove ${l.title}`}
+                          title="Remove this Lesson"
                           onClick={() => run({ kind: "removeLesson", lessonId: l.id })}
                           disabled={pending}
-                          aria-label={`Remove ${l.title}`}
-                          title="Remove this Lesson"
                           className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                         >
                           <X className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </Button>
+                        </RowAction>
                       </span>
                     </li>
                   ))}
@@ -514,11 +544,11 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
                   : "No changes yet"}
               </p>
 
-              {error ? (
+              {error && (
                 <p role="alert" className="w-full text-[0.8125rem] leading-[1.5] text-fg-2">
                   {error}
                 </p>
-              ) : null}
+              )}
 
               <Button variant="quiet" render={<Link href="/courses" />} className="ml-auto">
                 Back to Courses
@@ -554,10 +584,9 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
         </aside>
       </div>
 
-      {splitting ? (
+      {splitting && (
         <SplitDialog
           key={splitting.id}
-          lesson={splitting}
           onClose={() => setSplitting(null)}
           onSplit={(secondTitle, secondSummary) => {
             run({
@@ -569,17 +598,15 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
             setSplitting(null);
           }}
         />
-      ) : null}
+      )}
     </div>
   );
 }
 
 function SplitDialog({
-  lesson,
   onClose,
   onSplit,
 }: {
-  lesson: Module["lessons"][number] | null;
   onClose: () => void;
   onSplit: (secondTitle: string, secondSummary: string) => void;
 }) {
@@ -589,7 +616,7 @@ function SplitDialog({
   const ready = title.trim().length > 0 && summary.trim().length > 0;
 
   return (
-    <Dialog open={lesson !== null} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[26rem]">
         <DialogHeader>
           <DialogTitle>Split this Lesson</DialogTitle>

@@ -28,13 +28,6 @@ export function CourseRowMenu({ courseId, topic }: { courseId: string; topic: st
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  function deleteCourse() {
-    startTransition(async () => {
-      await deleteCourseAction(courseId);
-      setConfirming(false);
-    });
-  }
-
   return (
     <>
       <DropdownMenu>
@@ -61,15 +54,16 @@ export function CourseRowMenu({ courseId, topic }: { courseId: string; topic: st
       <Dialog
         open={confirming}
         onOpenChange={(open) => {
-          if (!pending) setConfirming(open);
+          if (pending) return;
+          setConfirming(open);
         }}
       >
         <DialogContent showCloseButton={false} className="gap-5 sm:max-w-[26rem]">
           <DialogHeader>
             <DialogTitle>Delete this Course?</DialogTitle>
             <DialogDescription>
-              Deleting &ldquo;{topic}&rdquo; removes its Sources, Outline, Lessons and progress. This cannot be
-              undone.
+              Deleting &ldquo;{topic}&rdquo; removes its Sources, Outline, Lessons and progress.
+              This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -78,7 +72,12 @@ export function CourseRowMenu({ courseId, topic }: { courseId: string; topic: st
             </Button>
             <Button
               variant="discard"
-              onClick={deleteCourse}
+              onClick={() => {
+                startTransition(async () => {
+                  await deleteCourseAction(courseId);
+                  setConfirming(false);
+                });
+              }}
               disabled={pending}
               className="px-4 py-2.5"
             >

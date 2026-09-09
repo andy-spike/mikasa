@@ -8,8 +8,8 @@ import { failDesignRun, latestDesignRun, startDesignRun } from "@/lib/db/design"
 import { failGenerationRun, latestGenerationRun } from "@/lib/db/outline";
 import { cancelGenerationRun, resetGenerationRun, currentRevision } from "@/lib/db/review";
 import { searchIsIncomplete } from "@/lib/db/fragments";
-import { deleteOwnedCourse, deleteOwnedDesigningCourse, findOwnedCourse } from "@/lib/db/courses";
-import { requireLearner } from "@/lib/session";
+import { deleteOwnedCourse, deleteOwnedDesigningCourse } from "@/lib/db/courses";
+import { requireLearner, requireOwnedCourse } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { validateCourseInput, type CourseInput, type CourseInputErrors } from "@/lib/course/limits";
 import { designCourseWorkflow } from "@/workflows/course-design";
@@ -56,9 +56,7 @@ export async function createCourseAction(
 export type RetryResult = { ok: true; courseId: string } | { ok: false; errors: CourseInputErrors };
 
 export async function retryCourseAction(courseId: string): Promise<RetryResult> {
-  const { user } = await requireLearner();
-
-  const course = await findOwnedCourse(db, user.id, courseId);
+  const { course } = await requireOwnedCourse(courseId);
   if (!course) return { ok: false, errors: { form: "Course not found." } };
 
   if (course.status !== "failed") {
@@ -99,12 +97,9 @@ export async function retryCourseAction(courseId: string): Promise<RetryResult> 
 
   const design = await latestDesignRun(db, courseId);
   if (!design) return { ok: false, errors: { form: "This Course has no run to retry." } };
-  const RESUMABLE = new Set(["outline", "specification", "persist"]);
-  const resumeFrom: "sources" | "outline" | "specification" | "persist" = RESUMABLE.has(
-    design.currentStep,
-  )
-    ? (design.currentStep as "outline" | "specification" | "persist")
-    : "sources";
+  const step = design.currentStep;
+  const resumeFrom =
+    step === "outline" || step === "specification" || step === "persist" ? step : "sources";
 
   const newRun = await startDesignRun(db, courseId);
   try {
@@ -161,8 +156,7 @@ export async function cancelGenerationAction(courseId: string): Promise<CancelRe
 export type RebuildFragmentsResult = { ok: boolean; message?: string };
 
 export async function rebuildFragmentsAction(courseId: string): Promise<RebuildFragmentsResult> {
-  const { user } = await requireLearner();
-  const course = await findOwnedCourse(db, user.id, courseId);
+  const { course } = await requireOwnedCourse(courseId);
   if (!course) return { ok: false, message: "Course not found." };
 
   const revision = await currentRevision(db, courseId);
@@ -179,8 +173,7 @@ export async function rebuildFragmentsAction(courseId: string): Promise<RebuildF
 }
 
 export async function searchIsIncompleteAction(courseId: string): Promise<boolean> {
-  const { user } = await requireLearner();
-  const course = await findOwnedCourse(db, user.id, courseId);
+  const { course } = await requireOwnedCourse(courseId);
   if (!course) return false;
   return searchIsIncomplete(db, courseId);
 }

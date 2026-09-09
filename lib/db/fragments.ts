@@ -3,8 +3,9 @@ import "server-only";
 /** Every query is scoped to one Course id, so one learner never reads another's fragments. */
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "./index";
-import { generationRuns, lessonFragments, outlines } from "./schema";
-import { currentRevision } from "./review";
+import { lessonFragments, outlines } from "./schema";
+import { currentRevision, findGenerationRunFor } from "./review";
+import { outlineLessonRefs } from "../course/structure";
 
 export type FragmentInput = {
   lessonRef: string;
@@ -12,27 +13,33 @@ export type FragmentInput = {
   content: string;
 };
 
+function assertEmbeddings(fragments: FragmentInput[], embeddings: number[][]): void {
+  if (fragments.length !== embeddings.length) {
+    throw new Error("Every fragment needs exactly one embedding.");
+  }
+}
+
+function toFragmentValues(courseId: string, fragments: FragmentInput[], embeddings: number[][]) {
+  return fragments.map((f, i) => ({
+    courseId,
+    lessonRef: f.lessonRef,
+    ordinal: f.ordinal,
+    content: f.content,
+    embedding: embeddings[i],
+  }));
+}
+
 export async function replaceCourseFragments(
   db: Db,
   courseId: string,
   fragments: FragmentInput[],
   embeddings: number[][],
 ): Promise<void> {
-  if (fragments.length !== embeddings.length) {
-    throw new Error("Every fragment needs exactly one embedding.");
-  }
+  assertEmbeddings(fragments, embeddings);
   await db.transaction(async (tx) => {
     await tx.delete(lessonFragments).where(eq(lessonFragments.courseId, courseId));
     if (fragments.length === 0) return;
-    await tx.insert(lessonFragments).values(
-      fragments.map((f, i) => ({
-        courseId,
-        lessonRef: f.lessonRef,
-        ordinal: f.ordinal,
-        content: f.content,
-        embedding: embeddings[i],
-      })),
-    );
+    await tx.insert(lessonFragments).values(toFragmentValues(courseId, fragments, embeddings));
   });
 }
 
@@ -43,9 +50,7 @@ export async function replaceLessonFragments(
   fragments: FragmentInput[],
   embeddings: number[][],
 ): Promise<void> {
-  if (fragments.length !== embeddings.length) {
-    throw new Error("Every fragment needs exactly one embedding.");
-  }
+  assertEmbeddings(fragments, embeddings);
   if (lessonRefs.length === 0) return;
   await db.transaction(async (tx) => {
     await tx
@@ -54,15 +59,7 @@ export async function replaceLessonFragments(
         and(eq(lessonFragments.courseId, courseId), inArray(lessonFragments.lessonRef, lessonRefs)),
       );
     if (fragments.length === 0) return;
-    await tx.insert(lessonFragments).values(
-      fragments.map((f, i) => ({
-        courseId,
-        lessonRef: f.lessonRef,
-        ordinal: f.ordinal,
-        content: f.content,
-        embedding: embeddings[i],
-      })),
-    );
+    await tx.insert(lessonFragments).values(toFragmentValues(courseId, fragments, embeddings));
   });
 }
 
@@ -80,7 +77,7 @@ export async function searchFragments(
   queryEmbedding: number[],
   k = 6,
 ): Promise<FragmentHit[]> {
-  const literal = `[${queryEmbedding.map((v) => v.toString()).join(",")}]`;
+  const literal = `[${queryEmbedding.join(",")}]`;
   const rows = await db
     .select({
       lessonRef: lessonFragments.lessonRef,
@@ -114,16 +111,7 @@ export async function searchIsIncomplete(db: Db, courseId: string): Promise<bool
   const revision = await currentRevision(db, courseId);
   if (!revision) return false;
 
-  const [run] = await db
-    .select({ fragmentsStatus: generationRuns.fragmentsStatus })
-    .from(generationRuns)
-    .where(
-      and(
-        eq(generationRuns.courseId, courseId),
-        eq(generationRuns.outlineVersion, revision.outlineVersion),
-      ),
-    )
-    .limit(1);
+  const run = await findGenerationRunFor(db, courseId, revision.outlineVersion);
   if (run?.fragmentsStatus === "failed") return true;
 
   const [outline] = await db
@@ -132,7 +120,7 @@ export async function searchIsIncomplete(db: Db, courseId: string): Promise<bool
     .where(and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)))
     .limit(1);
   if (!outline) return false;
-  const refs = outline.data.modules.flatMap((m) => m.lessons.map((l) => l.id));
+  const refs = outlineLessonRefs(outline.data);
   if (refs.length === 0) return false;
   const rows = await db
     .selectDistinct({ lessonRef: lessonFragments.lessonRef })

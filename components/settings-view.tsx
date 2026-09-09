@@ -12,14 +12,16 @@ function Row({ name, hint, children }: { name: string; hint?: string; children: 
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-hair py-5">
       <div className="min-w-0">
         <p className="text-[0.8125rem] font-medium text-fg">{name}</p>
-        {hint ? (
+        {hint && (
           <p className="mt-1 max-w-[26rem] text-[0.75rem] leading-[1.5] text-fg-3">{hint}</p>
-        ) : null}
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-3">{children}</div>
     </div>
   );
 }
+
+const THEME_LABELS = { system: "System", light: "Paper", dark: "Graphite" } as const;
 
 export function SettingsView({ email, courseCount }: { email: string; courseCount: number }) {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, serverTheme);
@@ -48,7 +50,7 @@ export function SettingsView({ email, courseCount }: { email: string; courseCoun
           >
             {(["system", "light", "dark"] as const satisfies ThemeChoice[]).map((c) => (
               <ToggleGroupItem key={c} value={c}>
-                {c === "system" ? "System" : c === "light" ? "Paper" : "Graphite"}
+                {THEME_LABELS[c]}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>

@@ -13,6 +13,17 @@ export type AuthConfig = {
   trustedOrigins?: string[];
 };
 
+function resolveGoogle(
+  google: AuthConfig["google"],
+  env: Record<string, string | undefined>,
+): { clientId: string; clientSecret: string } | undefined {
+  if (google === false) return undefined;
+  return {
+    clientId: google?.clientId ?? env.GOOGLE_CLIENT_ID ?? "",
+    clientSecret: google?.clientSecret ?? env.GOOGLE_CLIENT_SECRET ?? "",
+  };
+}
+
 // Throws naming every missing variable, never printing a value.
 export function assertAuthConfig(
   overrides: Pick<AuthConfig, "baseURL" | "secret" | "google"> = {},
@@ -20,13 +31,7 @@ export function assertAuthConfig(
 ): void {
   const baseURL = overrides.baseURL ?? env.BETTER_AUTH_URL;
   const secret = overrides.secret ?? env.BETTER_AUTH_SECRET;
-  const google =
-    overrides.google === false
-      ? undefined
-      : {
-          clientId: overrides.google?.clientId ?? env.GOOGLE_CLIENT_ID ?? "",
-          clientSecret: overrides.google?.clientSecret ?? env.GOOGLE_CLIENT_SECRET ?? "",
-        };
+  const google = resolveGoogle(overrides.google, env);
   const missing = [
     !baseURL && "BETTER_AUTH_URL",
     !secret && "BETTER_AUTH_SECRET",
@@ -42,13 +47,7 @@ export function createAuth(db: AuthDb, config: AuthConfig = {}) {
   assertAuthConfig(config);
   const baseURL = config.baseURL ?? process.env.BETTER_AUTH_URL;
   const secret = config.secret ?? process.env.BETTER_AUTH_SECRET;
-  const google =
-    config.google === false
-      ? undefined
-      : {
-          clientId: config.google?.clientId ?? process.env.GOOGLE_CLIENT_ID ?? "",
-          clientSecret: config.google?.clientSecret ?? process.env.GOOGLE_CLIENT_SECRET ?? "",
-        };
+  const google = resolveGoogle(config.google, process.env);
 
   const options: BetterAuthOptions = {
     baseURL,

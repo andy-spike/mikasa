@@ -8,6 +8,13 @@ import { listOwnedCoursesWithCompletion } from "@/lib/db/courses";
 import { db } from "@/lib/db";
 import { requireLearner } from "@/lib/session";
 
+const OUTLINE_LABELS: Record<string, string> = {
+  "awaiting-outline-approval": "Outline",
+  designing: "Designing",
+  failed: "Failed",
+  reviewing: "Reviewing",
+};
+
 function rowFor(course: { id: string; status: string; published: boolean }): {
   href: string;
   label: string;
@@ -16,19 +23,23 @@ function rowFor(course: { id: string; status: string; published: boolean }): {
   if (course.published || course.status === "ready") {
     return { href: `/courses/${course.id}`, label: "", reading: true };
   }
-  if (course.status === "awaiting-outline-approval") {
-    return { href: `/courses/${course.id}/outline`, label: "Outline", reading: false };
+  return {
+    href: `/courses/${course.id}/outline`,
+    label: OUTLINE_LABELS[course.status] ?? "Generating",
+    reading: false,
+  };
+}
+
+function RowMark({ reading, complete }: { reading: boolean; complete: boolean }) {
+  if (!reading) return <UnsetMark />;
+  if (complete) {
+    return (
+      <span className="text-fg-3">
+        <DoneCheck />
+      </span>
+    );
   }
-  if (course.status === "designing") {
-    return { href: `/courses/${course.id}/outline`, label: "Designing", reading: false };
-  }
-  if (course.status === "failed") {
-    return { href: `/courses/${course.id}/outline`, label: "Failed", reading: false };
-  }
-  if (course.status === "reviewing") {
-    return { href: `/courses/${course.id}/outline`, label: "Reviewing", reading: false };
-  }
-  return { href: `/courses/${course.id}/outline`, label: "Generating", reading: false };
+  return <LiveMark />;
 }
 
 export default async function CoursesPage() {
@@ -57,7 +68,8 @@ export default async function CoursesPage() {
           <ul className="mt-8 border-t border-hair">
             {owned.map((c) => {
               const { href, label, reading } = rowFor(c);
-              const complete = reading && c.completion && c.completion.done >= c.completion.total;
+              const complete =
+                reading && c.completion ? c.completion.done >= c.completion.total : false;
               return (
                 <li key={c.id} className="group relative border-b border-hair hover:bg-panel">
                   <Link
@@ -65,17 +77,7 @@ export default async function CoursesPage() {
                     className="row grid grid-cols-[0.75rem_1fr_auto] items-start gap-x-4 px-2 py-5"
                   >
                     <span className="flex h-5 w-3 items-center justify-center">
-                      {reading ? (
-                        complete ? (
-                          <span className="text-fg-3">
-                            <DoneCheck />
-                          </span>
-                        ) : (
-                          <LiveMark />
-                        )
-                      ) : (
-                        <UnsetMark />
-                      )}
+                      <RowMark reading={reading} complete={complete} />
                     </span>
 
                     <span className="min-w-0">
@@ -104,7 +106,7 @@ export default async function CoursesPage() {
         )}
       </div>
 
-      {owned.length > 0 ? (
+      {owned.length > 0 && (
         <Button
           variant="hero"
           render={<Link href="/courses/new" />}
@@ -115,7 +117,7 @@ export default async function CoursesPage() {
           <Plus className="h-4 w-4" strokeWidth={1.75} />
           <span className="new-course-label">New Course</span>
         </Button>
-      ) : null}
+      )}
     </AppShell>
   );
 }

@@ -26,6 +26,31 @@ export type ModuleView = {
   lessons: (ReadingLesson & { n: number })[];
 };
 
+function LessonMark({
+  live,
+  stamp,
+  ghost,
+  handing,
+  striking,
+}: {
+  live: boolean;
+  stamp: string | undefined;
+  ghost: boolean;
+  handing: boolean;
+  striking: boolean;
+}) {
+  if (live) return <LiveMark handing={handing} />;
+  if (stamp) {
+    return (
+      <span className="text-fg-3">
+        <DoneCheck striking={striking} />
+      </span>
+    );
+  }
+  if (ghost) return <UnsetMark />;
+  return null;
+}
+
 type Props = {
   topic: string;
   goal: string;
@@ -117,79 +142,75 @@ export function Outline({
       </SidebarHeader>
 
       <SidebarContent className="scroll-thin gap-0 overflow-y-auto border-t border-hair px-2 py-2 group-data-[collapsible=icon]:hidden">
-        {modules.map((m) => {
-          return (
-            <SidebarGroup key={m.numeral} className="mb-2 p-0 last:mb-0">
-              <SidebarGroupLabel className="h-auto justify-start px-2 pt-4 pb-1.5 text-fg-3">
-                <h2 className="grid min-w-0 grid-cols-[1.5rem_1fr] text-[0.6875rem] leading-[1.35] font-semibold tracking-[0.06em] uppercase">
-                  <span className="tnum">{m.numeral}</span>
-                  <span>{m.title}</span>
-                </h2>
-              </SidebarGroupLabel>
+        {modules.map((m) => (
+          <SidebarGroup key={m.numeral} className="mb-2 p-0 last:mb-0">
+            <SidebarGroupLabel className="h-auto justify-start px-2 pt-4 pb-1.5 text-fg-3">
+              <h2 className="grid min-w-0 grid-cols-[1.5rem_1fr] text-[0.6875rem] leading-[1.35] font-semibold tracking-[0.06em] uppercase">
+                <span className="tnum">{m.numeral}</span>
+                <span>{m.title}</span>
+              </h2>
+            </SidebarGroupLabel>
 
-              <SidebarGroupContent>
-                <SidebarMenu className="gap-0">
-                  {m.lessons.map((l) => {
-                    const stamp = stampFor(l.id);
-                    const ghost = l.status === "unset";
-                    const isOpen = l.id === openId;
-                    const isLive = l.id === liveId;
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-0">
+                {m.lessons.map((l) => {
+                  const stamp = stampFor(l.id);
+                  const ghost = l.status === "unset";
+                  const isOpen = l.id === openId;
+                  const isLive = l.id === liveId;
 
-                    return (
-                      <SidebarMenuItem key={l.id}>
-                        <SidebarMenuButton
-                          ref={isOpen ? openLessonRef : undefined}
-                          isActive={isOpen}
-                          render={ghost ? <div /> : undefined}
-                          aria-disabled={ghost || undefined}
-                          aria-current={isOpen ? "page" : undefined}
-                          aria-label={`${l.n}. ${l.title}${stamp ? ", complete" : isLive ? ", current Lesson" : ""}`}
-                          title={l.title}
-                          onClick={ghost ? undefined : () => onOpen(l.id)}
+                  return (
+                    <SidebarMenuItem key={l.id}>
+                      <SidebarMenuButton
+                        ref={isOpen ? openLessonRef : undefined}
+                        isActive={isOpen}
+                        render={ghost ? <div /> : undefined}
+                        aria-disabled={ghost || undefined}
+                        aria-current={isOpen ? "page" : undefined}
+                        aria-label={`${l.n}. ${l.title}${stamp ? ", complete" : isLive ? ", current Lesson" : ""}`}
+                        title={l.title}
+                        onClick={ghost ? undefined : () => onOpen(l.id)}
+                        className={cn(
+                          "row grid h-auto grid-cols-[0.75rem_1.25rem_1fr] items-center gap-x-2 overflow-visible px-2 text-left aria-disabled:opacity-100",
+                          isMobile ? "min-h-11 py-2.5" : "min-h-7 py-1",
+                          ghost && "hover:bg-transparent",
+                        )}
+                      >
+                        <span className="flex h-4 w-3 items-center justify-center">
+                          <LessonMark
+                            live={isLive}
+                            stamp={stamp}
+                            ghost={ghost}
+                            handing={handing}
+                            striking={justDoneId === l.id}
+                          />
+                        </span>
+
+                        <span
                           className={cn(
-                            "row grid h-auto grid-cols-[0.75rem_1.25rem_1fr] items-center gap-x-2 overflow-visible px-2 text-left aria-disabled:opacity-100",
-                            isMobile ? "min-h-11 py-2.5" : "min-h-7 py-1",
-                            ghost && "hover:bg-transparent",
+                            "tnum text-[0.75rem] tabular-nums",
+                            ghost ? "text-fg-dim" : isOpen ? "text-fg-2" : "text-fg-3",
                           )}
                         >
-                          <span className="flex h-4 w-3 items-center justify-center">
-                            {isLive ? (
-                              <LiveMark handing={handing} />
-                            ) : stamp ? (
-                              <span className="text-fg-3">
-                                <DoneCheck striking={justDoneId === l.id} />
-                              </span>
-                            ) : ghost ? (
-                              <UnsetMark />
-                            ) : null}
-                          </span>
+                          {l.n}
+                        </span>
 
-                          <span
-                            className={cn(
-                              "tnum text-[0.75rem] tabular-nums",
-                              ghost ? "text-fg-dim" : isOpen ? "text-fg-2" : "text-fg-3",
-                            )}
-                          >
-                            {l.n}
-                          </span>
-
-                          <span
-                            className={cn(
-                              "truncate text-[0.8125rem] leading-5",
-                              ghost ? "text-fg-3" : isOpen ? "font-medium text-fg" : "text-fg-2",
-                            )}
-                          >
-                            {l.title}
-                          </span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          );
-        })}
+                        <span
+                          className={cn(
+                            "truncate text-[0.8125rem] leading-5",
+                            ghost ? "text-fg-3" : isOpen ? "font-medium text-fg" : "text-fg-2",
+                          )}
+                        >
+                          {l.title}
+                        </span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       {resizer}

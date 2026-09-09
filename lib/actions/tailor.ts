@@ -4,8 +4,8 @@ import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 import { start } from "workflow/api";
 import { db } from "@/lib/db";
-import { requireLearner } from "@/lib/session";
-import { courses, generationRuns } from "@/lib/db/schema";
+import { requireLearner, requireOwnedCourse } from "@/lib/session";
+import { generationRuns } from "@/lib/db/schema";
 import {
   applyPlanToOutline,
   discardStagedRevision,
@@ -34,6 +34,10 @@ const planSchema = z.object({
   courseId: z.string().uuid(),
   planId: z.string().uuid(),
 });
+
+function parsePlanIds(courseId: string, planId: string) {
+  return planSchema.safeParse({ courseId, planId });
+}
 
 export type OperationReviewResult = { ok: boolean; message?: string };
 
@@ -118,7 +122,7 @@ export async function applyPlanToOutlineAction(
   planId: string,
 ): Promise<ApplyPlanResult> {
   const { user } = await requireLearner();
-  const parsed = planSchema.safeParse({ courseId, planId });
+  const parsed = parsePlanIds(courseId, planId);
   if (!parsed.success) {
     return { ok: false, reason: "invalid", message: "That apply does not fit the plan." };
   }
@@ -138,7 +142,7 @@ export async function undoPlanRevisionAction(
   planId: string,
 ): Promise<UndoPlanResult> {
   const { user } = await requireLearner();
-  const parsed = planSchema.safeParse({ courseId, planId });
+  const parsed = parsePlanIds(courseId, planId);
   if (!parsed.success) {
     return { ok: false, reason: "invalid", message: "That undo does not fit the plan." };
   }
@@ -162,13 +166,12 @@ export type PublishedPlanRow = {
   blockedReason?: string;
 };
 
+function touches(ids: string[] | null, pool: string[] | null): boolean {
+  return (ids ?? []).some((id) => (pool ?? []).includes(id));
+}
+
 export async function listPublishedPlansAction(courseId: string): Promise<PublishedPlanRow[]> {
-  const { user } = await requireLearner();
-  const [course] = await db
-    .select({ id: courses.id })
-    .from(courses)
-    .where(and(eq(courses.id, courseId), eq(courses.ownerId, user.id)))
-    .limit(1);
+  const { course } = await requireOwnedCourse(courseId);
   if (!course) return [];
   const plans = await listPlansWithOperations(db, courseId);
   const published = plans
@@ -180,8 +183,8 @@ export async function listPublishedPlansAction(courseId: string): Promise<Publis
       (q) =>
         q.id !== plan.id &&
         q.publishedRevisionNumber! > plan.publishedRevisionNumber! &&
-        ((q.touchedLessons ?? []).some((l) => (plan.touchedLessons ?? []).includes(l)) ||
-          (q.touchedModules ?? []).some((m) => (plan.touchedModules ?? []).includes(m))),
+        (touches(q.touchedLessons, plan.touchedLessons) ||
+          touches(q.touchedModules, plan.touchedModules)),
     );
     return {
       plan: toPlanView(plan),
@@ -200,39 +203,14 @@ export async function stagePlanRevisionAction(
   planId: string,
 ): Promise<StageRevisionActionResult> {
   const { user } = await requireLearner();
-  const parsed = planSchema.safeParse({ courseId, planId });
+  const parsed = parsePlanIds(courseId, planId);
   if (!parsed.success) {
     return { ok: false, reason: "invalid", message: "That stage does not fit the plan." };
   }
 
   const staged = await stagePlanRevision(db, user.id, courseId, parsed.data.planId);
   if (!staged.ok) return staged;
-
-  try {
-    await start(stageRevisionWorkflow, [
-      courseId,
-      parsed.data.planId,
-      staged.runId,
-      staged.stagedOutlineVersion,
-      staged.baseRevisionNumber,
-      staged.regenerateLessonRefs,
-      staged.embedLessonRefs,
-    ]);
-    return { ok: true, stagedOutlineVersion: staged.stagedOutlineVersion };
-  } catch {
-    await failGenerationRun(
-      db,
-      courseId,
-      staged.runId,
-      "The generation engine could not start this revision.",
-      { touchCourse: false },
-    );
-    return {
-      ok: false,
-      reason: "dispatch-failed",
-      message: "The generation engine could not start this revision. Try again.",
-    };
-  }
+  return dispatchRevision(courseId, parsed.data.planId, staged, "revision");
 }
 
 export async function retryPlanRevisionAction(
@@ -240,37 +218,51 @@ export async function retryPlanRevisionAction(
   planId: string,
 ): Promise<StageRevisionActionResult> {
   const { user } = await requireLearner();
-  const parsed = planSchema.safeParse({ courseId, planId });
+  const parsed = parsePlanIds(courseId, planId);
   if (!parsed.success) {
     return { ok: false, reason: "invalid", message: "That retry does not fit the plan." };
   }
 
   const resume = await resumeStagedRevision(db, user.id, courseId, parsed.data.planId);
   if (!resume.ok) return resume;
+  return dispatchRevision(courseId, parsed.data.planId, resume, "retry");
+}
 
+async function dispatchRevision(
+  courseId: string,
+  planId: string,
+  run: {
+    runId: string;
+    stagedOutlineVersion: number;
+    baseRevisionNumber: number;
+    regenerateLessonRefs: string[];
+    embedLessonRefs: string[];
+  },
+  verb: "revision" | "retry",
+): Promise<StageRevisionActionResult> {
   try {
     await start(stageRevisionWorkflow, [
       courseId,
-      parsed.data.planId,
-      resume.runId,
-      resume.stagedOutlineVersion,
-      resume.baseRevisionNumber,
-      resume.regenerateLessonRefs,
-      resume.embedLessonRefs,
+      planId,
+      run.runId,
+      run.stagedOutlineVersion,
+      run.baseRevisionNumber,
+      run.regenerateLessonRefs,
+      run.embedLessonRefs,
     ]);
-    return { ok: true, stagedOutlineVersion: resume.stagedOutlineVersion };
+    return { ok: true, stagedOutlineVersion: run.stagedOutlineVersion };
   } catch {
     await failGenerationRun(
       db,
       courseId,
-      resume.runId,
-      "The generation engine could not start this retry.",
+      run.runId,
+      `The generation engine could not start this ${verb}.`,
       { touchCourse: false },
     );
     return {
       ok: false,
       reason: "dispatch-failed",
-      message: "The generation engine could not start this retry. Try again.",
+      message: `The generation engine could not start this ${verb}. Try again.`,
     };
   }
 }
@@ -284,7 +276,7 @@ export async function discardStagedRevisionAction(
   planId: string,
 ): Promise<DiscardStagedRevisionResult> {
   const { user } = await requireLearner();
-  const parsed = planSchema.safeParse({ courseId, planId });
+  const parsed = parsePlanIds(courseId, planId);
   if (!parsed.success) {
     return { ok: false, reason: "invalid", message: "That discard does not fit the plan." };
   }

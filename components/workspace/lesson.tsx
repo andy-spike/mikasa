@@ -2,17 +2,87 @@
 
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { ReadingLesson, SourceLink } from "@/lib/course/reading";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DoneCheck } from "./marks";
 import { Inline, LessonBlock } from "./prose";
+
+type NavTarget = { id: string; n: number; title: string };
+
+function LessonNav({
+  direction,
+  nav,
+  onOpen,
+}: {
+  direction: "previous" | "next";
+  nav: NavTarget;
+  onOpen: (id: string) => void;
+}) {
+  const backward = direction === "previous";
+  const Icon = backward ? ArrowLeft : ArrowRight;
+  return (
+    <Button
+      variant="bare"
+      onClick={() => onOpen(nav.id)}
+      className="group flex min-w-0 items-center gap-3 px-3 py-3 text-left hover:bg-panel"
+    >
+      {backward && (
+        <Icon
+          className="h-4 w-4 shrink-0 text-fg-3 transition-transform duration-120 ease-expo group-hover:-translate-x-1"
+          strokeWidth={1.75}
+        />
+      )}
+      <span className="min-w-0">
+        <span className="label block text-fg-dim">{backward ? "Previous" : "Next"}</span>
+        <span className="mt-1 block truncate text-[0.9375rem] text-fg-2 group-hover:text-fg">
+          <span className="tnum mr-2 text-fg-3">{nav.n}</span>
+          {nav.title}
+        </span>
+      </span>
+      {!backward && (
+        <Icon
+          className="ml-auto h-4 w-4 shrink-0 text-fg-3 transition-transform duration-120 ease-expo group-hover:translate-x-1"
+          strokeWidth={1.75}
+        />
+      )}
+    </Button>
+  );
+}
+
+function ExerciseAction({
+  stamp,
+  striking,
+  onMark,
+  onUnmark,
+}: {
+  stamp: string | undefined;
+  striking: boolean;
+  onMark: () => void;
+  onUnmark: () => void;
+}) {
+  if (!stamp) return <Button onClick={onMark}>Mark the Exercise done</Button>;
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+      <span className="flex items-center gap-2 rounded-sm bg-panel px-3 py-2 text-[0.8125rem] text-fg-2">
+        <span className="text-fg-2">
+          <DoneCheck striking={striking} />
+        </span>
+        Done <span className="tnum text-fg-3">{stamp}</span>
+      </span>
+      <Button variant="quiet" onClick={onUnmark}>
+        Undo
+      </Button>
+    </div>
+  );
+}
 
 type Props = {
   lesson: ReadingLesson & { n: number; moduleNumeral: string; moduleTitle: string };
   total: number;
   stamp?: string;
   striking: boolean;
-  previous: { id: string; n: number; title: string } | null;
-  next: { id: string; n: number; title: string } | null;
+  previous: NavTarget | null;
+  next: NavTarget | null;
   sourceFor?: (ref: string) => SourceLink | undefined;
   onMark: () => void;
   onUnmark: () => void;
@@ -48,7 +118,7 @@ export function LessonPane({
           ))}
         </div>
 
-        {lesson.exercise ? (
+        {lesson.exercise && (
           <section className="mt-12 max-w-(--measure) border-t border-hair pt-7">
             <h3 className="label text-fg-3">Exercise</h3>
             <p className="mt-3.5 text-[1rem] leading-[1.7] text-fg">
@@ -59,67 +129,25 @@ export function LessonPane({
             </p>
 
             <div className="mt-7">
-              {stamp ? (
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                  <span className="flex items-center gap-2 rounded-sm bg-panel px-3 py-2 text-[0.8125rem] text-fg-2">
-                    <span className="text-fg-2">
-                      <DoneCheck striking={striking} />
-                    </span>
-                    Done <span className="tnum text-fg-3">{stamp}</span>
-                  </span>
-                  <Button variant="quiet" onClick={onUnmark}>
-                    Undo
-                  </Button>
-                </div>
-              ) : (
-                <Button onClick={onMark}>Mark the Exercise done</Button>
-              )}
+              <ExerciseAction
+                stamp={stamp}
+                striking={striking}
+                onMark={onMark}
+                onUnmark={onUnmark}
+              />
             </div>
           </section>
-        ) : null}
+        )}
 
         <footer
-          className={`mt-12 grid max-w-(--measure) gap-3 border-t border-hair pt-4 ${previous && next ? "grid-cols-2" : "grid-cols-1"}`}
+          className={cn(
+            "mt-12 grid max-w-(--measure) gap-3 border-t border-hair pt-4",
+            previous && next ? "grid-cols-2" : "grid-cols-1",
+          )}
         >
-          {previous ? (
-            <Button
-              variant="bare"
-              onClick={() => onOpen(previous.id)}
-              className="group flex min-w-0 items-center gap-3 px-3 py-3 text-left hover:bg-panel"
-            >
-              <ArrowLeft
-                className="h-4 w-4 shrink-0 text-fg-3 transition-transform duration-120 ease-expo group-hover:-translate-x-1"
-                strokeWidth={1.75}
-              />
-              <span className="min-w-0">
-                <span className="label block text-fg-dim">Previous</span>
-                <span className="mt-1 block truncate text-[0.9375rem] text-fg-2 group-hover:text-fg">
-                  <span className="tnum mr-2 text-fg-3">{previous.n}</span>
-                  {previous.title}
-                </span>
-              </span>
-            </Button>
-          ) : null}
+          {previous && <LessonNav direction="previous" nav={previous} onOpen={onOpen} />}
 
-          {next ? (
-            <Button
-              variant="bare"
-              onClick={() => onOpen(next.id)}
-              className="group flex min-w-0 items-center gap-3 px-3 py-3 text-left hover:bg-panel"
-            >
-              <span className="min-w-0">
-                <span className="label block text-fg-dim">Next</span>
-                <span className="mt-1 block truncate text-[0.9375rem] text-fg-2 group-hover:text-fg">
-                  <span className="tnum mr-2 text-fg-3">{next.n}</span>
-                  {next.title}
-                </span>
-              </span>
-              <ArrowRight
-                className="ml-auto h-4 w-4 shrink-0 text-fg-3 transition-transform duration-120 ease-expo group-hover:translate-x-1"
-                strokeWidth={1.75}
-              />
-            </Button>
-          ) : null}
+          {next && <LessonNav direction="next" nav={next} onOpen={onOpen} />}
         </footer>
       </article>
     </div>

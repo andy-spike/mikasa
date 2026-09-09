@@ -7,8 +7,9 @@ import { db } from "@/lib/db";
 import { generationRuns } from "@/lib/db/schema";
 import { requireLearner } from "@/lib/session";
 import { reconcileSpecification } from "@/lib/course/reconcile";
+import { validateSpecification } from "@/lib/course/spec-validate";
 import { designModel } from "@/lib/model";
-import type { OutlineOp } from "@/lib/course/structure";
+import { listCourseSources } from "@/lib/db/design";
 import {
   applyOutlineChange,
   failGenerationRun,
@@ -75,7 +76,7 @@ export async function applyOutlineOpAction(
       message: "That change does not fit the Outline.",
     };
   }
-  return applyOutlineChange(db, user.id, courseId, baseVersion, [parsed.data as OutlineOp]);
+  return applyOutlineChange(db, user.id, courseId, baseVersion, [parsed.data]);
 }
 
 export type ApprovalResult =
@@ -94,12 +95,7 @@ export async function approveOutlineAction(
   }
   const { course, outline, specRow } = context;
 
-  if (
-    course.status !== "awaiting-outline-approval" &&
-    course.status !== "generating" &&
-    course.status !== "reviewing" &&
-    course.status !== "ready"
-  ) {
+  if (!["awaiting-outline-approval", "generating", "reviewing", "ready"].includes(course.status)) {
     return {
       ok: false,
       reason: "not-approvable",
@@ -119,8 +115,7 @@ export async function approveOutlineAction(
   // A re-approval of the version a run is already pinned to is a no-op (covers double clicks in flight).
   if (course.status !== "awaiting-outline-approval") {
     const opened = await openGenerationRun(db, user.id, courseId, baseVersion);
-    if (opened.ok) return { ok: true, duplicate: true };
-    return opened;
+    return opened.ok ? { ok: true, duplicate: true } : opened;
   }
 
   // Reconcile stale specifications once at approval. The extra repair call
@@ -152,8 +147,6 @@ export async function approveOutlineAction(
   // Validate reading-order consistency and Source references before starting
   // work. On failure, attempt one reconciliation with the validation errors.
   if (specForValidation) {
-    const { validateSpecification } = await import("@/lib/course/spec-validate");
-    const { listCourseSources } = await import("@/lib/db/design");
     const stored = await listCourseSources(db, courseId);
     const available = new Set(stored.map((s) => s.ref));
     try {

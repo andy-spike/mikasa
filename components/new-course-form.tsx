@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonLines } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -29,16 +29,26 @@ import {
   type CourseInputErrors,
 } from "@/lib/course/limits";
 
+const INITIAL_VALUES: CourseInput = {
+  topic: "",
+  goal: "",
+  background: "",
+  language: "en",
+  depth: "reach",
+  grounding: true,
+};
+
+const TOUCH_ALL: Partial<Record<keyof CourseInput, boolean>> = {
+  topic: true,
+  goal: true,
+  background: true,
+  language: true,
+  depth: true,
+};
+
 export function NewCourseForm() {
   const router = useRouter();
-  const [values, setValues] = useState<CourseInput>({
-    topic: "",
-    goal: "",
-    background: "",
-    language: "en",
-    depth: "reach",
-    grounding: true,
-  });
+  const [values, setValues] = useState<CourseInput>(INITIAL_VALUES);
   const [touched, setTouched] = useState<Partial<Record<keyof CourseInput, boolean>>>({});
   const [errors, setErrors] = useState<CourseInputErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -48,14 +58,15 @@ export function NewCourseForm() {
     const next = { ...values, [key]: value };
     setValues(next);
     const fresh = validateCourseInput(next);
-    setErrors(() => {
-      if (fresh.ok) return {};
-      const kept: CourseInputErrors = {};
-      for (const field of Object.keys(fresh.errors) as (keyof CourseInputErrors)[]) {
-        if (field === "form" || touched[field]) kept[field] = fresh.errors[field];
-      }
-      return kept;
-    });
+    if (fresh.ok) {
+      setErrors({});
+      return;
+    }
+    const kept: CourseInputErrors = {};
+    for (const field of Object.keys(fresh.errors) as (keyof CourseInputErrors)[]) {
+      if (field === "form" || touched[field]) kept[field] = fresh.errors[field];
+    }
+    setErrors(kept);
   }
 
   function blur(key: keyof CourseInput) {
@@ -66,10 +77,18 @@ export function NewCourseForm() {
     }
   }
 
-  const errorsToShow = (key: keyof CourseInput) => (touched[key] && errors[key]) || undefined;
+  const errorsToShow = (key: keyof CourseInput) => (touched[key] ? errors[key] : undefined);
+
+  const invalidProps = (key: keyof CourseInput, id: string) => {
+    const error = errorsToShow(key);
+    return {
+      "aria-invalid": error ? true : undefined,
+      "aria-describedby": error ? id : undefined,
+    };
+  };
 
   function submit() {
-    setTouched({ topic: true, goal: true, background: true, language: true, depth: true });
+    setTouched(TOUCH_ALL);
     const fresh = validateCourseInput(values);
     if (!fresh.ok) {
       setErrors(fresh.errors);
@@ -83,7 +102,7 @@ export function NewCourseForm() {
         return;
       }
       setSubmitting(false);
-      setTouched({ topic: true, goal: true, background: true, language: true, depth: true });
+      setTouched(TOUCH_ALL);
       setErrors(result.errors);
     });
   }
@@ -99,13 +118,7 @@ export function NewCourseForm() {
           come back.
         </p>
         <div className="mt-9 space-y-2.5">
-          {[10, 6, 8, 5, 9, 7, 4].map((w, i) => (
-            <Skeleton
-              key={i}
-              className="h-4 rounded-sm bg-panel"
-              style={{ width: `${w * 8 + 12}%` }}
-            />
-          ))}
+          <SkeletonLines />
         </div>
       </div>
     );
@@ -138,8 +151,7 @@ export function NewCourseForm() {
             value={values.topic}
             onChange={(e) => set("topic", e.target.value)}
             onBlur={() => blur("topic")}
-            aria-invalid={errorsToShow("topic") ? true : undefined}
-            aria-describedby={errorsToShow("topic") ? "nc-topic-error" : undefined}
+            {...invalidProps("topic", "nc-topic-error")}
             placeholder="the Vercel AI SDK"
             className={`${field} mt-3`}
           />
@@ -164,8 +176,7 @@ export function NewCourseForm() {
             value={values.goal}
             onChange={(e) => set("goal", e.target.value)}
             onBlur={() => blur("goal")}
-            aria-invalid={errorsToShow("goal") ? true : undefined}
-            aria-describedby={errorsToShow("goal") ? "nc-goal-error" : undefined}
+            {...invalidProps("goal", "nc-goal-error")}
             placeholder="build my own AI chat app"
             className="mt-3"
           />
@@ -247,8 +258,7 @@ export function NewCourseForm() {
             value={values.background}
             onChange={(e) => set("background", e.target.value)}
             onBlur={() => blur("background")}
-            aria-invalid={errorsToShow("background") ? true : undefined}
-            aria-describedby={errorsToShow("background") ? "nc-background-error" : undefined}
+            {...invalidProps("background", "nc-background-error")}
             placeholder="I write basic SELECTs and JOINs…"
             className="mt-3"
           />
@@ -278,25 +288,18 @@ export function NewCourseForm() {
           </ToggleGroup>
         </div>
 
-        {errors.form ? (
+        {errors.form && (
           <p role="alert" className="mt-6 text-[0.8125rem] leading-[1.55] text-fg-2">
             {errors.form}
           </p>
-        ) : null}
+        )}
 
         <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
           <Button type="submit">Generate the Outline</Button>
           <Button
             variant="quiet"
             onClick={() => {
-              setValues({
-                topic: "",
-                goal: "",
-                background: "",
-                language: "en",
-                depth: "reach",
-                grounding: true,
-              });
+              setValues(INITIAL_VALUES);
               setTouched({});
               setErrors({});
             }}

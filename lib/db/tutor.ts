@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "./index";
 import { courses, outlines, tutorConversations, tutorMessages } from "./schema";
 import { currentRevision } from "./review";
+import { outlineLessonRefs } from "../course/structure";
 
 export type TutorTurnRow = {
   id: string;
@@ -13,6 +14,22 @@ export type TutorTurnRow = {
   content: string;
   createdAt: Date;
 };
+
+function toTutorTurnRow(r: {
+  id: string;
+  seq: number;
+  role: string;
+  content: string;
+  createdAt: Date;
+}): TutorTurnRow {
+  return {
+    id: r.id,
+    seq: r.seq,
+    role: r.role as TutorTurnRow["role"],
+    content: r.content,
+    createdAt: r.createdAt,
+  };
+}
 
 export type ConversationResolution =
   | { ok: true; conversationId: string | undefined }
@@ -47,7 +64,7 @@ export async function findTutorConversation(
     .from(outlines)
     .where(and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)))
     .limit(1);
-  const planned = outline?.data.modules.flatMap((m) => m.lessons.map((l) => l.id)) ?? [];
+  const planned = outline ? outlineLessonRefs(outline.data) : [];
   if (!planned.includes(lessonRef)) {
     return {
       ok: false,
@@ -72,13 +89,7 @@ export async function listTutorMessages(db: Db, conversationId: string): Promise
     .from(tutorMessages)
     .where(eq(tutorMessages.conversationId, conversationId))
     .orderBy(asc(tutorMessages.seq));
-  return rows.map((r) => ({
-    id: r.id,
-    seq: r.seq,
-    role: r.role as "learner" | "tutor",
-    content: r.content,
-    createdAt: r.createdAt,
-  }));
+  return rows.map(toTutorTurnRow);
 }
 
 export async function loadTutorHistory(
@@ -103,13 +114,7 @@ export async function loadTutorHistory(
   const byConversation = new Map<string, TutorTurnRow[]>();
   for (const m of messages) {
     const list = byConversation.get(m.conversationId) ?? [];
-    list.push({
-      id: m.id,
-      seq: m.seq,
-      role: m.role as "learner" | "tutor",
-      content: m.content,
-      createdAt: m.createdAt,
-    });
+    list.push(toTutorTurnRow(m));
     byConversation.set(m.conversationId, list);
   }
 
@@ -129,7 +134,7 @@ export async function appendTutorTurn(
   lessonRef: string,
   turn: { learner: string; tutor: string },
 ): Promise<{ learner: TutorTurnRow; tutor: TutorTurnRow }> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
       return await db.transaction(async (tx) => {
         await tx.insert(tutorConversations).values({ courseId, lessonRef }).onConflictDoNothing();
@@ -166,22 +171,7 @@ export async function appendTutorTurn(
           .returning();
 
         const [learnerRow, tutorRow] = inserted;
-        return {
-          learner: {
-            id: learnerRow.id,
-            seq: learnerRow.seq,
-            role: "learner" as const,
-            content: learnerRow.content,
-            createdAt: learnerRow.createdAt,
-          },
-          tutor: {
-            id: tutorRow.id,
-            seq: tutorRow.seq,
-            role: "tutor" as const,
-            content: tutorRow.content,
-            createdAt: tutorRow.createdAt,
-          },
-        };
+        return { learner: toTutorTurnRow(learnerRow), tutor: toTutorTurnRow(tutorRow) };
       });
     } catch (error) {
       const code = (error as { code?: string }).code;

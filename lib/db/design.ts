@@ -90,18 +90,21 @@ export async function listDesignEvents(
   courseId: string,
   runId?: string,
 ): Promise<DesignEvent[]> {
-  if (runId) {
-    return db
-      .select()
-      .from(designEvents)
-      .where(and(eq(designEvents.courseId, courseId), eq(designEvents.runId, runId)))
-      .orderBy(asc(designEvents.createdAt));
-  }
-  return db
-    .select()
-    .from(designEvents)
-    .where(eq(designEvents.courseId, courseId))
-    .orderBy(asc(designEvents.createdAt));
+  const cond = runId
+    ? and(eq(designEvents.courseId, courseId), eq(designEvents.runId, runId))
+    : eq(designEvents.courseId, courseId);
+  return db.select().from(designEvents).where(cond).orderBy(asc(designEvents.createdAt));
+}
+
+function toSourceValues(courseId: string, s: GatheredSource) {
+  return {
+    courseId,
+    ref: s.ref,
+    title: s.title,
+    url: s.url,
+    fetchedAt: new Date(s.fetchedAt),
+    excerpt: s.excerpt,
+  };
 }
 
 export async function saveDesignSources(
@@ -112,16 +115,7 @@ export async function saveDesignSources(
   await db.transaction(async (tx) => {
     await tx.delete(sources).where(eq(sources.courseId, courseId));
     if (gathered.length > 0) {
-      await tx.insert(sources).values(
-        gathered.map((s) => ({
-          courseId,
-          ref: s.ref,
-          title: s.title,
-          url: s.url,
-          fetchedAt: new Date(s.fetchedAt),
-          excerpt: s.excerpt,
-        })),
-      );
+      await tx.insert(sources).values(gathered.map((s) => toSourceValues(courseId, s)));
     }
   });
 }
@@ -135,14 +129,7 @@ export async function upsertDesignSources(
   for (const s of gathered) {
     await db
       .insert(sources)
-      .values({
-        courseId,
-        ref: s.ref,
-        title: s.title,
-        url: s.url,
-        fetchedAt: new Date(s.fetchedAt),
-        excerpt: s.excerpt,
-      })
+      .values(toSourceValues(courseId, s))
       .onConflictDoUpdate({
         target: [sources.courseId, sources.url],
         set: {
@@ -168,7 +155,7 @@ export async function saveDesignOutline(
       .where(eq(outlines.courseId, courseId))
       .orderBy(desc(outlines.version))
       .limit(1);
-    return tx
+    const [saved] = await tx
       .insert(outlines)
       .values({
         courseId,
@@ -176,8 +163,8 @@ export async function saveDesignOutline(
         data: outline,
         draft: draft ?? null,
       })
-      .returning()
-      .then((rows) => rows[0]);
+      .returning();
+    return saved;
   });
 }
 

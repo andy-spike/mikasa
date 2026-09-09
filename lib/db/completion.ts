@@ -3,10 +3,7 @@ import type { Db } from "./index";
 import { completions, courses, outlines } from "./schema";
 import { currentRevision } from "./review";
 import { formatDayStamp } from "@/lib/utils";
-
-function stampOf(date: Date): string {
-  return formatDayStamp(date);
-}
+import { outlineLessonRefs } from "../course/structure";
 
 export type MarkResult =
   | {
@@ -26,7 +23,7 @@ async function currentLessonRefs(db: Db, courseId: string): Promise<string[]> {
     .from(outlines)
     .where(and(eq(outlines.courseId, courseId), eq(outlines.version, revision.outlineVersion)))
     .limit(1);
-  return outline?.data.modules.flatMap((m) => m.lessons.map((l) => l.id)) ?? [];
+  return outline ? outlineLessonRefs(outline.data) : [];
 }
 
 export type CourseCompletion = { done: number; total: number; complete: boolean };
@@ -64,39 +61,30 @@ async function ownedPublishedLesson(
   ownerId: string,
   courseId: string,
   lessonRef: string,
-): Promise<{ ok: true; total: number } | { ok: false; result: MarkResult }> {
+): Promise<{ ok: true; total: number } | Extract<MarkResult, { ok: false }>> {
   const [course] = await db
     .select()
     .from(courses)
     .where(and(eq(courses.ownerId, ownerId), eq(courses.id, courseId)))
     .limit(1);
   if (!course) {
-    return {
-      ok: false,
-      result: { ok: false, reason: "not-found", message: "Course not found." },
-    };
+    return { ok: false, reason: "not-found", message: "Course not found." };
   }
 
   const lessonRefs = await currentLessonRefs(db, courseId);
   if (lessonRefs.length === 0) {
     return {
       ok: false,
-      result: {
-        ok: false,
-        reason: "not-published",
-        message: "This Course has not been published yet.",
-      },
+      reason: "not-published",
+      message: "This Course has not been published yet.",
     };
   }
 
   if (!lessonRefs.includes(lessonRef)) {
     return {
       ok: false,
-      result: {
-        ok: false,
-        reason: "unknown-lesson",
-        message: "That Lesson is not part of the Course as it is published.",
-      },
+      reason: "unknown-lesson",
+      message: "That Lesson is not part of the Course as it is published.",
     };
   }
   return { ok: true, total: lessonRefs.length };
@@ -109,7 +97,7 @@ export async function markLessonDone(
   lessonRef: string,
 ): Promise<MarkResult> {
   const checked = await ownedPublishedLesson(db, ownerId, courseId, lessonRef);
-  if (!checked.ok) return checked.result;
+  if (!checked.ok) return checked;
 
   return db.transaction(async (tx) => {
     const [row] = await tx
@@ -117,20 +105,18 @@ export async function markLessonDone(
       .values({ courseId, lessonRef })
       .onConflictDoNothing()
       .returning();
-    const doneAt =
-      row?.doneAt ??
-      (
-        await tx
-          .select({ doneAt: completions.doneAt })
-          .from(completions)
-          .where(and(eq(completions.courseId, courseId), eq(completions.lessonRef, lessonRef)))
-          .limit(1)
-      )[0]!.doneAt;
+    const [found] = await tx
+      .select({ doneAt: completions.doneAt })
+      .from(completions)
+      .where(and(eq(completions.courseId, courseId), eq(completions.lessonRef, lessonRef)))
+      .limit(1);
+    const doneAt = row?.doneAt ?? found?.doneAt;
+    if (!doneAt) throw new Error("The completion record vanished right after it was written.");
     const completion = await recomputeCourseCompletion(tx, courseId, doneAt);
 
     return {
       ok: true as const,
-      stamp: stampOf(doneAt),
+      stamp: formatDayStamp(doneAt),
       doneCount: completion.done,
       total: completion.total,
       courseComplete: completion.complete,
@@ -145,7 +131,7 @@ export async function markLessonUndone(
   lessonRef: string,
 ): Promise<MarkResult> {
   const checked = await ownedPublishedLesson(db, ownerId, courseId, lessonRef);
-  if (!checked.ok) return checked.result;
+  if (!checked.ok) return checked;
 
   return db.transaction(async (tx) => {
     await tx

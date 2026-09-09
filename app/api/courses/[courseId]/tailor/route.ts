@@ -2,12 +2,10 @@ import "server-only";
 
 import { headers } from "next/headers";
 import { z } from "zod";
-import { desc, eq } from "drizzle-orm";
 import { isStepCount, streamText, tool } from "ai";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/session";
 import { findOwnedCourse } from "@/lib/db/courses";
-import { outlines } from "@/lib/db/schema";
 import {
   appendTailorTurn,
   createChangePlan,
@@ -16,37 +14,31 @@ import {
 } from "@/lib/db/tailor";
 import { changePlanSchema, opDetail, opEntry, opVerb } from "@/lib/course/change-plan";
 import { designModel, designProviderOptions } from "@/lib/model";
+import { latestOutline } from "@/lib/db/design";
+import { collectStreamText, jsonError, textStreamResponse } from "@/lib/api/stream";
+import { historyMessages } from "@/lib/course/tutor";
 
 const turnSchema = z.object({
   message: z.string().min(1).max(4000),
   effort: z.enum(["low", "medium", "high"]).default("low"),
 });
 
-function json(status: number, body: { error: string }) {
-  return Response.json(body, { status });
-}
-
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ courseId: string }> },
 ) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) return json(401, { error: "Sign in to talk with the Tailor." });
+  if (!session) return jsonError(401, "Sign in to talk with the Tailor.");
 
   const parsed = turnSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return json(400, { error: "That request was not a Tailor turn." });
+  if (!parsed.success) return jsonError(400, "That request was not a Tailor turn.");
   const { message, effort } = parsed.data;
 
   const { courseId } = await params;
   const course = await findOwnedCourse(db, session.user.id, courseId);
-  if (!course) return json(404, { error: "Course not found." });
+  if (!course) return jsonError(404, "Course not found.");
 
-  const [outline] = await db
-    .select()
-    .from(outlines)
-    .where(eq(outlines.courseId, courseId))
-    .orderBy(desc(outlines.version))
-    .limit(1);
+  const outline = await latestOutline(db, courseId);
   const shape = outline
     ? outline.data.modules.map((m) => ({
         moduleId: m.id,
@@ -92,14 +84,7 @@ export async function POST(
       "",
       `Language: always answer in ${course.language}, the course language.`,
     ].join("\n"),
-    messages: [
-      ...history.map((turn) =>
-        turn.role === "learner"
-          ? ({ role: "user", content: turn.content } as const)
-          : ({ role: "assistant", content: turn.content } as const),
-      ),
-      { role: "user", content: message },
-    ],
+    messages: historyMessages(history, message),
     tools: {
       proposeChangePlan: tool({
         description:
@@ -125,11 +110,7 @@ export async function POST(
     stopWhen: [isStepCount(4)],
     onEnd: async (event) => {
       /* Only a cleanly finished stream becomes history. */
-      const text =
-        event.content
-          .filter((part): part is { type: "text"; text: string } => part.type === "text")
-          .map((part) => part.text)
-          .join("") || event.text;
+      const text = collectStreamText(event);
       if (!text.trim()) return;
       await appendTailorTurn(db, session.user.id, courseId, {
         learner: message,
@@ -138,10 +119,5 @@ export async function POST(
     },
   });
 
-  return new Response(result.textStream.pipeThrough(new TextEncoderStream()), {
-    headers: {
-      "content-type": "text/plain; charset=utf-8",
-      "cache-control": "no-store",
-    },
-  });
+  return textStreamResponse(result.textStream);
 }

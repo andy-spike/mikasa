@@ -32,13 +32,15 @@ export function CommandPalette({
     const order: string[] = [];
     const byGroup = new Map<string, Command[]>();
     for (const c of commands) {
-      if (!byGroup.has(c.group)) {
-        byGroup.set(c.group, []);
+      const list = byGroup.get(c.group);
+      if (list) {
+        list.push(c);
+      } else {
+        byGroup.set(c.group, [c]);
         order.push(c.group);
       }
-      byGroup.get(c.group)!.push(c);
     }
-    return order.map((name) => ({ name, items: byGroup.get(name)! }));
+    return order.map((name) => ({ name, items: byGroup.get(name) ?? [] }));
   }, [commands]);
 
   return (
@@ -72,11 +74,11 @@ export function CommandPalette({
                   }}
                 >
                   <span className="truncate">{c.label}</span>
-                  {c.hint ? (
+                  {c.hint && (
                     <span className="ml-auto shrink-0 truncate text-[0.75rem] text-fg-dim">
                       {c.hint}
                     </span>
-                  ) : null}
+                  )}
                 </CommandItem>
               ))}
             </CommandGroup>
