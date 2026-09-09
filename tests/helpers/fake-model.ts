@@ -8,10 +8,12 @@ import { MockLanguageModelV4 } from "ai/test";
 
 export function scriptedModel(responses: string[]) {
   const prompts: string[] = [];
+  const responseFormats: unknown[] = [];
   let i = 0;
 
   const model = new MockLanguageModelV4({
     doGenerate: async (options) => {
+      responseFormats.push(options.responseFormat);
       const parts: string[] = [];
       for (const message of options.prompt) {
         if ("content" in message) {
@@ -45,7 +47,7 @@ export function scriptedModel(responses: string[]) {
     },
   });
 
-  return { model, prompts, calls: () => i };
+  return { model, prompts, responseFormats, calls: () => i };
 }
 
 export function json(value: unknown): string {

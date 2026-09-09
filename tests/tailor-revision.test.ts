@@ -30,36 +30,29 @@ vi.mock("workflow/api", () => ({
   },
 }));
 
-/* Staged revisions rerun review slices only for regenerated Lessons; the
-   structural slice is proven elsewhere. */
+/* Staged revisions review the complete candidate; the combined slice is
+   proven elsewhere. */
 const reviewSlices = vi.hoisted(() => ({
-  factualScope: [] as string[][],
-  designScope: [] as string[][],
+  combinedScope: [] as string[][],
 }));
 vi.mock("@/lib/course/review", () => ({
   structuralFindings: () => [],
-  factualFindings: async (
-    _model: unknown,
-    _course: unknown,
-    _spec: unknown,
-    _sources: unknown,
-    lessons: { lessonId: string }[],
-  ) => {
-    reviewSlices.factualScope.push(lessons.map((l) => l.lessonId));
-    return [];
-  },
-  designFindings: async (
+  combinedFindings: async (
     _model: unknown,
     _course: unknown,
     _spec: unknown,
     _outline: unknown,
+    _sources: unknown,
     lessons: { lessonId: string }[],
   ) => {
-    reviewSlices.designScope.push(lessons.map((l) => l.lessonId));
+    reviewSlices.combinedScope.push(lessons.map((l) => l.lessonId));
     return [];
   },
+  dedupeCorrectionQueries: () => [],
   correctLesson: vi.fn(),
-  MAX_CORRECTION_ROUNDS: 2,
+  MAX_CORRECTION_ROUNDS: 3,
+  lessonContextExcerpt: () => "",
+  CORRECTION_SOURCE_QUERY_CAP: 3,
 }));
 
 const revisionModelState = vi.hoisted(() => ({
@@ -91,7 +84,8 @@ const {
 } = await import("@/lib/db/schema");
 const { currentRevision } = await import("@/lib/db/review");
 const { createChangePlan } = await import("@/lib/db/tailor");
-const { retryPlanRevisionAction, stagePlanRevisionAction } = await import("@/lib/actions/tailor");
+const { findStagedPlanAction, retryPlanRevisionAction, stagePlanRevisionAction } =
+  await import("@/lib/actions/tailor");
 const { signInWithGoogle } = await import("./helpers/auth");
 const { setRequestCookie } = await import("./helpers/request-context");
 const { makeOutline, makeSpec } = await import("./helpers/fixtures");
@@ -130,10 +124,13 @@ function reconcileJson(lessonIds: string[]): string {
     learningGraph: [],
     alignment: lessonIds.map((id) => ({
       lessonId: id,
-      performance: "does",
+      performance: `does ${id}`,
       prerequisiteNodes: [],
       moduleMilestone: "m",
       exerciseContribution: "c",
+      exampleStart: "",
+      exampleEnd: "",
+      sourceRefs: [],
     })),
   });
 }
@@ -154,8 +151,7 @@ let ownerCookie = "";
 beforeEach(async () => {
   setRequestCookie(null);
   ownerCookie = await signInWithGoogle(OWNER);
-  reviewSlices.factualScope = [];
-  reviewSlices.designScope = [];
+  reviewSlices.combinedScope = [];
   embedCalls.count = 0;
   workflowStarts.calls.length = 0;
 });
@@ -185,6 +181,7 @@ describe("stagePlanRevisionAction", () => {
 
     const result = await stagePlanRevisionAction(courseId, planId);
     expect(result).toMatchObject({ ok: true, stagedOutlineVersion: 2 });
+    expect(await findStagedPlanAction(courseId)).toMatchObject({ stage: "queued", failed: false });
 
     const revision = await currentRevision(db, courseId);
     expect(revision?.revisionNumber).toBe(1);
@@ -276,8 +273,7 @@ describe("stageRevisionWorkflow", () => {
     expect(l3v2.body).toEqual(l3v1.body);
     expect(l3v2.title).toBe("Lesson three, Repainted");
 
-    expect(reviewSlices.factualScope).toEqual([["l1"]]);
-    expect(reviewSlices.designScope).toEqual([["l1"]]);
+    expect(reviewSlices.combinedScope).toEqual([["l1", "l3"]]);
 
     expect(embedCalls.count).toBeGreaterThan(0);
     const fragmentRefs = (await db.select().from(lessonFragments)).map((f) => f.lessonRef);

@@ -86,10 +86,13 @@ export function makeSpec(outline: OutlineData, overrides: SpecOverrides = {}): C
         overrides.alignment ??
           ((l) => ({
             lessonId: l.id,
-            performance: "does",
+            performance: `does ${l.title}`,
             prerequisiteNodes: [] as string[],
             moduleMilestone: "m",
             exerciseContribution: "c",
+            exampleStart: "",
+            exampleEnd: "",
+            sourceRefs: [] as string[],
           })),
       ),
     finalExercise: overrides.finalExercise ?? { task: "t", acceptanceChecks: ["c"] },

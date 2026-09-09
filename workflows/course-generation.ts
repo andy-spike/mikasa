@@ -1,60 +1,26 @@
 // Step args cross process boundaries as JSON, so providers resolve inside each step.
-import { LESSON_WAVE_SIZE } from "@/lib/course/generate";
-import { MAX_CORRECTION_ROUNDS } from "@/lib/course/review";
+import { MAX_CORRECTION_ROUNDS, dedupeCorrectionQueries } from "@/lib/course/review-policy";
 import {
+  ensureValidSpec,
   groupFindingsByLesson,
+  resolveReviewResumePoint,
   runReviewRound,
   stepEmbedFragments,
   stepFailGeneration,
-  stepFetchSource,
+  stepFetchCorrectionSources,
   stepFinish,
   stepFinishReviewRun,
   stepFailReview,
   stepGenerateLesson,
   stepGenerationCancelled,
-  stepLoadContext,
   stepMarkStep,
   stepMarkCorrected,
   stepCorrectLesson,
   stepOpenReviewRun,
   stepOrder,
-  stepPlanSources,
   stepPublish,
   type ReviewFindingPayload,
 } from "./course-steps";
-
-async function stepReviewResumePoint(
-  courseId: string,
-  outlineVersion: number,
-): Promise<
-  | { action: "review" }
-  | { action: "publish"; reviewRunId: string }
-  | { action: "done"; revisionNumber: number }
-> {
-  "use step";
-  const { db } = await import("@/lib/db");
-  const { latestReviewRun, currentRevision } = await import("@/lib/db/review");
-  const { reviewFindings } = await import("@/lib/db/schema");
-  const { and, eq } = await import("drizzle-orm");
-
-  const revision = await currentRevision(db, courseId);
-  if (revision && revision.outlineVersion === outlineVersion) {
-    return { action: "done", revisionNumber: revision.revisionNumber };
-  }
-
-  const review = await latestReviewRun(db, courseId);
-  if (review && review.outlineVersion === outlineVersion && review.status === "succeeded") {
-    const open = await db
-      .select({ id: reviewFindings.id })
-      .from(reviewFindings)
-      .where(and(eq(reviewFindings.reviewRunId, review.id), eq(reviewFindings.status, "open")))
-      .limit(1);
-    if (open.length === 0) {
-      return { action: "publish", reviewRunId: review.id };
-    }
-  }
-  return { action: "review" };
-}
 
 export async function generateCourseWorkflow(
   courseId: string,
@@ -63,49 +29,50 @@ export async function generateCourseWorkflow(
 ) {
   "use workflow";
 
-  const context = await stepLoadContext(courseId, outlineVersion);
-  if (!context) {
-    await stepFailGeneration(courseId, runId, "The Course to generate no longer exists.", true);
-    return { ok: false as const, reason: "course-not-found" };
+  // If already published, resume only unfinished embedding or bookkeeping.
+  const already = await resolveReviewResumePoint(courseId, outlineVersion);
+  if (already.action === "done") {
+    await stepEmbedFragments(courseId, outlineVersion, runId);
+    return { ok: true as const, revisionNumber: already.revisionNumber };
   }
 
   try {
-    const order = await stepOrder(context);
+    // Validate the specification against reading order and stored Sources.
+    // One conditional repair on failure; otherwise record an actionable error.
+    const valid = await ensureValidSpec(courseId, outlineVersion);
+    if (!valid.ok) {
+      if (valid.reason === "course-not-found") {
+        await stepFailGeneration(courseId, runId, "The Course to generate no longer exists.", true);
+        return { ok: false as const, reason: "course-not-found" };
+      }
+      if (valid.reason === "repair-failed") {
+        await stepFailGeneration(courseId, runId, valid.error, true);
+        return { ok: false as const, reason: "invalid-spec" };
+      }
+      await stepFailGeneration(
+        courseId,
+        runId,
+        `The Course specification is invalid: ${valid.errors.join(" ")}`,
+        true,
+      );
+      return { ok: false as const, reason: "invalid-spec" };
+    }
+    const activeContext = valid.context;
+
+    const order = await stepOrder(activeContext);
     await stepMarkStep(runId, "lessons");
 
-    // Outline titles and summaries are known up front, so every Lesson
-    // prompt carries the same static framing and waves stay independent.
-    const priorLessons = order.map((l) => ({ title: l.title, summary: l.summary }));
-    const position = new Map(order.map((l, i) => [l.id, i]));
-    const already = new Set(context.written);
-    const pending = order.filter((l) => !already.has(l.id));
+    // One Lesson at a time, in reading order (ADR 0009): each Lesson sees the
+    // actual prose of the Lessons before it, so shared scaffolding is
+    // established once and extended instead of reinvented per Lesson.
+    const alreadyWritten = new Set(activeContext.written);
+    const pending = order.filter((l) => !alreadyWritten.has(l.id));
 
-    const sourcePlans = await stepPlanSources(
-      context,
-      pending.map((l) => ({ id: l.id, title: l.title, summary: l.summary })),
-    );
-    const fetched = await Promise.all(
-      sourcePlans.map((plan) => stepFetchSource(context.course.id, plan.query)),
-    );
-    const sources = [...context.sources, ...fetched.filter((f) => f !== null)];
-
-    for (let w = 0; w < pending.length; w += LESSON_WAVE_SIZE) {
+    for (const lesson of pending) {
       if (await stepGenerationCancelled(runId)) {
         return { ok: false as const, reason: "cancelled" };
       }
-      const wave = pending.slice(w, w + LESSON_WAVE_SIZE);
-      await Promise.all(
-        wave.map((lesson) =>
-          stepGenerateLesson(
-            context,
-            runId,
-            lesson,
-            order[position.get(lesson.id)! + 1] ?? null,
-            priorLessons,
-            sources,
-          ),
-        ),
-      );
+      await stepGenerateLesson(activeContext, runId, lesson.id);
     }
 
     if (await stepGenerationCancelled(runId)) {
@@ -123,8 +90,9 @@ export async function generateCourseWorkflow(
     if (await stepGenerationCancelled(runId)) {
       return { ok: false as const, reason: "cancelled" };
     }
-    const resume = await stepReviewResumePoint(courseId, outlineVersion);
+    const resume = await resolveReviewResumePoint(courseId, outlineVersion);
     if (resume.action === "done") {
+      await stepEmbedFragments(courseId, outlineVersion, runId);
       return { ok: true as const, revisionNumber: resume.revisionNumber };
     }
 
@@ -136,7 +104,7 @@ export async function generateCourseWorkflow(
     } else {
       await stepMarkStep(runId, "review");
       reviewRunId = await stepOpenReviewRun(courseId, outlineVersion, true);
-      findings = await runReviewRound(courseId, outlineVersion, reviewRunId, 0);
+      findings = await runReviewRound(courseId, outlineVersion, reviewRunId, 0, runId);
     }
 
     let round = 0;
@@ -147,15 +115,27 @@ export async function generateCourseWorkflow(
       }
       await stepMarkStep(runId, `corrections:${round}`);
 
+      // Correction searches obey Grounding and the query cap: deduped
+      // factual sourceQuery values, at most three, in stable finding order.
+      const queries = dedupeCorrectionQueries(findings);
+      if (queries.length > 0) {
+        await stepFetchCorrectionSources(courseId, activeContext.course.grounding, queries);
+      }
+
       const byLesson = groupFindingsByLesson(findings);
-      await Promise.all(
-        [...byLesson].map(([lessonRef, lessonFindings]) =>
-          stepCorrectLesson(courseId, outlineVersion, runId, lessonRef, lessonFindings),
-        ),
-      );
+      // One Lesson at a time: each correction step re-reads the candidate,
+      // so it sees what the previous corrections just changed and agrees
+      // with them. Parallel corrections of one shared example diverge.
+      for (const [lessonRef, lessonFindings] of byLesson) {
+        if (await stepGenerationCancelled(runId)) {
+          return { ok: false as const, reason: "cancelled" };
+        }
+        await stepCorrectLesson(courseId, outlineVersion, runId, lessonRef, lessonFindings);
+      }
+      // Findings count as corrected only after their writes succeeded.
       await stepMarkCorrected(reviewRunId, round - 1);
 
-      findings = await runReviewRound(courseId, outlineVersion, reviewRunId, round);
+      findings = await runReviewRound(courseId, outlineVersion, reviewRunId, round, runId);
     }
 
     if (findings.length > 0) {
@@ -170,12 +150,13 @@ export async function generateCourseWorkflow(
       return { ok: false as const, reason: "cancelled" };
     }
     await stepMarkStep(runId, "publish");
-    const published = await stepPublish(courseId, outlineVersion, reviewRunId);
+    const published = await stepPublish(courseId, outlineVersion, reviewRunId, runId);
     if (!published.ok) {
       // Review stays succeeded so a retry resumes at publication.
       await stepFailGeneration(courseId, runId, published.reason ?? "Publication failed.", true);
       return { ok: false as const, reason: "publish-failed" };
     }
+    // Embedding failure stays repairable and does not fail publication.
     await stepEmbedFragments(courseId, outlineVersion, runId);
     return { ok: true as const, revisionNumber: published.revisionNumber };
   } catch (error) {

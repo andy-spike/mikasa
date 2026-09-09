@@ -41,11 +41,10 @@ The Outline is a checkpoint before the expensive work starts. After approval, Mi
 - The Course specification links the Goal, final Exercise, learning dependencies, shared examples, Lesson responsibilities, and Sources.
 - The Learner can change the Outline manually, through the Tailor, or with both before approval. Each change makes the Course specification stale until approval reconciles it.
 - Outline approval starts full Course generation.
-- Mikasa generates Lessons in dependency order, one Module at a time.
+- Mikasa generates Lessons one at a time in reading order, each seeing the actual prose of the Lessons before it (ADR 0009). The Course specification defines their learning dependencies and reading order.
 - Every Lesson has an explanation, worked example, recall prompt, self-explanation prompt, one Exercise, and a bridge to the next Lesson.
-- Mikasa reviews the complete Course for structure, factual and code accuracy, and learning design.
-- Review findings trigger targeted corrections. Mikasa runs at most two correction rounds.
-- Coding Courses run executable examples in an isolated sandbox before publication.
+- Mikasa reviews the complete Course for structure and critical factual accuracy.
+- Review findings trigger targeted corrections. Mikasa runs at most three correction rounds (ADR 0009).
 - The Course becomes readable only when every Lesson and review has passed.
 - A failed build retries only failed work and preserves valid drafts.
 - Lessons and Tutor answers include inline links to relevant Sources.

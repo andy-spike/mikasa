@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { designProviderOptions, groundingProviderOptions } from "@/lib/model";
 import { depthBounds, type CourseInput, type DepthId } from "./limits";
+import { languageName as courseLanguageName } from "./prompt-blocks";
 import type { CourseSpecification, GatheredSource, OutlineData, OutlineModule } from "./types";
 
 export class DesignError extends Error {
@@ -27,17 +28,6 @@ export type SourceSearcher = (query: string, limit: number) => Promise<FetchedPa
 export const SOURCE_LIMIT = 6;
 
 export const EXCERPT_MAX_CHARS = 600;
-
-function courseLanguageName(language: string): string {
-  const names: Record<string, string> = {
-    en: "English",
-    es: "Spanish",
-    fr: "French",
-    de: "German",
-    pt: "Portuguese",
-  };
-  return names[language] ?? "English";
-}
 
 function searchQuery(course: DesignCourse): string {
   return [course.topic, course.goal].filter(Boolean).join(" — ");
@@ -101,8 +91,9 @@ export async function selectExcerpts(
   const fallback = (page: FetchedPage) => page.content.slice(0, EXCERPT_MAX_CHARS).trim();
 
   if (pages.length === 0) return new Map();
+  const byUrl = new Map(pages.map((p) => [p.url, p]));
 
-  let chosen: Map<string, string>;
+  let chosen: Map<string, string | undefined>;
   try {
     const { output } = await generateText({
       model,
@@ -113,9 +104,10 @@ export async function selectExcerpts(
         `Topic: ${course.topic}`,
         `Goal: ${course.goal}`,
         "",
-        "Below are web pages fetched for this course. For each page, quote the single passage (at most",
-        `${EXCERPT_MAX_CHARS} characters) most relevant to teaching this topic toward this goal.`,
+        "Below are web pages fetched for this course. For each page, do one job:",
+        `quote the single passage (at most ${EXCERPT_MAX_CHARS} characters) most relevant to teaching this topic toward this goal.`,
         "Return every URL you were given, each with its excerpt, verbatim from the page.",
+        "When a page has no passage that helps teach the topic, return an empty string for its excerpt. Never invent text.",
         "",
         ...pages.map(
           (p) => `URL: ${p.url}\nTITLE: ${p.title}\nCONTENT:\n${p.content.slice(0, 4000)}`,
@@ -124,9 +116,7 @@ export async function selectExcerpts(
     });
 
     chosen = new Map(
-      (output?.excerpts ?? [])
-        .map((e) => [e.url, e.excerpt.trim().slice(0, EXCERPT_MAX_CHARS)] as const)
-        .filter(([url, excerpt]) => url && excerpt.length > 0),
+      (output?.excerpts ?? []).map((e) => [e.url, e.excerpt.trim().slice(0, EXCERPT_MAX_CHARS)] as const),
     );
   } catch {
     chosen = new Map();
@@ -134,9 +124,18 @@ export async function selectExcerpts(
 
   const result = new Map<string, string>();
   for (const page of pages) {
-    const picked = chosen.get(page.url);
-    result.set(page.url, picked && picked.length > 0 ? picked : fallback(page));
+    if (!chosen.has(page.url)) {
+      result.set(page.url, fallback(page));
+      continue;
+    }
+    const picked = (chosen.get(page.url) ?? "").trim().slice(0, EXCERPT_MAX_CHARS);
+    if (!picked) {
+      result.set(page.url, "");
+      continue;
+    }
+    result.set(page.url, picked);
   }
+  void byUrl;
   return result;
 }
 
@@ -162,7 +161,13 @@ export type OutlineDraft = {
   terminalPerformances: string[];
   exclusions: string[];
   learnerAssumptions: string[];
-  throughline: { premise: string; runningExample: string; vocabulary: string[] };
+  throughline: {
+    premise: string;
+    runningExample: string;
+    vocabulary: string[];
+    /** Required for new drafts by the schema; absent in drafts saved before it existed. */
+    exampleContract?: string;
+  };
 };
 
 const outlineSchema = z.object({
@@ -172,7 +177,7 @@ const outlineSchema = z.object({
       lessons: z.array(
         z.object({
           title: z.string().min(1),
-          summary: z.string().min(1),
+          summary: z.string().min(1).max(200),
           // Models sometimes return fractional minutes; rounding beats failing the outline.
           minutes: z.number().positive(),
         }),
@@ -186,6 +191,7 @@ const outlineSchema = z.object({
     premise: z.string().min(1),
     runningExample: z.string().min(1),
     vocabulary: z.array(z.string()),
+    exampleContract: z.string(),
   }),
 });
 
@@ -194,6 +200,18 @@ const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 function describeBounds(depth: string): string {
   const b = depthBounds(depth);
   return `${b.minModules}–${b.maxModules} Modules with ${b.minLessonsPerModule}–${b.maxLessonsPerModule} Lessons each`;
+}
+
+function exactOutlineCounts(depth: string): { modules: number; lessonsPerModule: number } {
+  const b = depthBounds(depth);
+  const modules = Math.round((b.minModules + b.maxModules) / 2);
+  const lessonsPerModule = Math.round((b.minLessonsPerModule + b.maxLessonsPerModule) / 2);
+  return { modules, lessonsPerModule };
+}
+
+function describeExactCounts(depth: string): string {
+  const exact = exactOutlineCounts(depth);
+  return `exactly ${exact.modules} Modules with exactly ${exact.lessonsPerModule} Lessons each`;
 }
 
 function depthIntent(depth: string): string {
@@ -233,7 +251,7 @@ export async function draftOutline(
       course.background
         ? `Background (skip fundamentals this names): ${course.background}`
         : "Background: none given.",
-      `Depth: ${course.depth}. ${depthIntent(course.depth)} The outline must land inside ${describeBounds(course.depth)}.`,
+      `Depth: ${course.depth}. ${depthIntent(course.depth)} The outline must hit ${describeExactCounts(course.depth)} (inside ${describeBounds(course.depth)}).`,
       `Course language: write every title, summary and sentence in ${courseLanguageName(course.language)}.`,
       "",
       grounded,
@@ -241,9 +259,13 @@ export async function draftOutline(
       "Plan the course backwards from the goal:",
       "- terminalPerformances: 2-5 things the learner can demonstrably DO at the end, phrased as verbs.",
       "- modules: each covers one area; lessons are a small, named step that serves its module.",
-      "- summaries: ONE sentence per lesson saying what the learner gets from it.",
+      "- summaries: exactly ONE sentence per lesson, under 200 characters, saying what the learner gets from it.",
       "- minutes: a realistic study estimate per lesson (5-90).",
       "- throughline: one running problem, project or scenario every lesson extends, plus the shared vocabulary.",
+      "- throughline.exampleContract: pin the running example once, now, in this fixed template and nothing else:",
+      "  Tags: <exact tags in order>; Classes: <exact class names>; Values: <exact shared values, breakpoints, sizes, units, file names>.",
+      "  Lessons copy this verbatim; anything not pinned here each Lesson may choose, but never contradict.",
+      "  Use an empty string only when the Topic has no cumulative example.",
       "- exclusions: what this course deliberately leaves out.",
       "- learnerAssumptions: what you assume they already know, derived from the background.",
       "",
@@ -302,7 +324,7 @@ export function buildOutline(
 const specificationSchema = z.object({
   learningGraph: z.array(
     z.object({
-      id: z.string(),
+      id: z.string().regex(/^g\d+$/),
       skill: z.string().min(1),
       requires: z.array(z.string()),
       lessonId: z.string(),
@@ -315,6 +337,9 @@ const specificationSchema = z.object({
       prerequisiteNodes: z.array(z.string()),
       moduleMilestone: z.string().min(1),
       exerciseContribution: z.string().min(1),
+      exampleStart: z.string(),
+      exampleEnd: z.string(),
+      sourceRefs: z.array(z.string()),
     }),
   ),
   finalExercise: z.object({
@@ -370,8 +395,8 @@ export async function designSpecification(
         : "Grounding was off: return an empty evidence array.",
       "",
       "Produce:",
-      "- learningGraph: one node per skill/concept (ids g1, g2, ...), each introduced by exactly one lessonId, with requires listing node ids that must come first.",
-      "- alignment: for EVERY lesson id: the performance it teaches, the graph nodes it assumes, the module milestone it advances, and how its Exercise contributes to the final one.",
+      "- learningGraph: one node per skill/concept (ids g1, g2, ... in order; every id unique, matching /^g\\d+$/), each introduced by exactly one lessonId from the list above, with requires listing node ids introduced at the same or an earlier Lesson. Never require a skill introduced later.",
+      "- alignment: for EVERY lesson id: the performance it teaches (distinct from every other Lesson's performance — duplicates fail validation; two Lessons with the same performance read as duplicate Lessons), the graph nodes it assumes (only nodes introduced at the same or an earlier Lesson), the module milestone it advances, how its Exercise contributes to the final one, exampleStart (how the shared running example looks before this Lesson; empty when the Topic has no cumulative example), exampleEnd (how it looks after; empty when none), and sourceRefs (stored Source refs this Lesson leans on; empty array is fine when it leans on none).",
       "- finalExercise: the one task that evidences the goal, with concrete acceptance checks.",
       "- evidence: for each source ref you actually rely on, the claim it supports.",
       "",
@@ -383,18 +408,9 @@ export async function designSpecification(
 
   if (!output) throw new DesignError("The model returned no specification.");
 
-  const lessonIds = new Set(lessons.map((l) => l.id));
-  const missing = lessons.filter((l) => !output.alignment.some((a) => a.lessonId === l.id));
-  if (missing.length > 0) {
-    throw new DesignError(
-      `The specification skipped ${missing.length} Lesson(s): ${missing.map((l) => l.title).join(", ")}.`,
-    );
-  }
-
-  const sourceRefs = new Set(sources.map((s) => s.ref));
-  const nodeIds = new Set(output.learningGraph.map((n) => n.id));
-
-  return {
+  const { validateSpecification } = await import("./spec-validate");
+  const sourceRefSet = new Set(sources.map((s) => s.ref));
+  const candidate: CourseSpecification = {
     contract: {
       topic: course.topic,
       goal: course.goal,
@@ -406,14 +422,17 @@ export async function designSpecification(
       learnerAssumptions: draft.learnerAssumptions,
     },
     throughline: draft.throughline,
-    learningGraph: output.learningGraph
-      .filter((n) => lessonIds.has(n.lessonId))
-      .map((n) => ({
-        ...n,
-        requires: n.requires.filter((r) => nodeIds.has(r)),
-      })),
-    alignment: output.alignment.filter((a) => lessonIds.has(a.lessonId)),
+    learningGraph: output.learningGraph,
+    alignment: output.alignment,
     finalExercise: output.finalExercise,
-    evidence: output.evidence.filter((e) => sourceRefs.has(e.sourceRef)),
+    evidence: output.evidence,
   };
+  try {
+    validateSpecification(candidate, outline, sourceRefSet);
+  } catch (error) {
+    throw new DesignError(
+      error instanceof Error ? error.message : "The specification did not validate.",
+    );
+  }
+  return candidate;
 }

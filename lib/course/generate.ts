@@ -1,8 +1,7 @@
 import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
 import { nanoid } from "nanoid";
-import { z } from "zod";
-import { designProviderOptions } from "@/lib/model";
+import { generationProviderOptions } from "@/lib/model";
 import {
   lessonContentSchema,
   parseLessonContent,
@@ -10,6 +9,13 @@ import {
   type LessonContent,
 } from "./content";
 import type { CourseSpecification, OutlineData, OutlineLesson } from "./types";
+import { findCyclePath, introducedAtMap, outlinePosition } from "./spec-graph";
+import {
+  contractWriteBlock,
+  finalExerciseLines,
+  languageName,
+  sourceLine,
+} from "./prompt-blocks";
 
 export type PromptSource = {
   ref: string;
@@ -27,174 +33,103 @@ export class GenerationError extends Error {
   name = "GenerationError";
 }
 
-// Ties keep Outline order; a cycle or missing node fails loudly rather than generating on nothing.
+// Reading order is the Outline order. The specification must already be
+// consistent with it; this function validates and returns that order.
+// It never reorders the approved Outline.
 export function generationOrder(spec: CourseSpecification, outline: OutlineData): OutlineLesson[] {
-  const lessons = outline.modules.flatMap((m) => m.lessons);
-  const position = new Map(lessons.map((l, i) => [l.id, i]));
+  const { lessons, position } = outlinePosition(outline);
 
-  const introducedBy = new Map<string, string>();
+  const seenAlignment = new Set<string>();
+  for (const a of spec.alignment) {
+    if (seenAlignment.has(a.lessonId)) {
+      throw new GenerationError(
+        `The specification has two alignment entries for Lesson "${a.lessonId}". Keep one.`,
+      );
+    }
+    seenAlignment.add(a.lessonId);
+    if (!position.has(a.lessonId)) {
+      throw new GenerationError(
+        `The specification aligns Lesson "${a.lessonId}", which the Outline does not have.`,
+      );
+    }
+  }
+  const missingAlignment = lessons.filter((l) => !seenAlignment.has(l.id));
+  if (missingAlignment.length > 0) {
+    throw new GenerationError(
+      `The specification skipped ${missingAlignment.length} Lesson(s): ${missingAlignment.map((l) => l.title).join(", ")}.`,
+    );
+  }
+
+  const nodeIds = new Set<string>();
   for (const node of spec.learningGraph) {
+    if (nodeIds.has(node.id)) {
+      throw new GenerationError(
+        `The specification introduces skill "${node.id}" twice. Give every graph node a unique id.`,
+      );
+    }
+    nodeIds.add(node.id);
     if (!position.has(node.lessonId)) {
       throw new GenerationError(
         `The specification's node "${node.id}" points at Lesson "${node.lessonId}", which the Outline does not have.`,
       );
     }
-    introducedBy.set(node.id, node.lessonId);
   }
-
-  const dependsOn = new Map<string, Set<string>>(lessons.map((l) => [l.id, new Set<string>()]));
   for (const node of spec.learningGraph) {
-    const dependentLesson = node.lessonId;
     for (const required of node.requires) {
-      const providerLesson = introducedBy.get(required);
-      if (!providerLesson) {
+      if (!nodeIds.has(required)) {
         throw new GenerationError(
           `Node "${node.id}" requires "${required}", which no node introduces.`,
         );
       }
-      if (providerLesson !== dependentLesson) {
-        dependsOn.get(dependentLesson)!.add(providerLesson);
+    }
+  }
+  for (const a of spec.alignment) {
+    for (const p of a.prerequisiteNodes) {
+      if (!nodeIds.has(p)) {
+        throw new GenerationError(
+          `Lesson "${a.lessonId}" assumes skill "${p}", which no graph node introduces.`,
+        );
       }
     }
   }
 
-  const remaining = new Map([...dependsOn.entries()].map(([id, deps]) => [id, new Set(deps)]));
-  const ordered: OutlineLesson[] = [];
-  let progress = true;
-  while (ordered.length < lessons.length && progress) {
-    progress = false;
-    for (const lesson of lessons) {
-      if (ordered.some((o) => o.id === lesson.id)) continue;
-      const deps = remaining.get(lesson.id)!;
-      if (deps.size === 0) {
-        ordered.push(lesson);
-        progress = true;
-        for (const set of remaining.values()) set.delete(lesson.id);
-      }
-    }
-  }
-  if (ordered.length < lessons.length) {
+  // Cycle check over graph nodes.
+  const cycle = findCyclePath(spec.learningGraph);
+  if (cycle) {
     throw new GenerationError(
       "The specification's dependency graph has a cycle; no Lesson order satisfies it.",
     );
   }
-  return ordered;
-}
 
-const planSchema = z.object({
-  needsSource: z.boolean(),
-  query: z.string().optional(),
-});
-
-export async function planLessonSource(
-  model: LanguageModel,
-  course: { topic: string; goal: string; grounding: boolean },
-  lesson: { title: string; summary: string; performance?: string },
-  sharedSources: PromptSource[],
-): Promise<{ needsSource: boolean; query?: string }> {
-  if (!course.grounding) return { needsSource: false };
-
-  const { output } = await generateText({
-    model,
-    providerOptions: designProviderOptions(),
-    output: Output.object({ schema: planSchema }),
-    prompt: [
-      "A course Lesson is about to be written. Decide whether it needs one web",
-      "Source the shared set does not carry — current facts, version numbers,",
-      "a concrete reference. Most Lessons need nothing.",
-      "",
-      `Topic: ${course.topic}`,
-      `Goal: ${course.goal}`,
-      `Lesson: ${lesson.title} — ${lesson.summary}`,
-      lesson.performance ? `What it teaches: ${lesson.performance}` : "",
-      "",
-      "Shared sources:",
-      ...sharedSources.map((s) => `- ${s.title} (${s.url}): ${s.excerpt.slice(0, 200)}`),
-      "",
-      "Return needsSource and, only if true, one specific search query.",
-    ]
-      .filter(Boolean)
-      .join("\n"),
-  });
-
-  if (!output) return { needsSource: false };
-  if (output.needsSource && output.query && output.query.trim()) {
-    return { needsSource: true, query: output.query.trim() };
+  // Reading-order consistency: a prerequisite cannot be introduced later.
+  // Same-Lesson edges are allowed.
+  const introducedAt = introducedAtMap(spec.learningGraph, position);
+  for (const n of spec.learningGraph) {
+    const at = position.get(n.lessonId)!;
+    for (const r of n.requires) {
+      if (introducedAt.get(r)! > at) {
+        throw new GenerationError(
+          `Node "${n.id}" in Lesson "${n.lessonId}" requires "${r}", which is only introduced in a later Lesson.`,
+        );
+      }
+    }
   }
-  return { needsSource: false };
+  for (const a of spec.alignment) {
+    const at = position.get(a.lessonId)!;
+    for (const p of a.prerequisiteNodes) {
+      const providerAt = introducedAt.get(p);
+      if (providerAt !== undefined && providerAt > at) {
+        throw new GenerationError(
+          `Lesson "${a.lessonId}" assumes skill "${p}", which is only introduced in a later Lesson.`,
+        );
+      }
+    }
+  }
+
+  return lessons;
 }
 
 export const LESSON_SOURCE_LIMIT = 2;
-
-// How many Lessons one wave generates at once. Lessons only read the
-// Course specification and Outline summaries, never each other's prose,
-// so a wave is bounded by provider concurrency, not by data flow.
-export const LESSON_WAVE_SIZE = 5;
-
-const planBatchSchema = z.object({
-  plans: z.array(
-    z.object({
-      lessonId: z.string(),
-      needsSource: z.boolean(),
-      query: z.string().optional(),
-    }),
-  ),
-});
-
-export type LessonSourcePlan = { lessonId: string; needsSource: boolean; query?: string };
-
-// One model call plans the Source lookups for every pending Lesson, so the
-// workflow fetches once and generates with the full Source pool instead of
-// paying a planning call per Lesson in series.
-export async function planLessonSources(
-  model: LanguageModel,
-  course: { topic: string; goal: string; grounding: boolean },
-  lessons: { id: string; title: string; summary: string; performance?: string }[],
-  sharedSources: PromptSource[],
-): Promise<LessonSourcePlan[]> {
-  if (!course.grounding || lessons.length === 0) {
-    return lessons.map((l) => ({ lessonId: l.id, needsSource: false }));
-  }
-
-  const { output } = await generateText({
-    model,
-    providerOptions: designProviderOptions(),
-    output: Output.object({ schema: planBatchSchema }),
-    prompt: [
-      "Course Lessons are about to be written in parallel. For each Lesson,",
-      "decide whether it needs one web Source the shared set does not carry",
-      "— current facts, version numbers, a concrete reference. Most Lessons",
-      "need nothing.",
-      "",
-      `Topic: ${course.topic}`,
-      `Goal: ${course.goal}`,
-      "",
-      "Shared sources:",
-      ...sharedSources.map((s) => `- ${s.title} (${s.url}): ${s.excerpt.slice(0, 200)}`),
-      "",
-      "Lessons:",
-      ...lessons.map(
-        (l) =>
-          `- ${l.id}: ${l.title} — ${l.summary}${l.performance ? ` (teaches: ${l.performance})` : ""}`,
-      ),
-      "",
-      "Return plans: one entry per Lesson that needs a Source, with lessonId",
-      "and one specific search query. Omit Lessons that need nothing.",
-    ]
-      .filter(Boolean)
-      .join("\n"),
-  });
-
-  if (!output) return lessons.map((l) => ({ lessonId: l.id, needsSource: false }));
-  const byId = new Map(output.plans.map((p) => [p.lessonId, p]));
-  return lessons.map((l) => {
-    const plan = byId.get(l.id);
-    if (plan?.needsSource && plan.query?.trim()) {
-      return { lessonId: l.id, needsSource: true, query: plan.query.trim() };
-    }
-    return { lessonId: l.id, needsSource: false };
-  });
-}
 
 export function newLessonSourceRef(): string {
   return `les-${nanoid(10)}`;
@@ -214,7 +149,7 @@ export async function generateLesson(
     spec: CourseSpecification;
     lesson: { id: string; title: string; summary: string };
     nextLesson: { title: string } | null;
-    priorLessons: { title: string; summary: string }[];
+    priorLessons: { title: string; summary: string; excerpt?: string }[];
     sources: PromptSource[];
   },
 ): Promise<LessonContent> {
@@ -231,14 +166,26 @@ export async function generateLesson(
     .map((id) => input.spec.learningGraph.find((n) => n.id === id)?.skill)
     .filter((s): s is string => Boolean(s));
   const adjustment = input.spec.adjustments?.find((a) => a.lessonId === input.lesson.id);
+  const relevantSources =
+    alignment.sourceRefs.length > 0
+      ? input.sources.filter((s) => alignment.sourceRefs.includes(s.ref))
+      : input.sources;
 
   const { output } = await generateText({
     model,
-    providerOptions: designProviderOptions(),
+    providerOptions: generationProviderOptions(),
     output: Output.object({ schema: lessonContentSchema }),
     prompt: [
-      "You write one Lesson of a Mikasa course. It must read as part of one",
-      "coherent course, not a standalone explainer.",
+      "You write one Lesson of a Mikasa course. One job: write THIS lesson as",
+      "part of one coherent course, not a standalone explainer.",
+      "Precedence when sources disagree, in order: 1) the spec alignment for",
+      "this Lesson. 2) the example contract verbatim. 3) the prior Lessons'",
+      "prose. 4) the Sources. The spec wins over prior prose.",
+      "Accuracy: only state facts you can support from the spec, the prior",
+      "Lessons, or the Sources below. Do not invent versions, APIs, or",
+      "behavior. If a fact is uncertain, omit it or state the limit — never",
+      "guess. When the Lesson shows code, keep it consistent with the Sources",
+      "and the shared example; do not invent APIs the Sources do not show.",
       "",
       `Topic: ${input.course.topic}`,
       `Goal: ${input.course.goal}`,
@@ -250,9 +197,29 @@ export async function generateLesson(
       "The course's throughline — extend it, do not restart it:",
       JSON.stringify(input.spec.throughline),
       "",
-      "Lessons that come before this one (in order):",
+      input.spec.throughline.exampleContract
+        ? contractWriteBlock(input.spec.throughline.exampleContract)
+        : "",
+      alignment.exampleStart
+        ? `Shared example before this Lesson: ${alignment.exampleStart}`
+        : "Shared example before this Lesson: none yet (do not invent a prior state).",
+      alignment.exampleEnd
+        ? `Shared example after this Lesson: ${alignment.exampleEnd}`
+        : "Shared example after this Lesson: unchanged (leave it as it was).",
+      alignment.sourceRefs.length
+        ? `Stored Sources this Lesson leans on: ${alignment.sourceRefs.join(", ")}`
+        : "",
+      "",
+      ...finalExerciseLines(input.spec),
+      "",
+      "The Lessons before this one, as they currently stand. This Lesson continues",
+      "from them: keep the names, rules, and scaffolding they already established",
+      "(shared styles, guards, classes, the running example) and extend them —",
+      "never introduce them again as if new:",
       ...(input.priorLessons.length
-        ? input.priorLessons.map((l) => `- ${l.title}: ${l.summary}`)
+        ? input.priorLessons.map((l) =>
+            [`- ${l.title} — ${l.summary}`, ...(l.excerpt ? [l.excerpt] : [])].join("\n"),
+          )
         : ["- (this is the first)"]),
       "",
       `THIS Lesson: ${input.lesson.title} — ${input.lesson.summary}`,
@@ -267,13 +234,14 @@ export async function generateLesson(
         : "",
       "",
       "Sources you may cite (cite by ref, only these):",
-      ...(input.sources.length
-        ? input.sources.map((s) => `- ${s.ref}: ${s.title} (${s.url}) — ${s.excerpt.slice(0, 300)}`)
+      ...(relevantSources.length
+        ? relevantSources.map((s) => sourceLine(s))
         : ["- (none: make no factual citation claims)"]),
       "",
       "Produce, as JSON:",
       "- body: 3-7 blocks of explanatory prose (kind 'p'; `code` and **bold**",
-      "  inline; cite source refs on 'p' blocks where a claim leans on one).",
+      "  inline; add sourceRefs on a 'p' block when its claim leans on a Source,",
+      "  but plain teaching without a Source needs no refs).",
       "- workedExample: 1-4 blocks walking one concrete example through the",
       "  throughline's running example.",
       "- recallPrompt: one question the learner answers from memory.",
@@ -311,18 +279,10 @@ function stripUnknownRefs(known: Set<string>) {
   };
 }
 
-function languageName(language: string): string {
-  const names: Record<string, string> = {
-    en: "English",
-    es: "Spanish",
-    fr: "French",
-    de: "German",
-    pt: "Portuguese",
-  };
-  return names[language] ?? "English";
-}
-
 export function candidateIsComplete(outline: OutlineData, writtenLessonIds: Set<string>): boolean {
   const planned = outline.modules.flatMap((m) => m.lessons.map((l) => l.id));
   return planned.every((id) => writtenLessonIds.has(id));
 }
+
+// Replay-safe ordering helpers are gone: generation writes one Lesson at a
+// time in reading order (ADR 0009), so there is nothing to schedule.

@@ -5,17 +5,25 @@ import type {
   OpenRouterProviderOptions,
 } from "@openrouter/ai-sdk-provider";
 
+export type ReasoningEffort = "low" | "medium" | "high";
+
 export const MODEL_PROFILES = {
+  // Gemini 3.7 Flash supports the three thinking levels exposed to the
+  // Learner and a 1M-token window for sequential Lesson generation.
   design: {
-    model: "z-ai/glm-5.3-flash",
+    model: "google/gemini-3.7-flash",
     reasoning: { effort: "medium" },
   },
   grounding: {
-    model: "z-ai/glm-5.3-flash",
+    model: "google/gemini-3.7-flash",
     reasoning: { effort: "low" },
   },
+  generation: {
+    model: "google/gemini-3.7-flash",
+    reasoning: { effort: "high" },
+  },
   tutor: {
-    model: "z-ai/glm-5.3-flash",
+    model: "google/gemini-3.7-flash",
     reasoning: { effort: "low" },
   },
   embedding: {
@@ -28,39 +36,49 @@ function openrouter() {
   return createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 }
 
-// Ordered by measured throughput; fallbacks stay on so a total outage degrades instead of failing.
-const DESIGN_PROVIDER_ORDER = ["baseten", "friendli", "makora", "digitalocean", "together"];
-
-const DESIGN_ROUTING: OpenRouterChatSettings = {
-  provider: { order: [...DESIGN_PROVIDER_ORDER], allow_fallbacks: true },
+const GOOGLE_AI_STUDIO_FLEX: OpenRouterChatSettings = {
+  provider: {
+    order: ["google-ai-studio"],
+    allow_fallbacks: false,
+    require_parameters: true,
+  },
+  extraBody: { service_tier: "flex" },
 };
 
-export function designProviderOptions(): { openrouter: OpenRouterProviderOptions } {
-  return { openrouter: { reasoning: { ...MODEL_PROFILES.design.reasoning } } };
+export function designProviderOptions(
+  effort: ReasoningEffort = MODEL_PROFILES.design.reasoning.effort,
+): { openrouter: OpenRouterProviderOptions } {
+  return { openrouter: { reasoning: { effort } } };
 }
 
 export function groundingProviderOptions(): { openrouter: OpenRouterProviderOptions } {
   return { openrouter: { reasoning: { ...MODEL_PROFILES.grounding.reasoning } } };
 }
 
+export function generationProviderOptions(): { openrouter: OpenRouterProviderOptions } {
+  return { openrouter: { reasoning: { ...MODEL_PROFILES.generation.reasoning } } };
+}
+
 export function designModel(): LanguageModel {
-  return openrouter()(MODEL_PROFILES.design.model, DESIGN_ROUTING);
+  return openrouter()(MODEL_PROFILES.design.model, GOOGLE_AI_STUDIO_FLEX);
 }
 
 export function groundingModel(): LanguageModel {
-  return openrouter()(MODEL_PROFILES.grounding.model);
+  return openrouter()(MODEL_PROFILES.grounding.model, GOOGLE_AI_STUDIO_FLEX);
 }
 
 export function generationModel(): LanguageModel {
-  return openrouter()(MODEL_PROFILES.design.model, DESIGN_ROUTING);
+  return openrouter()(MODEL_PROFILES.generation.model, GOOGLE_AI_STUDIO_FLEX);
 }
 
 export function tutorModel(): LanguageModel {
-  return openrouter()(MODEL_PROFILES.tutor.model);
+  return openrouter()(MODEL_PROFILES.tutor.model, GOOGLE_AI_STUDIO_FLEX);
 }
 
-export function tutorProviderOptions(): { openrouter: OpenRouterProviderOptions } {
-  return { openrouter: { reasoning: { ...MODEL_PROFILES.tutor.reasoning } } };
+export function tutorProviderOptions(
+  effort: ReasoningEffort = MODEL_PROFILES.tutor.reasoning.effort,
+): { openrouter: OpenRouterProviderOptions } {
+  return { openrouter: { reasoning: { effort } } };
 }
 
 // 1536-dimensional by construction: the model and the embedding column agree, so no negotiation happens.

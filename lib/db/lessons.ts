@@ -92,6 +92,17 @@ export async function saveLessonContent(
   options?: { touchRun?: boolean },
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    // The generation run is the authority for candidate writes. Check its
+    // existence first, in the same locking order as cancellation (run row
+    // before candidate rows), so a late write cannot recreate cancelled data.
+    const [run] = await tx
+      .select({ id: generationRuns.id })
+      .from(generationRuns)
+      .where(eq(generationRuns.id, runId))
+      .limit(1);
+    if (!run) {
+      throw new Error("The generation run is gone; discarding this Lesson write.");
+    }
     await tx
       .insert(lessons)
       .values({
@@ -202,10 +213,18 @@ export async function finishGeneration(
     return { ok: false, missing: missing.length };
   }
 
+  // The run stays active through review and publication; it succeeds only
+  // when publication succeeds. Record progress without closing the run.
   await db.transaction(async (tx) => {
+    const [run] = await tx
+      .select({ id: generationRuns.id })
+      .from(generationRuns)
+      .where(eq(generationRuns.id, runId))
+      .limit(1);
+    if (!run) return;
     await tx
       .update(generationRuns)
-      .set({ status: "succeeded", currentStep: "complete", updatedAt: new Date() })
+      .set({ currentStep: "lessons-complete", updatedAt: new Date() })
       .where(eq(generationRuns.id, runId));
     /* A staged revision finishes without touching the Course. */
     if (options?.promoteCourse === false) return;
@@ -215,6 +234,13 @@ export async function finishGeneration(
       .where(eq(courses.id, courseId));
   });
   return { ok: true, missing: 0 };
+}
+
+export async function succeedGenerationRun(db: Db, runId: string): Promise<void> {
+  await db
+    .update(generationRuns)
+    .set({ status: "succeeded", currentStep: "complete", updatedAt: new Date() })
+    .where(eq(generationRuns.id, runId));
 }
 
 export async function failGeneration(

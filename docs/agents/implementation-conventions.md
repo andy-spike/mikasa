@@ -18,7 +18,6 @@ Every worker implementing a Mikasa ticket follows these rules. They exist so tic
 - OpenRouter through the AI SDK (`ai` v7 is installed) for all model calls.
 - Firecrawl for web Sources.
 - Vercel Workflow for durable Course work (design, generation, review, correction, approved post-ready changes). Tutor and Tailor conversations stream directly and never use Workflow.
-- Vercel Sandbox for coding Topic verification.
 
 Secrets live in `.env.local` and are already present (GOOGLE_CLIENT_ID/SECRET, BETTER_AUTH_*, DATABASE_URL, OPENROUTER_API_KEY, FIRECRAWL_API_KEY, NEON_PROJECT_ID). Never print, commit, or copy secret values. Read them only through `process.env`. A missing auth variable fails at startup: `instrumentation.ts` runs `assertAuthConfig` when the server boots.
 
@@ -36,7 +35,7 @@ Every query and mutation filters by the authenticated Learner. Cross-Learner acc
 ## Testing
 
 - Test runner: `vitest` (`bun run test`). Unit tests for pure domain logic; integration tests run the Drizzle schema on PGlite (in-process Postgres, includes pgvector) so no Docker or remote DB is needed.
-- External providers are always substituted in tests: fake model (AI SDK mock model or hand-written fake), fake Firecrawl, fake Sandbox, fake embeddings. Tests must never call real APIs.
+- External providers are always substituted in tests: fake model (AI SDK mock model or hand-written fake), fake Firecrawl, fake embeddings. Tests must never call real APIs.
 - Where a ticket says "end-to-end checks", write hermetic integration tests that exercise the route handler or server action plus the database on PGlite, with substituted providers. The orchestrator does real-browser verification separately.
 - Durable work: keep step bodies as plain functions taking explicit inputs and returning explicit outputs. Test those directly. The workflow wrapper stays thin. If Vercel Workflow cannot execute locally in this environment, test the step functions and document the limitation in the commit message.
 - `bun run typecheck` (tsc --noEmit) and `bun run lint` must pass. Run the full test suite before committing.

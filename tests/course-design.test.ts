@@ -51,6 +51,8 @@ function draftOf(modules: number, lessons: number): OutlineDraft {
       premise: "One app, grown lesson by lesson",
       runningExample: "The chat app",
       vocabulary: ["stream", "tool"],
+      exampleContract:
+        "One repo: src/app.ts entry, src/stream.ts streams via streamText, src/history.ts keeps turns.",
     },
   };
 }
@@ -181,6 +183,7 @@ describe("draftOutline and buildOutline", () => {
     expect(prompt).toContain("English");
     expect(prompt).toContain("3–4 Modules with 2–3 Lessons each");
     expect(prompt).toContain("https://sdk.vercel.example/docs");
+    expect(prompt).toContain("exampleContract");
   });
 
   it("freezes the draft into an Outline inside the Depth bounds", () => {
@@ -243,21 +246,30 @@ describe("designSpecification", () => {
         prerequisiteNodes: i === 0 ? [] : ["g1"],
         moduleMilestone: "The app runs",
         exerciseContribution: "Adds a page to the app",
+        exampleStart: "",
+        exampleEnd: "",
+        sourceRefs: [],
       })),
       finalExercise: {
         task: "Ship the chat app",
         acceptanceChecks: ["A reply streams in", "History survives a reload"],
       },
-      evidence: [
-        { sourceRef: "src-a", supports: "streamText streams tokens" },
-        { sourceRef: "src-unknown", supports: "should be dropped" },
-      ],
+      evidence: [{ sourceRef: "src-a", supports: "streamText streams tokens" }],
     };
   }
 
   it("materializes the private specification against the real lesson ids", async () => {
     const specModel = scriptedModel([json(specResponse())]);
-    const spec = await designSpecification(specModel.model, course, outline, REACH_DRAFT, []);
+    const sources = [
+      {
+        ref: "src-a",
+        title: "Docs",
+        url: "https://a.example",
+        fetchedAt: "2026-08-31T00:00:00.000Z",
+        excerpt: "...",
+      },
+    ];
+    const spec = await designSpecification(specModel.model, course, outline, REACH_DRAFT, sources);
 
     expect(specModel.prompts[0]).toContain(lessonIds[0]);
     expect(spec.contract).toMatchObject({
@@ -274,7 +286,7 @@ describe("designSpecification", () => {
     expect(spec.finalExercise.acceptanceChecks).toHaveLength(2);
   });
 
-  it("keeps only evidence that cites a real Source ref", async () => {
+  it("fails on evidence that cites a Source the Course does not have", async () => {
     const specModel = scriptedModel([json(specResponse())]);
     const sources = [
       {
@@ -285,6 +297,19 @@ describe("designSpecification", () => {
         excerpt: "...",
       },
     ];
+    // src-a is known, but the response below adds an unknown ref; use a
+    // response with an unknown ref to prove we fail loudly instead of
+    // silently dropping it.
+    const bad = specResponse();
+    bad.evidence = [
+      { sourceRef: "src-a", supports: "streamText streams tokens" },
+      { sourceRef: "src-unknown", supports: "should fail, not drop" },
+    ];
+    const badModel = scriptedModel([json(bad)]);
+    await expect(
+      designSpecification(badModel.model, course, outline, REACH_DRAFT, sources),
+    ).rejects.toThrow(DesignError);
+    // The valid response still passes.
     const spec = await designSpecification(specModel.model, course, outline, REACH_DRAFT, sources);
 
     expect(spec.evidence).toEqual([{ sourceRef: "src-a", supports: "streamText streams tokens" }]);
@@ -362,6 +387,9 @@ describe("design persistence", () => {
           prerequisiteNodes: [],
           moduleMilestone: "The app runs",
           exerciseContribution: "Adds a page",
+          exampleStart: "",
+          exampleEnd: "",
+          sourceRefs: [],
         })),
         finalExercise: { task: "Ship it", acceptanceChecks: ["It runs"] },
         evidence: sources.map((s) => ({ sourceRef: s.ref, supports: `${s.title} backs this` })),

@@ -123,8 +123,10 @@ export async function approveOutlineAction(
     return opened;
   }
 
-  // Reconcile before anything changes: a failed model call leaves the Course as it was.
+  // Reconcile stale specifications once at approval. The extra repair call
+  // below is conditional on validation failure.
   const adjustments = await activeContentAdjustments(db, courseId, outline.data);
+  let specForValidation = specRow?.spec;
   if (specRow && specIsStale(specRow, outline.version)) {
     try {
       const reconciled = await reconcileSpecification(
@@ -134,6 +136,7 @@ export async function approveOutlineAction(
         adjustments,
       );
       await saveReconciledSpec(db, courseId, reconciled, outline.version);
+      specForValidation = reconciled;
     } catch (error) {
       return {
         ok: false,
@@ -143,6 +146,40 @@ export async function approveOutlineAction(
             ? `The Course specification could not be reconciled: ${error.message}`
             : "The Course specification could not be reconciled. Try again.",
       };
+    }
+  }
+
+  // Validate reading-order consistency and Source references before starting
+  // work. On failure, attempt one reconciliation with the validation errors.
+  if (specForValidation) {
+    const { validateSpecification } = await import("@/lib/course/spec-validate");
+    const { listCourseSources } = await import("@/lib/db/design");
+    const stored = await listCourseSources(db, courseId);
+    const available = new Set(stored.map((s) => s.ref));
+    try {
+      validateSpecification(specForValidation, outline.data, available);
+    } catch (first) {
+      const firstMessage = first instanceof Error ? first.message : "The specification is invalid.";
+      try {
+        const repaired = await reconcileSpecification(
+          designModel(),
+          outline.data,
+          specForValidation,
+          adjustments,
+          [firstMessage],
+        );
+        await saveReconciledSpec(db, courseId, repaired, outline.version);
+        validateSpecification(repaired, outline.data, available);
+        specForValidation = repaired;
+      } catch (repairError) {
+        const message =
+          repairError instanceof Error && repairError.message ? repairError.message : firstMessage;
+        return {
+          ok: false,
+          reason: "invalid",
+          message: `The Course specification is invalid and could not be repaired: ${message}`,
+        };
+      }
     }
   }
 

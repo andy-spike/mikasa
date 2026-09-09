@@ -3,9 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { deleteOwnedDesigningCourse } from "@/lib/db/courses";
 import { generationRunCancelled } from "@/lib/db/outline";
 import { designCourseExists } from "@/lib/db/design";
-import { cancelGenerationRun, openReviewRun } from "@/lib/db/review";
+import { cancelGenerationRun } from "@/lib/db/review";
 import {
-  codeVerifications,
   courses,
   designRuns,
   generationRuns,
@@ -215,27 +214,6 @@ describe("cancelling a generating Course", () => {
     const [after] = await db.select().from(courses).where(eq(courses.id, course.id));
     expect(after.status).toBe("awaiting-outline-approval");
     expect(await db.select().from(generationRuns).where(eq(generationRuns.id, run.id))).toEqual([]);
-  });
-
-  it("a new review run drops the previous run's Sandbox result", async () => {
-    /* Otherwise the new run reuses a stale failure and can never pass,
-       even after corrections fixed the code. */
-    const db = await makeTestDb();
-    const user = await seedUser(db, "u1");
-    const { course } = await seedGeneratingCourse(db, user.id);
-    await db.insert(codeVerifications).values({
-      courseId: course.id,
-      outlineVersion: 1,
-      round: 0,
-      status: "failed",
-      evidence: { commands: [] },
-    });
-
-    await openReviewRun(db, course.id, 1, { touchCourse: false });
-
-    expect(
-      await db.select().from(codeVerifications).where(eq(codeVerifications.courseId, course.id)),
-    ).toEqual([]);
   });
 });
 

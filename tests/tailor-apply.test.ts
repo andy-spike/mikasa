@@ -52,10 +52,13 @@ vi.mock("@/lib/course/reconcile", () => ({
       alignment: outline.modules.flatMap((m) =>
         m.lessons.map((l) => ({
           lessonId: l.id,
-          performance: "aligned",
+          performance: `aligned ${l.id}`,
           prerequisiteNodes: [],
           moduleMilestone: "milestone",
           exerciseContribution: "contributes",
+          exampleStart: "",
+          exampleEnd: "",
+          sourceRefs: [],
         })),
       ),
     };

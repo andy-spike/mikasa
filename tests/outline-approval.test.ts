@@ -46,10 +46,13 @@ vi.mock("@/lib/course/reconcile", () => ({
       alignment: outline.modules.flatMap((m) =>
         m.lessons.map((l) => ({
           lessonId: l.id,
-          performance: "aligned",
+          performance: `aligned ${l.id}`,
           prerequisiteNodes: [],
           moduleMilestone: "milestone",
           exerciseContribution: "contributes",
+          exampleStart: "",
+          exampleEnd: "",
+          sourceRefs: [],
         })),
       ),
     };
@@ -74,10 +77,13 @@ const SPEC = makeSpec(OUTLINE, {
   learningGraph: [{ id: "g1", skill: "Stream text", requires: [], lessonId: "l1" }],
   alignment: (l) => ({
     lessonId: l.id,
-    performance: "does the thing",
+    performance: `does ${l.id}`,
     prerequisiteNodes: [],
     moduleMilestone: "milestone",
     exerciseContribution: "contributes",
+    exampleStart: "",
+    exampleEnd: "",
+    sourceRefs: [],
   }),
   finalExercise: { task: "Build it", acceptanceChecks: ["It runs"] },
 });

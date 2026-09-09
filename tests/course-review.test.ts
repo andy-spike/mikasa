@@ -15,8 +15,6 @@ import type { LessonContent } from "@/lib/course/content";
 
 const {
   correctLesson,
-  designFindings,
-  factualFindings,
   MAX_CORRECTION_ROUNDS,
   structuralFindings,
 } = await import("@/lib/course/review");
@@ -50,6 +48,9 @@ const SPEC = makeSpec(OUTLINE, {
     prerequisiteNodes: [],
     moduleMilestone: "milestone",
     exerciseContribution: "contributes",
+    exampleStart: "",
+    exampleEnd: "",
+    sourceRefs: [],
   }),
   finalExercise: { task: "Build it", acceptanceChecks: ["It runs"] },
   evidence: [{ sourceRef: "src-1", supports: "The main claim" }],
@@ -131,10 +132,6 @@ async function seedCandidate(): Promise<string> {
   return course.id;
 }
 
-const SOURCES = [
-  { ref: "src-1", title: "The docs", url: "https://example.com/docs", excerpt: "e" },
-];
-
 describe("structuralFindings", () => {
   it("passes a whole candidate that cites known Sources", () => {
     const findings = structuralFindings({
@@ -184,50 +181,6 @@ describe("structuralFindings", () => {
   });
 });
 
-describe("model reviews", () => {
-  it("maps the model's findings onto the factual and design slices", async () => {
-    const model = scriptedModel([
-      json({
-        findings: [{ lessonRef: "l1", detail: "Wrong version number.", correction: "Fix to v7." }],
-      }),
-      json({
-        findings: [
-          {
-            lessonRef: null,
-            detail: "Bridge contradicts next Lesson.",
-            correction: "Rewrite the bridge.",
-          },
-        ],
-      }),
-    ]);
-    const courseMeta = { topic: "t", goal: "g", language: "en" };
-    const lessons = [contentFor("l1"), contentFor("l2")];
-
-    const factual = await factualFindings(model.model, courseMeta, SPEC, SOURCES, lessons);
-    const design = await designFindings(model.model, courseMeta, SPEC, OUTLINE, lessons);
-
-    expect(factual).toEqual([
-      {
-        kind: "factual",
-        lessonRef: "l1",
-        detail: "Wrong version number.",
-        correction: "Fix to v7.",
-      },
-    ]);
-    expect(design[0].kind).toBe("learning-design");
-    expect(design[0].lessonRef).toBeNull();
-  });
-
-  it("treats a broken model response as a review failure, not a pass", async () => {
-    const model = scriptedModel(["not json"]);
-    await expect(
-      factualFindings(model.model, { topic: "t", goal: "g", language: "en" }, SPEC, SOURCES, [
-        contentFor("l1"),
-      ]),
-    ).rejects.toThrow();
-  });
-});
-
 describe("correctLesson", () => {
   it("rewrites only the affected Lesson, in the same six-part shape", async () => {
     const model = scriptedModel([
@@ -253,6 +206,85 @@ describe("correctLesson", () => {
     expect(corrected.lessonId).toBe("l1");
     expect(corrected.body[0]).toMatchObject({ text: "Explanation, now with v7." });
     expect(model.prompts[0]).toContain("Wrong version.");
+    expect(JSON.stringify(model.responseFormats[0])).toContain('"kind"');
+  });
+
+  it("holds the corrected Lesson to the example contract", async () => {
+    const contract = "img.card-img; 300px and 500px breakpoints";
+    const model = scriptedModel([
+      json({
+        body: [{ kind: "p", text: "Fixed." }],
+        workedExample: [{ kind: "p", text: "Worked." }],
+        recallPrompt: "What?",
+        selfExplanationPrompt: "Why?",
+        exercise: { task: "Do it.", check: "It ran." },
+        bridge: "Next.",
+      }),
+    ]);
+
+    await correctLesson(
+      model.model,
+      { topic: "t", goal: "g", language: "en" },
+      makeSpec(makeOutline([2]), {
+        throughline: {
+          premise: "p",
+          runningExample: "r",
+          vocabulary: [],
+          exampleContract: contract,
+        },
+      }),
+      contentFor("l1"),
+      [
+        {
+          kind: "factual",
+          lessonRef: "l1",
+          detail: "Names drift.",
+          correction: "Match the contract.",
+        },
+      ],
+      [],
+    );
+
+    expect(model.prompts[0]).toContain("authoritative");
+    expect(model.prompts[0]).toContain(contract);
+  });
+
+  it("shows the corrected Lesson the other Lessons' current text", async () => {
+    const model = scriptedModel([
+      json({
+        body: [{ kind: "p", text: "Fixed." }],
+        workedExample: [{ kind: "p", text: "Worked." }],
+        recallPrompt: "What?",
+        selfExplanationPrompt: "Why?",
+        exercise: { task: "Do it.", check: "It ran." },
+        bridge: "Next.",
+      }),
+    ]);
+
+    await correctLesson(
+      model.model,
+      { topic: "t", goal: "g", language: "en" },
+      SPEC,
+      contentFor("l2"),
+      [
+        {
+          kind: "factual",
+          lessonRef: "l2",
+          detail: "The recap contradicts Lesson 1.",
+          correction: "Match what Lesson 1 ships.",
+        },
+      ],
+      [
+        {
+          title: "Lesson one",
+          summary: "First.",
+          excerpt: "EXERCISE: Wrap one card | CHECK: class names match the contract",
+        },
+      ],
+    );
+
+    expect(model.prompts[0]).toContain("currently stand");
+    expect(model.prompts[0]).toContain("EXERCISE: Wrap one card | CHECK: class names match");
   });
 });
 
@@ -303,9 +335,9 @@ describe("publication", () => {
     const run = await openReviewRun(db, courseId, 1);
     await saveFindings(db, run.id, courseId, 1, 0, [
       {
-        kind: "learning-design",
+        kind: "factual",
         lessonRef: null,
-        detail: "No throughline.",
+        detail: "Wrong version.",
         correction: "Rewrite.",
       },
     ]);
@@ -319,7 +351,7 @@ describe("publication", () => {
   });
 
   it("keeps the two-round cap a constant the workflow cannot stretch", () => {
-    expect(MAX_CORRECTION_ROUNDS).toBe(2);
+    expect(MAX_CORRECTION_ROUNDS).toBe(3);
   });
 });
 

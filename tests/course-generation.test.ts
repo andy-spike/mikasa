@@ -30,7 +30,7 @@ import { json, scriptedModel } from "./helpers/fake-model";
 import { makeTestDb } from "./helpers/test-db";
 import { makeOutline } from "./helpers/fixtures";
 
-const { candidateIsComplete, generateLesson, generationOrder, GenerationError, planLessonSource } =
+const { candidateIsComplete, generateLesson, generationOrder, GenerationError } =
   await import("@/lib/course/generate");
 const { users, courses, outlines, courseSpecs, sources, generationRuns, lessons } =
   await import("@/lib/db/schema");
@@ -72,6 +72,9 @@ const SPEC = {
       prerequisiteNodes: [] as string[],
       moduleMilestone: "milestone",
       exerciseContribution: "contributes",
+      exampleStart: "",
+      exampleEnd: "",
+      sourceRefs: [],
     })),
   ),
   finalExercise: { task: "Build it", acceptanceChecks: ["It runs"] },
@@ -132,13 +135,13 @@ afterEach(async () => {
 });
 
 describe("generationOrder", () => {
-  it("orders Lessons so required skills come first, breaking ties by Outline order", () => {
+  it("returns the Outline reading order when dependencies already match it", () => {
     const order = generationOrder(SPEC, OUTLINE);
     const ids = order.map((l) => l.id);
     expect(ids).toEqual(["l1", "l2", "l3", "l4"]);
   });
 
-  it("corrects an Outline whose positions contradict the dependency graph", () => {
+  it("fails loudly when the Outline order contradicts the dependency graph", () => {
     const wrong = {
       modules: [
         {
@@ -151,8 +154,9 @@ describe("generationOrder", () => {
         },
       ],
     };
-    const order = generationOrder(SPEC, wrong);
-    expect(order.map((l) => l.id)).toEqual(["l2", "l1", "l3", "l4"]);
+    // The approved Outline is never reordered; an inconsistent graph is a
+    // validation error that triggers one repair, not a silent reorder.
+    expect(() => generationOrder(SPEC, wrong)).toThrow(GenerationError);
   });
 
   it("fails loudly on a cyclic graph instead of generating a broken Course", () => {
@@ -164,31 +168,6 @@ describe("generationOrder", () => {
       ],
     };
     expect(() => generationOrder(cyclic, OUTLINE)).toThrow(GenerationError);
-  });
-});
-
-describe("planLessonSource", () => {
-  it("asks for nothing when Grounding is off, without calling the model", async () => {
-    const model = scriptedModel([json({ needsSource: true, query: "nope" })]);
-    const plan = await planLessonSource(
-      model.model,
-      { topic: "t", goal: "g", grounding: false },
-      { title: "L", summary: "S" },
-      [],
-    );
-    expect(plan).toEqual({ needsSource: false });
-    expect(model.calls()).toBe(0);
-  });
-
-  it("passes a query through when the model wants one", async () => {
-    const model = scriptedModel([json({ needsSource: true, query: "ai sdk v7 tools" })]);
-    const plan = await planLessonSource(
-      model.model,
-      { topic: "t", goal: "g", grounding: true },
-      { title: "L", summary: "S" },
-      [],
-    );
-    expect(plan).toEqual({ needsSource: true, query: "ai sdk v7 tools" });
   });
 });
 
@@ -268,6 +247,25 @@ describe("generateLesson", () => {
     expect(model.prompts[0]).toContain("Stream by hand");
     expect(model.prompts[0]).not.toContain("Not this lesson.");
   });
+
+  it("pins the shared example contract into the Lesson's prompt", async () => {
+    const contract = "article.card > img.card-img, h2.card-title; breakpoints 300px and 500px";
+    const model = scriptedModel([lessonJson("Lesson one")]);
+    await generateLesson(model.model, {
+      course: { topic: "t", goal: "g", background: "", language: "en", depth: "reach" },
+      spec: {
+        ...SPEC,
+        throughline: { ...SPEC.throughline, exampleContract: contract },
+      },
+      lesson: { id: "l1", title: "Lesson one", summary: "First." },
+      nextLesson: null,
+      priorLessons: [],
+      sources: [],
+    });
+
+    expect(model.prompts[0]).toContain("pinned before any Lesson was written");
+    expect(model.prompts[0]).toContain(contract);
+  });
 });
 
 describe("a full candidate", () => {
@@ -280,27 +278,15 @@ describe("a full candidate", () => {
       .returning();
 
     const model = scriptedModel([
-      json({ needsSource: false }),
       lessonJson("Lesson one"),
-      json({ needsSource: false }),
       lessonJson("Lesson two"),
-      json({ needsSource: false }),
       lessonJson("Lesson three"),
-      json({ needsSource: false }),
       lessonJson("Lesson four"),
     ]);
 
     const order = generationOrder(context.spec, context.outline.data);
     const prior: { title: string; summary: string }[] = [];
     for (const lesson of order) {
-      /* The same two calls the workflow's step makes: plan the Source
-         lookup (none needed here), then write. */
-      await planLessonSource(
-        model.model,
-        context.course,
-        { title: lesson.title, summary: lesson.summary },
-        context.sources,
-      );
       const content = await generateLesson(model.model, {
         course: context.course,
         spec: context.spec,

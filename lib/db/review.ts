@@ -26,17 +26,6 @@ export async function openReviewRun(
   outlineVersion: number,
   options?: { touchCourse?: boolean },
 ): Promise<ReviewRun> {
-  /* Sandbox results belong to one review run. A new run must re-run them
-     against the current Lessons: reusing the previous run's failed result
-     would fail the new run even after corrections fixed the code. */
-  await db
-    .delete(codeVerifications)
-    .where(
-      and(
-        eq(codeVerifications.courseId, courseId),
-        eq(codeVerifications.outlineVersion, outlineVersion),
-      ),
-    );
   const [run] = await db.insert(reviewRuns).values({ courseId, outlineVersion }).returning();
   if (options?.touchCourse === false) return run;
   await db
@@ -57,8 +46,31 @@ export async function saveFindings(
   outlineVersion: number,
   round: number,
   findings: Finding[],
+  options?: { generationRunId?: string },
 ): Promise<ReviewFindingRow[]> {
   return db.transaction(async (tx) => {
+    // A late review write must not recreate cancelled candidate data.
+    // The generation run owns the candidate; if it is gone, drop the write.
+    if (options?.generationRunId) {
+      const [genRun] = await tx
+        .select({ id: generationRuns.id })
+        .from(generationRuns)
+        .where(eq(generationRuns.id, options.generationRunId))
+        .limit(1);
+      if (!genRun) return [];
+    } else {
+      const [genRun] = await tx
+        .select({ id: generationRuns.id })
+        .from(generationRuns)
+        .where(
+          and(
+            eq(generationRuns.courseId, courseId),
+            eq(generationRuns.outlineVersion, outlineVersion),
+          ),
+        )
+        .limit(1);
+      if (!genRun) return [];
+    }
     await tx
       .delete(reviewFindings)
       .where(and(eq(reviewFindings.reviewRunId, runId), eq(reviewFindings.round, round)));
@@ -116,12 +128,17 @@ export type PublishResult = { ok: true; revision: Revision } | { ok: false; reas
 /**
  * Publication is one atomic transaction and idempotent per outline version:
  * a repeated retry reuses the existing revision instead of minting a second.
+ *
+ * The transaction owns every gate: candidate completeness, matching review
+ * identity, no open findings, run validity, and staged base-revision checks.
+ * A pre-publication check alone is insufficient.
  */
 export async function publishRevision(
   db: Db,
   courseId: string,
   outlineVersion: number,
   reviewRunId: string,
+  options?: { generationRunId?: string; baseRevisionNumber?: number },
 ): Promise<PublishResult> {
   return db.transaction(async (tx) => {
     const [outline] = await tx
@@ -153,6 +170,13 @@ export async function publishRevision(
     if (!run || run.status !== "succeeded") {
       return { ok: false as const, reason: "Refusing to publish before the review passes." };
     }
+    // Matching review identity: the review must belong to this candidate.
+    if (run.courseId !== courseId || run.outlineVersion !== outlineVersion) {
+      return {
+        ok: false as const,
+        reason: "Refusing to publish: the review is for another candidate.",
+      };
+    }
 
     const open = await tx
       .select({ id: reviewFindings.id })
@@ -163,23 +187,42 @@ export async function publishRevision(
       return { ok: false as const, reason: "Refusing to publish with open review findings." };
     }
 
-    /* A failed Sandbox pass blocks publication until a later round passes. */
-    const verification = await tx
-      .select()
-      .from(codeVerifications)
-      .where(
-        and(
-          eq(codeVerifications.courseId, courseId),
-          eq(codeVerifications.outlineVersion, outlineVersion),
-        ),
-      )
-      .orderBy(desc(codeVerifications.round))
-      .limit(1);
-    if (verification[0]?.status === "failed") {
-      return {
-        ok: false as const,
-        reason: "Refusing to publish: the code did not run cleanly in the Sandbox.",
-      };
+    // Run validity: the generation run must still exist for this candidate.
+    // A cancelled run is gone, so publication refuses.
+    if (options?.generationRunId) {
+      const [genRun] = await tx
+        .select()
+        .from(generationRuns)
+        .where(eq(generationRuns.id, options.generationRunId))
+        .limit(1);
+      if (!genRun || genRun.courseId !== courseId || genRun.outlineVersion !== outlineVersion) {
+        return { ok: false as const, reason: "Refusing to publish: the generation run is gone." };
+      }
+    } else {
+      const [genRun] = await tx
+        .select({ id: generationRuns.id })
+        .from(generationRuns)
+        .where(
+          and(
+            eq(generationRuns.courseId, courseId),
+            eq(generationRuns.outlineVersion, outlineVersion),
+          ),
+        )
+        .limit(1);
+      if (!genRun) {
+        return { ok: false as const, reason: "Refusing to publish: the generation run is gone." };
+      }
+    }
+
+    // Staged base-revision check: the Course must not have moved since staging.
+    if (options?.baseRevisionNumber !== undefined) {
+      const current = await currentRevision(tx, courseId);
+      if (!current || current.revisionNumber !== options.baseRevisionNumber) {
+        return {
+          ok: false as const,
+          reason: `Refusing to publish: the Course moved to revision ${current?.revisionNumber ?? "none"} while this revision was being prepared.`,
+        };
+      }
     }
 
     const [current] = await tx
@@ -205,19 +248,47 @@ export async function publishRevision(
       .set({ status: "ready", updatedAt: new Date() })
       .where(eq(courses.id, courseId));
     await recomputeCourseCompletion(tx, courseId);
+    // The generation run succeeds only now, not when Lessons finished.
+    if (options?.generationRunId) {
+      await tx
+        .update(generationRuns)
+        .set({ status: "succeeded", currentStep: "complete", updatedAt: new Date() })
+        .where(eq(generationRuns.id, options.generationRunId));
+    } else {
+      await tx
+        .update(generationRuns)
+        .set({ status: "succeeded", currentStep: "complete", updatedAt: new Date() })
+        .where(
+          and(
+            eq(generationRuns.courseId, courseId),
+            eq(generationRuns.outlineVersion, outlineVersion),
+          ),
+        );
+    }
 
     return { ok: true as const, revision };
   });
 }
 
-/** A retry reuses the existing row for the round instead of re-running the Sandbox. */
+/** Deprecated V1 leftover: the Sandbox verification lane is removed from the
+ * workflow. Kept for the orphaned rows until a migration drops the table. */
 export async function saveCodeVerification(
   db: Db,
   courseId: string,
   outlineVersion: number,
   round: number,
   result: { passed: boolean; evidence: unknown },
+  options?: { generationRunId?: string },
 ): Promise<{ created: boolean }> {
+  // Late writes must not recreate cancelled candidate data.
+  if (options?.generationRunId) {
+    const [genRun] = await db
+      .select({ id: generationRuns.id })
+      .from(generationRuns)
+      .where(eq(generationRuns.id, options.generationRunId))
+      .limit(1);
+    if (!genRun) return { created: false };
+  }
   const [existing] = await db
     .select()
     .from(codeVerifications)
@@ -239,6 +310,23 @@ export async function saveCodeVerification(
     evidence: result.evidence,
   });
   return { created: true };
+}
+
+export function verificationContentHash(
+  lessons: { lessonId: string; body: unknown; workedExample: unknown; exercise: unknown }[],
+): string {
+  const parts = [...lessons]
+    .sort((a, b) => (a.lessonId < b.lessonId ? -1 : 1))
+    .map(
+      (l) =>
+        `${l.lessonId}:${JSON.stringify(l.body)}:${JSON.stringify(l.workedExample)}:${JSON.stringify(l.exercise)}`,
+    );
+  let hash = 0;
+  const text = parts.join("|");
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash * 31 + text.charCodeAt(i)) | 0;
+  }
+  return `h${(hash >>> 0).toString(16)}`;
 }
 
 export async function findCodeVerification(
@@ -339,17 +427,22 @@ export async function resetGenerationRun(
   runId: string,
 ): Promise<boolean> {
   return db.transaction(async (tx) => {
-    const [run] = await tx
-      .select()
-      .from(generationRuns)
-      .where(and(eq(generationRuns.id, runId), eq(generationRuns.courseId, courseId)))
-      .limit(1);
-    if (!run || run.status !== "failed") return false;
-
-    await tx
+    // Atomic claim: only one concurrent Retry can flip failed -> running.
+    const claimed = await tx
       .update(generationRuns)
       .set({ status: "running", error: null, updatedAt: new Date() })
-      .where(eq(generationRuns.id, runId));
+      .where(
+        and(
+          eq(generationRuns.id, runId),
+          eq(generationRuns.courseId, courseId),
+          eq(generationRuns.status, "failed"),
+        ),
+      )
+      .returning({ id: generationRuns.id });
+    if (claimed.length === 0) return false;
+
+    // If the Course already published, leave it ready and let the workflow
+    // resume only unfinished embedding or Change plan bookkeeping.
     const [published] = await tx
       .select({ id: revisions.id })
       .from(revisions)

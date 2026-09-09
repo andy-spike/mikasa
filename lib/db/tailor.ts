@@ -872,6 +872,20 @@ export async function resumeStagedRevision(
 
   const accepted = plan.operations.filter((o) => o.status === "accepted").map((o) => o.payload);
   const affected = affectedLessonSets(baseOutline.data, stagedOutline.data, accepted);
+  // Retry retains the expanded correction set: corrections may have reached
+  // related Lessons beyond the original regenerate list. Union the stored
+  // touched set so Undo overlap checks and embeddings see the full set.
+  const storedTouched = new Set([
+    ...(plan.touchedLessons ?? []),
+    ...(plan.regeneratedLessons ?? []),
+  ]);
+  const regenerate = [
+    ...new Set([
+      ...affected.regenerate,
+      ...[...storedTouched].filter((r) => (plan.touchedLessons ?? []).includes(r)),
+    ]),
+  ];
+  const embed = [...new Set([...affected.embed, ...(plan.touchedLessons ?? [])])];
 
   const [run] = await db
     .select()
@@ -897,8 +911,8 @@ export async function resumeStagedRevision(
     runId: run.id,
     baseRevisionNumber: plan.baseRevisionNumber!,
     stagedOutlineVersion: plan.stagedOutlineVersion,
-    regenerateLessonRefs: affected.regenerate,
-    embedLessonRefs: affected.embed,
+    regenerateLessonRefs: regenerate,
+    embedLessonRefs: embed,
   };
 }
 

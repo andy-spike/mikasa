@@ -27,10 +27,12 @@ vi.mock("workflow/api", () => ({
 
 vi.mock("@/lib/course/review", () => ({
   structuralFindings: () => [],
-  factualFindings: async () => [],
-  designFindings: async () => [],
+  combinedFindings: async () => [],
+  dedupeCorrectionQueries: () => [],
   correctLesson: vi.fn(),
-  MAX_CORRECTION_ROUNDS: 2,
+  MAX_CORRECTION_ROUNDS: 3,
+  lessonContextExcerpt: () => "",
+  CORRECTION_SOURCE_QUERY_CAP: 3,
 }));
 
 const revisionModelState = vi.hoisted(() => ({
@@ -120,10 +122,13 @@ function reconcileJson(outline: { modules: { lessons: { id: string }[] }[] }): s
       .flatMap((m) => m.lessons)
       .map((l) => ({
         lessonId: l.id,
-        performance: "does",
+        performance: `does ${l.id}`,
         prerequisiteNodes: [],
         moduleMilestone: "m",
         exerciseContribution: "c",
+        exampleStart: "",
+        exampleEnd: "",
+        sourceRefs: [],
       })),
   });
 }

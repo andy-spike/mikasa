@@ -14,7 +14,8 @@
     "test": "vitest run",
     "db:generate": "DATABASE_URL=\"$DATABASE_URL_DEV\" bun --bun drizzle-kit generate",
     "db:migrate": "DATABASE_URL=\"$DATABASE_URL_DEV\" bun --bun drizzle-kit migrate",
-    "db:migrate:main": "DATABASE_URL=\"$DATABASE_URL_MAIN\" bun --bun drizzle-kit migrate"
+    "db:migrate:main": "DATABASE_URL=\"$DATABASE_URL_MAIN\" bun --bun drizzle-kit migrate",
+    "dev:reset": "bun run scripts/dev-reset.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -25,6 +26,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "cn": "^0.2.6",
     "drizzle-orm": "^0.45.2",
     "firecrawl": "^4.38.0",
     "lucide-react": "^1.35.0",

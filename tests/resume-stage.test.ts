@@ -30,13 +30,15 @@ const reviewState = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/course/review", () => ({
   structuralFindings: () => [],
-  factualFindings: async () => {
+  combinedFindings: async () => {
     if (reviewState.throwFactual) throw new Error("The review exploded.");
     return [];
   },
-  designFindings: async () => [],
+  dedupeCorrectionQueries: () => [],
   correctLesson: vi.fn(),
-  MAX_CORRECTION_ROUNDS: 2,
+  MAX_CORRECTION_ROUNDS: 3,
+  lessonContextExcerpt: () => "",
+  CORRECTION_SOURCE_QUERY_CAP: 3,
 }));
 
 const publishRefusal = vi.hoisted(() => ({
@@ -113,10 +115,13 @@ function reconcileJson(outline: { modules: { lessons: { id: string }[] }[] }): s
       .flatMap((m) => m.lessons)
       .map((l) => ({
         lessonId: l.id,
-        performance: "does",
+        performance: `does ${l.id}`,
         prerequisiteNodes: [],
         moduleMilestone: "m",
         exerciseContribution: "c",
+        exampleStart: "",
+        exampleEnd: "",
+        sourceRefs: [],
       })),
   });
 }
