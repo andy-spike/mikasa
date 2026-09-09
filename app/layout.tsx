@@ -40,7 +40,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 -->`;
 
 /* Runs before first paint, so the shell is never briefly the wrong ground. */
-const THEME_SCRIPT = `try{var t=localStorage.getItem("mk-theme");if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`;
+const THEME_SCRIPT = `try{var t=localStorage.getItem("mk-theme"),d=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);var p=document.querySelector('link[data-mk-favicon="paper"]'),g=document.querySelector('link[data-mk-favicon="graphite"]');if(p&&g){p.media=d?"not all":"all";g.media=d?"all":"not all"}}catch(e){}`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -50,6 +50,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={cn("h-full antialiased", geistSans.variable, geistMono.variable)}
     >
       <head>
+        <link
+          rel="icon"
+          href="/favicon-paper.svg"
+          type="image/svg+xml"
+          media="(prefers-color-scheme: light)"
+          data-mk-favicon="paper"
+        />
+        <link
+          rel="icon"
+          href="/favicon-graphite.svg"
+          type="image/svg+xml"
+          media="(prefers-color-scheme: dark)"
+          data-mk-favicon="graphite"
+        />
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="h-full">

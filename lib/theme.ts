@@ -3,12 +3,21 @@ export type ThemeChoice = "system" | "light" | "dark";
 
 const listeners = new Set<() => void>();
 
+function syncFavicon(dark: boolean) {
+  const paper = document.querySelector<HTMLLinkElement>('link[data-mk-favicon="paper"]');
+  const graphite = document.querySelector<HTMLLinkElement>('link[data-mk-favicon="graphite"]');
+  if (!paper || !graphite) return;
+  paper.media = dark ? "not all" : "all";
+  graphite.media = dark ? "all" : "not all";
+}
+
 export function subscribeTheme(onChange: () => void) {
   const media = matchMedia("(prefers-color-scheme: dark)");
   const syncSystem = () => {
     if (readTheme() === "system") {
       document.documentElement.classList.toggle("dark", media.matches);
     }
+    syncFavicon(document.documentElement.classList.contains("dark"));
     onChange();
   };
   listeners.add(onChange);
@@ -42,5 +51,6 @@ export function setTheme(next: ThemeChoice) {
   const dark =
     next === "dark" || (next === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
   document.documentElement.classList.toggle("dark", dark);
+  syncFavicon(dark);
   for (const notify of listeners) notify();
 }
