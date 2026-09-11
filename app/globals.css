@@ -5,60 +5,69 @@
    so `dark:` follows the class rather than the OS alone. */
 @custom-variant dark (&:is(.dark *));
 
-/* ── Graphite Workspace ────────────────────────────────────────────────────
-   A working shell. Surfaces separate by luminance, never by border. One
+/* ── Flexoki Paper Desk ────────────────────────────────────────────────────
+   A warm working desk. Surfaces separate by luminance, never by border. One
    accent, one meaning: the Lesson you are up to. Which Lesson is open is a
-   raised ground, never a colour. Every corner is square, and a row carries
-   the fewest facts that let the reader act on it.
-   Direction roll 21608bd1, re-roll 1, safer register, user-picked.
+   raised ground, never a colour. Corners are small and soft, rows carry the
+   fewest facts that let the reader act, and code alone carries syntax colour.
+   Direction: Flexoki paper desk, pick 1 of 7, seed 44ddd994, code-led.
 
-   Two grounds, one system. Graphite runs four steps up from #0f1012; paper
-   runs four steps down from #ffffff. Every ink lands on the same contrast
-   floor in both: 5.08 / 4.63 for the two quiet text steps against the
-   topmost surface, 3.18 for the one mark that is a graphic and never text.
+   Two warm grounds. Paper runs down from #FFFCF0; charcoal runs up from
+   #1B1A18. Every text step clears 4.5:1 on all four surfaces. Code sits on
+   the reading ground with a hairline enclosure so its syntax roles clear
+   4.5:1 too. Grain is subtle and never behind body text at reading opacity.
    ------------------------------------------------------------------------ */
 
 :root {
   color-scheme: light;
 
-  /* surfaces, four steps down from paper */
-  --canvas: #ffffff;
-  --panel: #f7f8fa;
-  --raised: #edeff2;
-  --over: #e3e5e9;
+  /* surfaces, four steps down from warm paper */
+  --canvas: #fffcf0;
+  --panel: #f2f0e5;
+  --raised: #e6e4d9;
+  --over: #d9d6c3;
 
   /* hairlines. these divide, they do not decorate */
-  --hair: #e7e9ed;
-  --rule: #d3d7dd;
+  --hair: #ddd9c7;
+  --rule: #c9c4b0;
 
-  /* text. every step clears 4.5:1 on all four surfaces: worst cases are
-     14.1 / 7.62 / 5.08 / 4.63 against the palette's own ground */
-  --fg: #16181b;
-  --fg-2: #3e464c;
-  --fg-3: #586066;
-  --fg-dim: #5e666c;
+  /* text. every step clears 4.5:1 on all four surfaces */
+  --fg: #1c1b1a;
+  --fg-2: #3f3e38;
+  --fg-3: #565651;
+  --fg-dim: #5e5d58;
   /* graphics only, never text: meaning-bearing marks need 3:1, not 4.5:1 */
-  --mark: #788086;
+  --mark: #76746b;
 
   /* the accent. it marks the Lesson you are up to, and nothing else */
-  --live: #0a7f5f;
-  --live-dim: #0f6b52;
-  --live-wash: rgba(10, 127, 95, 0.1);
+  --live: #4a6b0a;
+  --live-dim: #3f5a08;
+  --live-wash: rgba(74, 107, 10, 0.12);
 
   /* the browser surfaces we still own */
-  --select: rgba(10, 127, 95, 0.18);
-  --thumb: #ccd0d6;
-  --thumb-hover: #aeb4bd;
-  --scroll-shade: rgba(22, 24, 27, 0.14);
+  --select: rgba(74, 107, 10, 0.16);
+  --thumb: #c9c4b0;
+  --thumb-hover: #a8a497;
+  --scroll-shade: rgba(28, 27, 26, 0.16);
 
   /* the two grounds the shell does not own: what floats, and what it sits on */
-  --float: #ffffff;
-  --scrim: rgba(22, 24, 27, 0.44);
-  --lift: 0 18px 44px -12px rgba(22, 24, 27, 0.26), 0 3px 10px -3px rgba(22, 24, 27, 0.16);
+  --float: #fffdf5;
+  --scrim: rgba(28, 27, 26, 0.44);
+  --lift: 0 18px 44px -12px rgba(28, 27, 26, 0.26), 0 3px 10px -3px rgba(28, 27, 26, 0.16);
 
   /* spent only where a word already says the same thing */
-  --warn: #a75f06;
-  --bad: #b62a2a;
+  --warn: #9a5a00;
+  --bad: #af3029;
+
+  /* code syntax roles, used only inside code blocks on the reading ground */
+  --code-red: #af3029;
+  --code-orange: #bc5215;
+  --code-yellow: #8a6d00;
+  --code-green: #4a6b0a;
+  --code-cyan: #1f6e68;
+  --code-blue: #205ea6;
+  --code-purple: #5e409d;
+  --code-magenta: #a02f6f;
 
   /* ~68 characters of Geist at 16px */
   --measure: 36rem;
@@ -99,41 +108,51 @@
   --sidebar-ring: var(--live);
 }
 
-/* Graphite. The same system, four steps up from the dark instead of down
-   from the light: the sidebars still sit one step off the reading ground. */
+/* Warm charcoal. The same system, four steps up from the dark instead of
+   down from the light: the sidebars still sit one step off the reading
+   ground. */
 .dark {
   color-scheme: dark;
 
-  --canvas: #0f1012;
-  --panel: #16181b;
-  --raised: #1d2024;
-  --over: #24282e;
+  --canvas: #1b1a18;
+  --panel: #262522;
+  --raised: #2f2e2b;
+  --over: #3a3936;
 
-  --hair: #24272c;
-  --rule: #32363d;
+  --hair: #35322e;
+  --rule: #57534a;
 
-  /* worst cases here are 15.7 / 7.58 / 5.09 / 4.61 */
-  --fg: #e7e9ec;
-  --fg-2: #b4bac3;
-  --fg-3: #9198a2;
-  --fg-dim: #8a9099;
-  --mark: #6e747e;
+  /* worst cases here clear 4.5:1 on the topmost surface */
+  --fg: #fffcf0;
+  --fg-2: #d9d6c3;
+  --fg-3: #b5b2a6;
+  --fg-dim: #a8a49b;
+  --mark: #8a867d;
 
-  --live: #4fd1a5;
-  --live-dim: #2e8f72;
-  --live-wash: rgba(79, 209, 165, 0.1);
+  --live: #9cb52d;
+  --live-dim: #7a8e2b;
+  --live-wash: rgba(156, 181, 45, 0.14);
 
-  --select: rgba(79, 209, 165, 0.26);
-  --thumb: #2a2e34;
-  --thumb-hover: #3a4048;
+  --select: rgba(156, 181, 45, 0.22);
+  --thumb: #3a3936;
+  --thumb-hover: #57534a;
   --scroll-shade: rgba(0, 0, 0, 0.5);
 
   --float: var(--over);
   --scrim: rgba(0, 0, 0, 0.55);
   --lift: 0 18px 44px -12px rgba(0, 0, 0, 0.72), 0 3px 10px -3px rgba(0, 0, 0, 0.55);
 
-  --warn: #e5a050;
-  --bad: #e06c6c;
+  --warn: #d0a215;
+  --bad: #d14d41;
+
+  --code-red: #e0604a;
+  --code-orange: #da702c;
+  --code-yellow: #d0a215;
+  --code-green: #879a39;
+  --code-cyan: #3aa99f;
+  --code-blue: #5aa0d8;
+  --code-purple: #9a8fd0;
+  --code-magenta: #d96a9b;
 }
 
 @theme inline {
@@ -154,6 +173,14 @@
   --color-bad: var(--bad);
   --color-float: var(--float);
   --color-scrim: var(--scrim);
+  --color-code-red: var(--code-red);
+  --color-code-orange: var(--code-orange);
+  --color-code-yellow: var(--code-yellow);
+  --color-code-green: var(--code-green);
+  --color-code-cyan: var(--code-cyan);
+  --color-code-blue: var(--code-blue);
+  --color-code-purple: var(--code-purple);
+  --color-code-magenta: var(--code-magenta);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -186,12 +213,11 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Every corner in the product is square. The three steps stay named so a
-     call site still says which kind of thing it is, and so one edit here
-     would bring the ramp back if the world ever wanted it. */
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
+  /* Small soft corners for the paper desk. Call sites still name which kind
+     of thing they are, so one edit here would bring back the square world. */
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
 }
 
 @layer base {
@@ -345,6 +371,44 @@
   /* The floating layer. Offset and blur, never a halo. */
   .lift {
     box-shadow: var(--lift);
+  }
+
+  /* Paper tooth. A fixed grain wash over the shell at very low opacity.
+     It adds texture without sitting behind text at reading opacity. */
+  .grain::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
+    mix-blend-mode: multiply;
+  }
+  .dark .grain::after {
+    opacity: 0.07;
+    mix-blend-mode: overlay;
+  }
+
+  /* Syntax roles. Only inside code blocks on the reading ground, where each
+     role clears 4.5:1 on the canvas in both themes. */
+  .tok-key {
+    color: var(--code-green);
+    font-weight: 600;
+  }
+  .tok-str {
+    color: var(--code-orange);
+  }
+  .tok-num {
+    color: var(--code-purple);
+  }
+  .tok-func {
+    color: var(--code-blue);
+  }
+  .tok-com {
+    color: var(--fg-3);
+    font-style: italic;
   }
 }
 

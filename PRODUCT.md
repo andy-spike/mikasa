@@ -92,9 +92,9 @@ The Outline is a checkpoint before the expensive work starts. After approval, Mi
 
 The name "Mikasa" is fixed.
 
-The Graphite Workspace in `DESIGN.md` is the authoritative interface direction. It uses a calm, conventional application register inspired by products such as Linear and Notion. The earlier literary Reading Room direction was rejected.
+The Flexoki Paper Desk in `DESIGN.md` is the authoritative interface direction. It uses a calm, conventional application register inspired by products such as Linear and Notion, warmed with Flexoki paper and ink. The earlier literary Reading Room direction was rejected.
 
-Mikasa ships graphite and paper grounds. Neither is secondary. One accent marks the Lesson the Learner is up to, and the interface uses the design tokens, layout rules, typography, and component behavior recorded in `DESIGN.md`.
+Mikasa ships warm paper and warm charcoal grounds. Neither is secondary. One accent marks the Lesson the Learner is up to, and the interface uses the design tokens, layout rules, typography, and component behavior recorded in `DESIGN.md`.
 
 The frontend mockup is the product interface, not a disposable prototype. Backend work must replace authored demo state with real behavior without redesigning the screens or weakening their interaction and accessibility rules.
 
@@ -107,7 +107,7 @@ No other voice or asset commitments are binding yet.
 - The Course publishes as a cohesive unit, not as a growing set of unrelated Lessons.
 - The current Course remains readable while approved changes are prepared.
 - The Tutor informs. The Tailor proposes changes. Only Learner approval changes the Course.
-- Backend implementation preserves the Graphite Workspace and connects its existing states to real data.
+- Backend implementation preserves the Flexoki Paper Desk and connects its existing states to real data.
 
 ## Evidence on hand
 

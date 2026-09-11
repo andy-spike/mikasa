@@ -1,46 +1,62 @@
 ---
 name: Mikasa
-description: A working shell for structured courses, where everything on screen is information and the only colour is where you are.
+description: A warm desk for structured courses, where everything on screen is information and the only colour outside code is where you are.
 colors:
-  canvas: "#0f1012"
-  panel: "#16181b"
-  raised: "#1d2024"
-  over: "#24282e"
-  hair: "#24272c"
-  rule: "#32363d"
-  fg: "#e7e9ec"
-  fg-2: "#b4bac3"
-  fg-3: "#9198a2"
-  fg-dim: "#8a9099"
-  mark: "#6e747e"
-  live: "#4fd1a5"
-  bad: "#e06c6c"
-  select: "rgba(79, 209, 165, 0.26)"
-  thumb: "#2a2e34"
-  thumb-hover: "#3a4048"
+  canvas: "#1b1a18"
+  panel: "#262522"
+  raised: "#2f2e2b"
+  over: "#3a3936"
+  hair: "#35322e"
+  rule: "#57534a"
+  fg: "#fffcf0"
+  fg-2: "#d9d6c3"
+  fg-3: "#b5b2a6"
+  fg-dim: "#a8a49b"
+  mark: "#8a867d"
+  live: "#9cb52d"
+  bad: "#d14d41"
+  select: "rgba(156, 181, 45, 0.22)"
+  thumb: "#3a3936"
+  thumb-hover: "#57534a"
   scroll-shade: "rgba(0, 0, 0, 0.5)"
-  float: "#24282e"
+  float: "#3a3936"
   scrim: "rgba(0, 0, 0, 0.55)"
+  code-red: "#e0604a"
+  code-orange: "#da702c"
+  code-yellow: "#d0a215"
+  code-green: "#879a39"
+  code-cyan: "#3aa99f"
+  code-blue: "#5aa0d8"
+  code-purple: "#9a8fd0"
+  code-magenta: "#d96a9b"
 colorsLight:
-  canvas: "#ffffff"
-  panel: "#f7f8fa"
-  raised: "#edeff2"
-  over: "#e3e5e9"
-  hair: "#e7e9ed"
-  rule: "#d3d7dd"
-  fg: "#16181b"
-  fg-2: "#3e464c"
-  fg-3: "#586066"
-  fg-dim: "#5e666c"
-  mark: "#788086"
-  live: "#0a7f5f"
-  bad: "#b62a2a"
-  select: "rgba(10, 127, 95, 0.18)"
-  thumb: "#ccd0d6"
-  thumb-hover: "#aeb4bd"
-  scroll-shade: "rgba(22, 24, 27, 0.14)"
-  float: "#ffffff"
-  scrim: "rgba(22, 24, 27, 0.44)"
+  canvas: "#fffcf0"
+  panel: "#f2f0e5"
+  raised: "#e6e4d9"
+  over: "#d9d6c3"
+  hair: "#ddd9c7"
+  rule: "#c9c4b0"
+  fg: "#1c1b1a"
+  fg-2: "#3f3e38"
+  fg-3: "#565651"
+  fg-dim: "#5e5d58"
+  mark: "#76746b"
+  live: "#4a6b0a"
+  bad: "#af3029"
+  select: "rgba(74, 107, 10, 0.16)"
+  thumb: "#c9c4b0"
+  thumb-hover: "#a8a497"
+  scroll-shade: "rgba(28, 27, 26, 0.16)"
+  float: "#fffdf5"
+  scrim: "rgba(28, 27, 26, 0.44)"
+  code-red: "#af3029"
+  code-orange: "#bc5215"
+  code-yellow: "#8a6d00"
+  code-green: "#4a6b0a"
+  code-cyan: "#1f6e68"
+  code-blue: "#205ea6"
+  code-purple: "#5e409d"
+  code-magenta: "#a02f6f"
 typography:
   display:
     fontFamily: "Geist, ui-sans-serif, system-ui, sans-serif"
@@ -115,9 +131,9 @@ typography:
     lineHeight: 1.72
     letterSpacing: "normal"
 rounded:
-  sm: "0"
-  md: "0"
-  lg: "0"
+  sm: "3px"
+  md: "6px"
+  lg: "10px"
 spacing:
   row: "0.22rem"
   row-touch: "0.75rem"
@@ -223,7 +239,7 @@ components:
     backgroundColor: "{colors.raised}"
     textColor: "{colors.fg}"
   code-block:
-    backgroundColor: "{colors.panel}"
+    backgroundColor: "{colors.canvas}"
     textColor: "{colors.fg-2}"
     typography: "{typography.mono}"
     rounded: "{rounded.md}"
@@ -235,18 +251,18 @@ components:
 
 ## Overview
 
-**Creative North Star: "The Graphite Workspace"**
+**Creative North Star: "The Flexoki Paper Desk"**
 
-The Course is a working shell, not a reading room. It refuses the course player's checklist-and-progress-bar and the paper metaphor at once: everything on screen is information, and the only colour is where you are. The learner opens one Course at a laptop, often with an editor beside it, and the surface is built for that posture — quiet, square-cornered, and legible in a long session. Every row carries the fewest facts that let the reader act on it; a fact that is one click away, derivable from the screen, or fixed at creation time is not on the screen.
+The Course is a warm desk, not a grey instrument. It keeps the working-shell posture, one Course at a laptop, often with an editor beside it, built for long sessions. Every row carries the fewest facts that let the reader act on it; a fact that is one click away, derivable from the screen, or fixed at creation time is not on the screen.
 
-Depth comes from light, and light has two settings. Graphite runs four steps up from `#0f1012`; paper runs four steps down from `#ffffff`. The ground flips, the system does not: in both, the sidebars sit one step off the reading ground, the open row sits two, and what floats sits at the top of the stack. A stored choice decides which ground a learner gets, and with no stored choice the operating system does; the class is set on `<html>` before first paint, so the shell is never briefly the wrong colour. A graphite canvas with three luminance steps up carries every layer in the product; hairlines divide but never enclose, and nothing on screen is a card. Type does the structural work that borders would do elsewhere: one sans for every word, one mono for every number that is data, and a single small tracked label style for the few things that need naming rather than reading.
+Depth comes from light, and light has two warm settings. Paper runs four steps down from `#fffcf0`; charcoal runs four steps up from `#1b1a18`. The ground flips, the system does not: in both, the sidebars sit one step off the reading ground, the open row sits two, and what floats sits at the top of the stack. A stored choice decides which ground a learner gets, and with no stored choice the operating system does; the class is set on `<html>` before first paint, so the shell is never briefly the wrong colour. A fixed grain wash lies over the shell at very low opacity, multiply on paper and overlay on charcoal, so the surface has tooth without ever sitting behind body text at reading opacity. Hairlines divide but never enclose, except for code, which sits on the reading ground inside one hairline so its syntax roles stay legible. Type does the structural work that borders would do elsewhere: one sans for every word, one mono for every number that is data, and a single small tracked label style for the few things that need naming rather than reading.
 
-Colour is rationed to one job. `#4fd1a5` on graphite, `#0a7f5f` on paper, marks the Lesson you are up to and nothing else. Which Lesson is _open_ is carried by a raised ground, so position and progress never compete for the same signal. Everything the learner has already finished is neutral, and everything still ahead of them carries no mark at all. A Course is generated in one pass, so a generated Course has no missing Lesson; the dashed rule belongs to a Course still sitting at its Outline, where nothing has been written yet. This world explicitly replaced a serif, paper-and-brass direction that was rejected outright; that vocabulary is anti-reference, not heritage.
+Colour is rationed. `#4a6b0a` on paper, `#9cb52d` on charcoal, marks the Lesson you are up to and nothing else outside code. Which Lesson is _open_ is carried by a raised ground, so position and progress never compete for the same signal. Everything the learner has already finished is neutral, and everything still ahead of them carries no mark at all. Inside code blocks alone, a full Flexoki syntax palette is spent on keywords, strings, numbers, functions, and comments, each clearing 4.5:1 on the reading ground it sits on. A Course is generated in one pass, so a generated Course has no missing Lesson; the dashed rule belongs to a Course still sitting at its Outline, where nothing has been written yet. This world replaced a square-cornered graphite instrument; that precision is evidence, not heritage. The rejected serif Reading Room stays rejected.
 
 **Key Characteristics:**
 
-- Two grounds, one system: graphite and paper, four surface steps each, zero cards, one shadow.
-- One accent with exactly one meaning, spent on roughly one row per screen.
+- Two warm grounds, one system: paper and charcoal, four surface steps each, zero cards as page structure, one shadow, one grain wash.
+- One accent with exactly one meaning outside code, spent on roughly one row per screen. Code alone carries syntax colour.
 - Fewest facts per row: three in the Outline rail, three in the Courses list, everything else a click away.
 - Geist and Geist Mono only; no serif anywhere in the product.
 - A viewport-centred Lesson at a 36rem measure, with fixed edge tools that never move it.
@@ -255,27 +271,28 @@ Colour is rationed to one job. `#4fd1a5` on graphite, `#0a7f5f` on paper, marks 
 
 ## Colors
 
-A single near-neutral family (hue ~258, chroma under 0.02) carries every surface, hairline and text step, with one green as the only colour on the screen.
+A warm near-neutral family carries every surface, hairline and text step, with one olive green as the only chrome colour and a full Flexoki syntax palette spent only inside code.
 
 ### Two grounds
 
-Every semantic token has two values and one meaning. `{colors.*}` in this document names the graphite value; `colorsLight` in the frontmatter carries its paper twin. The pairing is by role, never by lightness — `--panel` is the sidebars' ground in both, which reads darker than the reading column on paper and lighter than it on graphite.
+Every semantic token has two values and one meaning. `{colors.*}` in this document names the charcoal value; `colorsLight` in the frontmatter carries its paper twin. The pairing is by role, never by lightness — `--panel` is the sidebars' ground in both, which reads darker than the reading column on paper and lighter than it on charcoal.
 
-The two grounds land on the same contrast floors, deliberately: the quiet text steps clear 5.08 and 4.63 against the topmost surface on paper, 5.09 and 4.61 on graphite, and the one graphics-only mark clears 3.18 and 3.15. Audited in the browser against the computed ground, both themes carry **zero** text below its floor.
+The two grounds land on the same contrast floor by construction: every text step clears 4.5:1 on all four surfaces in both themes, and the one graphics-only mark clears 3:1 wherever a dashed rule can sit. Code roles clear 4.5:1 on the reading ground they sit on, which is why code sits on the canvas inside a hairline instead of on a shaded fill.
 
 A colour is defined in `:root` and, if it moves, redefined in `.dark`. Nothing is ever defined only in one ground.
 
 ### Primary
 
-- **Live Mint** (`{colors.live}`): The accent. It marks the Lesson you are up to — the first Lesson that is set and not done — as a small solid triangle in the Outline rail. It also paints the focus ring, the text caret, and the selection wash, because those are the browser surfaces the workspace still owns. It is never spent on done, on code, on hover, on a button, or on a second meaning. 9.97:1 on graphite canvas; the paper twin `#0a7f5f` is darkened to 4.98:1 on white and 3.95:1 on the topmost surface, so the same mark clears the graphics floor on both grounds.
+- **Live Olive** (`{colors.live}`): The accent. It marks the Lesson you are up to — the first Lesson that is set and not done — as a small solid triangle in the Outline rail, drawn in `components/workspace/marks.tsx`. It also paints the focus ring, the text caret, and the selection wash, because those are the browser surfaces the workspace still owns. It is never spent on done, on hover, on a button, or on a second meaning outside code. `#4a6b0a` on paper clears 6.01:1 on the canvas; `#9cb52d` on charcoal clears 7.50:1, so the same mark clears the graphics floor on both grounds.
 
 ### Neutral — surfaces
 
-- **Graphite Canvas** (`{colors.canvas}`): The ground everything sits on. The reading column, the shell, the palette scrim's backdrop.
-- **Panel** (`{colors.panel}`): One step up. The Outline rail, the Tutor/Tailor panel, code blocks, the palette trigger, the Done chip.
-- **Raised** (`{colors.raised}`): Two steps up. The open Lesson row, the active palette option, the active mode-switch segment, inline code, the learner's own turns in the Tutor thread, the primary button at rest.
-- **Over** (`{colors.over}`): Three steps up. The compact Approve button and, on graphite, the command palette body.
-- **Float** (`{colors.float}`): What leaves the document. On graphite it is `--over`; on paper it is white, because a modal that steps _down_ from its own page reads as a hole rather than a layer. The command palette is its only consumer.
+- **Warm Canvas** (`{colors.canvas}`): The ground everything sits on. The reading column, the shell, the palette scrim's backdrop. `#fffcf0` by day, `#1b1a18` by night.
+- **Panel** (`{colors.panel}`): One step off the reading ground. The Outline rail, the Tutor/Tailor panel, the code header strip, the palette trigger, the Done chip.
+- **Raised** (`{colors.raised}`): Two steps off. The open Lesson row, the active palette option, the active mode-switch segment, inline code, the learner's own turns in the Tutor thread, the primary button at rest.
+- **Over** (`{colors.over}`): Three steps off. The compact Approve button and, on charcoal, the command palette body.
+- **Float** (`{colors.float}`): What leaves the document. On charcoal it is `--over`; on paper it is `#fffdf5`, because a modal that steps _down_ from its own page reads as a hole rather than a layer. The command palette is its only consumer.
+- **Grain** (`.grain::after` in `app/globals.css`): A fixed feTurbulence wash at 0.05 opacity on paper and 0.07 on charcoal. It adds tooth over the shell and never carries meaning.
 
 ### Neutral — hairlines
 
@@ -286,11 +303,15 @@ A colour is defined in `:root` and, if it moves, redefined in `.dark`. Nothing i
 
 Every text step is legal body text on all four surfaces; the ramp is a hierarchy of emphasis, not a hierarchy of legality.
 
-- **Full Ink** (`{colors.fg}`): Lesson titles, open Lesson rows, strong inline emphasis, code keywords, the last column of a result table. 12.18–15.65:1.
-- **Second Ink** (`{colors.fg-2}`): Body prose, unopened Lesson titles, Tutor answers. The colour most words in the product are set in. 7.58–9.75:1.
-- **Third Ink** (`{colors.fg-3}`): Supporting text — Goal, module counts, captions, quiet buttons, placeholders, code comments. 5.09–6.54:1.
-- **Dim Ink** (`{colors.fg-dim}`): The lowest text step — completion dates, minute estimates, keycaps, separators, palette group headers. 4.61–5.92:1.
-- **Mark** (`{colors.mark}`): 3.15–4.05:1. **Graphics only, never text.** Its one consumer is the dashed rule that stands in for a Lesson in a Course that has not been generated yet — the Outline screen and the Courses list, never inside a Course the learner is reading.
+- **Full Ink** (`{colors.fg}`): Lesson titles, open Lesson rows, strong inline emphasis, the last column of a result table.
+- **Second Ink** (`{colors.fg-2}`): Body prose, unopened Lesson titles, Tutor answers, code body. The colour most words in the product are set in.
+- **Third Ink** (`{colors.fg-3}`): Supporting text — Goal, module counts, captions, quiet buttons, placeholders, code comments. Placeholders use this step, so they clear body contrast too.
+- **Dim Ink** (`{colors.fg-dim}`): The lowest text step — completion dates, minute estimates, keycaps, separators, palette group headers. Still body-legal on the topmost surface in both themes.
+- **Mark** (`{colors.mark}`): Graphics only, never text. Its one consumer is the dashed rule that stands in for a Lesson in a Course that has not been generated yet — the Outline screen and the Courses list, never inside a Course the learner is reading.
+
+### Syntax — code blocks only
+
+Code sits on the reading ground inside one hairline, with a panel-ground language strip, so every role below clears 4.5:1 on its own ground. The highlighter lives in `components/workspace/prose.tsx`: keywords in green semibold (`.tok-key`), strings in orange (`.tok-str`), numbers in purple (`.tok-num`), SQL functions in blue (`.tok-func`), comments in third ink italic (`.tok-com`). No syntax colour leaks into chrome, rows, buttons, or the palette.
 
 ### Neutral — browser surfaces
 
@@ -306,13 +327,13 @@ One graphic in the product is exempt from everything above: Google's G on the si
 
 ### Declared but unspent
 
-`--live-dim`, `--live-wash` and `--warn` are declared in the token layer and have **zero consumers** in the components. They are recorded here as available, not as in use; a new surface that needs a second green or an amber should either spend them deliberately or drop them. `--radius` was declared and unread, and has been deleted; the ramp is `--radius-sm/md/lg`, all three at `0`.
+`--live-dim`, `--live-wash` and `--warn` are declared in the token layer. `--live-dim` and `--live-wash` back focus and selection depth; `--warn` stays reserved. `--radius` was declared and unread, and has been deleted; the ramp is `--radius-sm/md/lg`, now at `3px`, `6px`, and `10px`.
 
 ### Named Rules
 
-**The One Accent Rule.** `#4fd1a5` means exactly one thing: the Lesson you are up to. Roughly one row per screen carries it. If a second element wants the accent, the answer is a luminance step, not a hue. The one colour on screen that is not the accent is Google's G on the sign-in button, which belongs to Google.
+**The One Accent Rule.** Olive means exactly one thing outside code: the Lesson you are up to. Roughly one row per screen carries it. If a second element wants the accent, the answer is a luminance step, not a hue. Inside code blocks, syntax roles carry their own hues and never leak out. The one colour on screen that is not the accent is Google's G on the sign-in button, which belongs to Google.
 
-**The Light, Not Line Rule.** Surfaces separate by luminance. A hairline divides two regions; it never wraps one to make an object. If a thing needs a border on all four sides to read, it is drawn wrong.
+**The Light, Not Line Rule.** Surfaces separate by luminance. A hairline divides two regions; it never wraps one to make an object. The one exception is code, which sits on the reading ground inside a single hairline so its syntax roles stay legible. If any other thing needs a border on all four sides to read, it is drawn wrong.
 
 **The Graphics-Only Floor Rule.** `--mark` clears 3:1 and not 4.5:1. It is legal for meaning-bearing marks and illegal for text. Every other ink step is legal everywhere.
 
@@ -379,7 +400,7 @@ The column holds still by keeping the region around it a constant size, from bot
 
 ## Elevation & Depth
 
-The system is tonal, not shadowed. Depth is four steps of luminance — canvas, panel, raised, over — and an element's height in the stack is its distance from the reading ground: on graphite that is lighter, on paper it is darker. Hover is a step up; active is a step up; a floating layer is the top step. There is no ambient shadow, no glow, no ring, and no border used to fake separation.
+The system is tonal, not shadowed. Depth is four steps of luminance — canvas, panel, raised, over — plus one faint grain wash, and an element's height in the stack is its distance from the reading ground: on charcoal that is lighter, on paper it is darker. Hover is a step up; active is a step up; a floating layer is the top step. There is no ambient shadow, no glow, no ring, and no border used to fake separation, except the single hairline that encloses code on its own ground.
 
 Exactly one shadow ships, on the only thing that genuinely floats.
 
@@ -393,17 +414,17 @@ Exactly one shadow ships, on the only thing that genuinely floats.
 
 ## Shapes
 
-Nothing in this product has a rounded corner. Rows, chips, buttons, fields, code blocks, the command palette, the focus ring and the scrollbar thumb are all square. The ramp is still named in the token layer — `--radius-sm`, `--radius-md`, `--radius-lg`, all three set to `0` — so a call site still says which kind of thing it is, and one edit would bring a ramp back if this world ever wanted one.
+Corners are small and soft. Rows, chips, buttons, fields, code blocks, the command palette, the focus ring and the scrollbar thumb use the named ramp: `3px` for inline and compact things, `6px` for blocks and controls, `10px` for the floating palette. A call site still says which kind of thing it is, and one edit would bring the square world back if this world ever wanted it.
 
-The square corner is not decoration; it is the same argument the rest of the system makes. Depth here is light and division is a hairline. A radius would be a third way of saying "this is an object" on a surface that already has two, and the one that says it least precisely. Nothing is pill-shaped, nothing is circular, and no element carries a full border for decoration.
+The soft corner is not decoration; it is the desk register. Depth here is light plus a faint grain wash, and division is a hairline. Nothing is pill-shaped, nothing is circular, and no element carries a full border for decoration, except code on its reading ground.
 
-Marks are drawn, not iconified in a font: a 12px solid triangle for live, a 12px stroked check for done, a 12px dashed rule for unset — all on the same 12px box so a column of rows never shifts. Interface icons are Lucide at 14–16px, `strokeWidth` 1.75. The one exception to this whole section is Google's G on the sign-in button, a third-party mark that keeps its own geometry as well as its own colours.
+Marks are drawn, not iconified in a font: a 12px solid triangle in live olive for the current Lesson, a 12px stroked check for done, a 12px dashed rule for unset — all on the same 12px box so a column of rows never shifts. Interface icons are Lucide at 14–16px, `strokeWidth` 1.75. The one exception to this whole section is Google's G on the sign-in button, a third-party mark that keeps its own geometry as well as its own colours.
 
-The focus ring is a 2px solid mint outline at 2px offset, square like the thing it surrounds.
+The focus ring is a 2px solid olive outline at 2px offset, following the corner of the thing it surrounds.
 
 ### Named Rules
 
-**The Square Corner Rule.** There is no radius anywhere in this product. An element that needs to read as separate takes a luminance step or a hairline — the two tools the system already has.
+**The Small Corner Rule.** Radius stays at 3, 6, and 10px. An element that needs to read as separate takes a luminance step or a hairline first; the corner only softens what light already separated. Uppercase stays inside the one 0.6875rem label.
 
 ## Components
 
@@ -448,7 +469,7 @@ The Outline is a live, editable object beside the Lesson, not a table of content
 
 ### Buttons
 
-- **Shape:** square, like everything else. All seven live on `Button`; `variant` decides both the look and the padding.
+- **Shape:** small and soft, like everything else. All seven live on `Button`; `variant` decides both the look and the padding.
 - **Primary** (`Mark the Exercise done`): raised ground, full ink, 0.8125rem/500, 1rem × 0.625rem padding. Hover steps to over. It is the most important action on the page and it is still greyscale.
 - **Hero** (`Start a Course`, `Continue with Google`): over ground, full ink, 0.875rem/500, 1.25rem × 0.75rem padding, hover to rule. One luminance step above Primary, because an Operate screen has several actions competing and a Persuade surface has one. The step is the system answering "this needs more weight" the way it always does — with light, never with a hue.
 - **Compact** (`Approve`): over ground, full ink, 0.75rem/500. Hover steps to rule.
@@ -476,7 +497,7 @@ One panel, two modes, an explicit segmented switch at the top on a canvas-inset 
 ### Prose Blocks
 
 - **Paragraph:** second ink, 1rem/1.72, capped at the measure.
-- **Code:** panel ground, square, a label-style language strip over a hairline, and a horizontally scrolling body with edge fades (Lea Verou's local/scroll gradient pair) that appear only while there is content past the edge. Highlighting is weight for keywords and a dim step for comments; **no accent in code**.
+- **Code:** reading-ground block inside one hairline, 6px corners, a panel-ground label strip over a hairline, and a horizontally scrolling body with edge fades that appear only while there is content past the edge. Highlighting is syntax roles that each clear 4.5:1 on the canvas; comments fall back to third ink italic. **No syntax colour outside code.**
 - **Note:** a left rule at `--rule` with a label heading. Not a callout, not a box.
 - **Table:** mono, tabular, label-style headers over a rule, hairline row dividers, last column at full ink. Scrolls inside the measure with the same edge fades.
 
@@ -490,12 +511,14 @@ Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bo
 
 **The Two Signals Rule.** Where you are up to is colour; what you have open is light. The two never swap and never combine on one row.
 
+**The No Contract In Markup Rule.** Direction contracts live in surface briefs, never in shipped markup. No `DESIGN.md` language, hidden DOM, comment, or data attribute carries the contract into the browser.
+
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** separate surfaces with luminance — `{colors.canvas}` → `{colors.panel}` → `{colors.raised}` → `{colors.over}` — and use hairlines only to divide.
-- **Do** spend `{colors.live}` on exactly one thing: the Lesson the learner is up to.
+- **Do** separate surfaces with luminance — `{colors.canvas}` → `{colors.panel}` → `{colors.raised}` → `{colors.over}` — and use hairlines only to divide, except for the single enclosure around code.
+- **Do** spend `{colors.live}` outside code on exactly one thing: the Lesson the learner is up to.
 - **Do** carry the open state with a raised ground and `aria-current`, never with colour.
 - **Do** hold body copy to the 36rem measure and land every painted edge in the reading column on it.
 - **Do** set every number that is data in Geist Mono or with `.tnum`, so columns of counts, dates and estimates line up.
@@ -512,14 +535,14 @@ Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bo
 
 - **Don't** build cards. No bordered, radiused, shadowed boxes as page structure — the Tailor's change list included.
 - **Don't** introduce a second accent, a coloured status pill, a progress ring, a percentage, a streak, or an XP counter.
-- **Don't** spend the accent on done, on hover, on a button, on code syntax, or on anything but the live Lesson.
+- **Don't** spend the accent on done, on hover, on a button, or on anything but the live Lesson outside code. Syntax roles stay inside code blocks.
 - **Don't** set any part of this product in a serif, or reintroduce paper, vellum, ink stamps, folds, brass or a book metaphor. That world was tried and rejected outright.
 - **Don't** use `--mark` for text; it clears 3:1, not 4.5:1.
 - **Don't** render an unwritten Lesson as a disabled button, and don't list one in the command palette. Every Lesson of a generated Course is listed, because there are no unwritten ones left in it.
 - **Don't** add a shadow to anything that is not a floating modal layer; step the luminance instead.
 - **Don't** let opening or closing the rail or the panel shift the reading column by a single pixel.
 - **Don't** duplicate a control the panel already owns; while the panel is open, the shell shows no second control naming the same thing.
-- **Don't** add a radius. Anywhere. Uppercase stays inside the one 0.6875rem label.
+- **Don't** add a radius outside the 3/6/10px ramp. Uppercase stays inside the one 0.6875rem label.
 - **Don't** hardcode a colour at a call site, or define one in only one ground.
 - **Don't** let the accent change meaning between the two grounds — it is darkened for paper, not repurposed.
 - **Don't** carry the theme in React state; the class on `<html>` is the state, and a mounted flag is a hydration seam waiting to show.

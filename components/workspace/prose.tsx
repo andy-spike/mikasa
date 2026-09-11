@@ -64,7 +64,7 @@ export function Inline({ text }: { text: string }) {
 }
 
 const SQL_TOKEN =
-  /(--[^\n]*)|('(?:[^']|'')*')|\b(select|from|where|group|order|by|partition|over|as|with|sum|avg|count|min|max|rows|range|between|unbounded|preceding|following|current|row|and|or|not|null|nulls|first|last|interval|on|join|left|inner|case|when|then|else|end|distinct|having|limit|desc|asc|insert|into|values|delete|update|set|create|table)\b/gi;
+  /(--[^\n]*)|('(?:[^']|'')*')|\b(\d+(?:\.\d+)?)\b|\b(select|from|where|group|order|by|partition|over|as|with|sum|avg|count|min|max|rows|range|between|unbounded|preceding|following|current|row|and|or|not|null|nulls|first|last|interval|on|join|left|inner|case|when|then|else|end|distinct|having|limit|desc|asc|insert|into|values|delete|update|set|create|table)\b/gi;
 
 function highlightSql(code: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -74,20 +74,26 @@ function highlightSql(code: string): ReactNode[] {
     if (m.index > last) out.push(code.slice(last, m.index));
     if (m[1]) {
       out.push(
-        <span key={key++} className="text-fg-3">
+        <span key={key++} className="tok-com">
           {m[1]}
         </span>,
       );
     } else if (m[2]) {
       out.push(
-        <span key={key++} className="text-fg-3 italic">
+        <span key={key++} className="tok-str">
           {m[2]}
+        </span>,
+      );
+    } else if (m[3]) {
+      out.push(
+        <span key={key++} className="tok-num">
+          {m[3]}
         </span>,
       );
     } else {
       out.push(
-        <span key={key++} className="font-semibold text-fg">
-          {m[3]}
+        <span key={key++} className="tok-key">
+          {m[4]}
         </span>,
       );
     }
@@ -127,14 +133,14 @@ export function LessonBlock({
     const language = block.kind === "sql" ? "sql" : block.language;
     return (
       <figure className="max-w-(--measure)">
-        <div className="overflow-hidden rounded-md bg-panel">
-          <div className="flex items-center border-b border-hair px-3.5 py-2">
+        <div className="overflow-hidden rounded-md border border-hair bg-canvas">
+          <div className="flex items-center border-b border-hair bg-panel px-3.5 py-2">
             <span className="label text-fg-3">{language}</span>
           </div>
           <pre
             tabIndex={0}
             className="scroll-thin scroll-x"
-            style={{ "--scroll-bg": "var(--panel)" } as CSSProperties}
+            style={{ "--scroll-bg": "var(--canvas)" } as CSSProperties}
           >
             <code className="block w-max min-w-full px-3.5 py-3.5 font-mono text-[0.8125rem] leading-[1.72] text-fg-2">
               {language === "sql" ? highlightSql(block.code) : block.code}

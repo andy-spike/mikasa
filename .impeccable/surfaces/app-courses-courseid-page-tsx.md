@@ -7,62 +7,30 @@ related_targets: ["components/workspace"]
 
 # Surface brief: course workspace
 
-Route: `app/courses/[courseId]`. Visitor mode **Operate**. Direction: **Graphite Workspace** (roll 21608bd1, re-roll 1, safer register, user-picked, code-led).
+Scope: `app/courses/[courseId]` workspace shell. Visitor mode Operate.
 
-## Job and audience
+Audience and job: solo learner at a laptop, often with an editor beside it. Open one Course, know where they are, read the Lesson, mark the Exercise, ask Tutor or send Tailor after structure.
 
-General self-learners, alone, at a laptop, in a deep-work session and often with an editor open beside it. They open one Course and want to know where they are, read the current Lesson, mark its Exercise done, and occasionally ask the Tutor or send the Tailor after the structure.
+Proof: marking done hands the live mark to the next row. Done reads neutral with a date. Unreached carries no mark. No pills, rings, percentages, streaks.
 
-## Outcome and proof
+Constraints: readability is the hard line. Both grounds ship. Layout positions and palette behavior stay. Component visuals, tokens, radius, and code color can change. Warm paper leads per user pin. No serif. No skeuomorphic paper.
 
-Success is the learner finishing a Lesson and marking its Exercise, then seeing the accent hand off to the next entry. Progress reads without leaning on colour: done is a neutral check and a date, live is the one accent on the screen, and a Lesson not yet reached carries no mark at all. No badge, pill, ring, or percentage.
+Chosen direction: Flexoki paper desk. Warm grounds, ink text, muted accents, subtle grain, syntax color only in code.
 
-What only Mikasa can claim here: the Outline is a live, editable object sitting beside the Lesson, not a table of contents. The learner shaped it before content existed and can still reshape it. The workspace has to make that feel true.
+Memorable moment: the done stamp. Date lands, check strokes, live mark lifts to next.
 
-## The direction that was replaced
+## Direction contract
 
-The Reading Room (roll d3f00ad5) shipped and was rejected outright: too serif-heavy, too skeuomorphic. It is now anti-reference. Nothing carries forward from it except product truth, the demo content, and the three topology decisions below. Do not reintroduce paper, vellum, ink stamps, folds, brass, or a book metaphor, and do not set this product in a serif.
+THESIS: The workspace is a warm desk, not a grey instrument. Order comes from ink and spacing. Warmth never costs focus.
 
-## Selected direction and structure
+OWN-WORLD: Flexoki grounds and ink, small radii, hairline dividers, grain at low opacity. Chrome stays restrained. Code alone carries the full syntax palette.
 
-A working shell where every pixel carries information and the only colour is where you are.
+STORY: The learner sees place at a glance, reads long prose in comfort, trusts code examples, and feels progress as a stamped log.
 
-**Surfaces separate by luminance, never by border.** Four steps up from a graphite canvas. Hairlines divide; nothing is a card, nothing floats except the command palette.
+FIRST VIEWPORT: Lesson at 36rem on warm ground. Left rail as numbered entries with module tabs. Right panel closed. Code blocks show filtered syntax roles on matched grounds.
 
-**The rail.** The Outline is a dense left rail carrying the Course structure, three facts per row: mark, number, and title. Summaries do not belong in a scanning surface; they live on the Lesson. It is open on wide screens, collapses to a stub on smaller laptops, and comes back on click, keyboard, or the palette.
+FORM: Flexoki paper desk, 1 of 7 grounded candidates, seed key 44ddd994, kind pick. Assignment 3 translated to this material per user pin.
 
-**The panel.** One panel at the right edge, closed by default, holding the Tutor or the Tailor with an explicit mode switch at its top. On smaller laptops, opening it collapses the Outline and closing it restores the Learner's prior Outline state. While it is open it owns its own close and its own switch, so the shell shows no second control naming the same thing.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 
-**The command palette.** ⌘K is real navigation, not a shortcut: every Lesson and every action in the workspace is reachable from it without the pointer. A Course is generated in one pass, so every Lesson is there; the empty state covers a search that matches nothing.
-
-**Two grounds.** The workspace ships graphite and paper. The same system re-grounded, not a second design: four surface steps either way, the sidebars one step off the reading ground, and both grounds landing on the same contrast floors. A stored choice wins, the operating system decides otherwise, and the class is on `<html>` before first paint. One switch in the chrome, holding no React state.
-
-**The rails are the shadcn Sidebar.** Both of them, adapted rather than rebuilt: one open state per rail across both widths, no cookie, no provider-level keyboard shortcut, and `inert` while parked off the canvas. At 1440px and above both may remain open. From 1280px to 1439px only one full edge tool opens at a time. Below 1280px both become sheets.
-
-**Accent law.** One accent — `#4fd1a5` on graphite, `#0a7f5f` on paper — means exactly one thing: the Lesson you are up to, the first that is set and not done. Which Lesson is *open* is carried by a raised ground, never by colour, so the two signals never compete for the same meaning. The accent is not spent on done, on code, on a hover, or on a button.
-
-**Focal moment.** Marking an Exercise done is one handoff in two halves: the check strokes itself onto the row you finished, and the accent lifts to the next one. It fires on a real mark, never on first paint or a revisit. Reduced motion keeps both states and drops the movement.
-
-## Scope and boundaries
-
-A Course is generated in one cohesive pass on approval, so inside this workspace every Lesson exists and every Lesson opens. The dashed, inert row belongs to the Outline screen, where a Course still waiting on approval draws all of its Lessons before any of them are written. Generation itself is not part of this build.
-
-Anti-goals: cards as page structure anywhere, the Tailor's change list included, progress rings and percentages, coloured status pills, streaks or XP, a second accent, a serif anywhere, any material pretending to be paper.
-
-The brief's earlier anti-goal against "a generic collapsible-sidebar app shell" is superseded: the user chose the familiar register explicitly. What keeps it from being generic is the density (all twenty Lessons at once), the one-accent law, and the palette as primary navigation — not ornament.
-
-## States and ranges
-
-Demo Course: 3 to 6 Modules, 4 to 9 Lessons each, 14 to 40 Lessons total. Lesson titles of 2 to 7 words that must survive 12. Lesson body of 600 to 1500 words with 2 to 5 code blocks and one Exercise. Tutor thread of 0 to 30 turns. Tailor plan of 1 to 8 changes.
-
-States built: mid-progress as the default; Exercise just marked, with the handoff; rail collapsed; panel in both modes; Tailor plan pending, applied, and undone; the palette open, filtered, and empty; both overlays on a phone.
-
-Deferred with the logic: generation in progress, network and model errors, unsaved state.
-
-## Interaction and layout
-
-The Lesson holds a 65 to 75 character measure and does not stretch with the window. Every body block shares one right edge at that measure; code and tables scroll inside it rather than reaching past it, and each horizontal scroller fades its own edge while there is something past it. The Lesson stays centred on the viewport. Edge tools are fixed and reserve no width when closed, so their transitions never translate or resize the Lesson. Keyboard reaches the Outline toggle, every Lesson, mark done, the panel, and the palette. Below 1280px both edge tools become sheets: focus moves in, Escape closes, the layer behind goes inert, and focus returns to the control that opened it. That is the dialog primitive's job now, not the shell's.
-
-## Still not built
-
-Generation of any kind, auth, persistence, and model calls. The Tutor composer accepts a question and shows the pending state, then returns a labelled placeholder saying it is not connected in this build.
+Unresolved: exact grain opacity on low-end screens. Exact syntax roles for non-SQL languages.
