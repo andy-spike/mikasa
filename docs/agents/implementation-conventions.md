@@ -12,7 +12,7 @@ Every worker implementing a Mikasa ticket follows these rules. They exist so tic
 
 ## Stack (locked by ADRs)
 
-- Next.js 16 App Router, TypeScript, bun (`bun run dev`, `bun run build`).
+- Next.js 16 App Router, TypeScript, pnpm (`pnpm dev`, `pnpm build`).
 - Neon Postgres through Drizzle (`drizzle-orm`, `drizzle-kit`, `postgres` driver). Schema in one place, migrations via drizzle-kit.
 - Better Auth for Google OAuth sign-in.
 - OpenRouter through the AI SDK (`ai` v7 is installed) for all model calls.
@@ -34,11 +34,11 @@ Every query and mutation filters by the authenticated Learner. Cross-Learner acc
 
 ## Testing
 
-- Test runner: `vitest` (`bun run test`). Unit tests for pure domain logic; integration tests run the Drizzle schema on PGlite (in-process Postgres, includes pgvector) so no Docker or remote DB is needed.
+- Test runner: `vitest` (`pnpm test`). Unit tests for pure domain logic; integration tests run the Drizzle schema on PGlite (in-process Postgres, includes pgvector) so no Docker or remote DB is needed.
 - External providers are always substituted in tests: fake model (AI SDK mock model or hand-written fake), fake Firecrawl, fake embeddings. Tests must never call real APIs.
 - Where a ticket says "end-to-end checks", write hermetic integration tests that exercise the route handler or server action plus the database on PGlite, with substituted providers. The orchestrator does real-browser verification separately.
 - Durable work: keep step bodies as plain functions taking explicit inputs and returning explicit outputs. Test those directly. The workflow wrapper stays thin. If Vercel Workflow cannot execute locally in this environment, test the step functions and document the limitation in the commit message.
-- `bun run typecheck` (tsc --noEmit) and `bun run lint` must pass. Run the full test suite before committing.
+- `pnpm typecheck` (tsc --noEmit) and `pnpm lint` must pass. Run the full test suite before committing.
 
 ## Git
 

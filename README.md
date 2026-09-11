@@ -13,35 +13,35 @@ Next.js (App Router), React, TypeScript, Tailwind. Postgres on Neon with Drizzle
 Copy `.env.example` to `.env.local` and fill in the values. Auth vars are required at boot.
 
 ```bash
-bun install
-bun run dev
+pnpm install
+pnpm dev
 ```
 
 Open http://localhost:3000.
 
 ## Runtime note
 
-The Next.js scripts use Node.js. Bun's fetch ignores Workflow's Undici dispatcher and times out local queue requests after five minutes, which course generation can exceed. Use `bun run dev` for the dev server. Bun is fine for installing packages and other scripts.
+The Next.js scripts invoke `node` directly. Bun's fetch ignores Workflow's Undici dispatcher and times out local queue requests after five minutes, which course generation can exceed.
 
 `node tests/workflow-queue.check.mjs` checks a queue request lasting 310 seconds. Bun 1.4.0 fails it with a TimeoutError.
 
 ## Commands
 
-| Command                           | Purpose            |
-| --------------------------------- | ------------------ |
-| `bun run dev`                     | Development server |
-| `bun run build`                   | Production build   |
-| `bun run lint` / `lint:fix`       | Oxlint             |
-| `bun run format` / `format:check` | Oxfmt              |
-| `bun run typecheck`               | `tsc --noEmit`     |
-| `bun run test`                    | Vitest             |
+| Command                        | Purpose            |
+| ------------------------------ | ------------------ |
+| `pnpm dev`                     | Development server |
+| `pnpm build`                   | Production build   |
+| `pnpm lint` / `lint:fix`       | Oxlint             |
+| `pnpm format` / `format:check` | Oxfmt              |
+| `pnpm typecheck`               | `tsc --noEmit`     |
+| `pnpm test`                    | Vitest             |
 
 ## Database
 
 Two Neon Postgres branches: dev for daily work, main for production.
 
-| Command                   | Effect                                |
-| ------------------------- | ------------------------------------- |
-| `bun run db:generate`     | Generate migrations with drizzle-kit  |
-| `bun run db:migrate`      | Apply migrations to dev               |
-| `bun run db:migrate:main` | Promote to main after dev is verified |
+| Command                | Effect                                |
+| ---------------------- | ------------------------------------- |
+| `pnpm db:generate`     | Generate migrations with drizzle-kit  |
+| `pnpm db:migrate`      | Apply migrations to dev               |
+| `pnpm db:migrate:main` | Promote to main after dev is verified |

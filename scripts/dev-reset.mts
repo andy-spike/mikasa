@@ -3,7 +3,7 @@
 // the v1 generation change. Development data is disposable, but nothing
 // deletes automatically: run this by hand, never in production.
 //
-// Usage: bun run scripts/dev-reset.ts [--yes]
+// Usage: pnpm dev:reset -- [--yes]
 // Without --yes it only reports what would go.
 import postgres from "postgres";
 
