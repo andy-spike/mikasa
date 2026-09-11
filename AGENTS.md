@@ -40,12 +40,12 @@ Both databases must be current after a schema change. Apply to dev first, verify
 
 Pushing `main` deploys to production. There is no CI and no PR process, so the agent merges locally whenever the user says to ship a branch onto main.
 
-Worktree layout: `main` is checked out in the linked worktree at `/home/andy-spike/code/mikasa`. This worktree holds the work branches. Never check out `main` here. Run every merge step over there with `git -C /home/andy-spike/code/mikasa`.
+Worktree layout: a single worktree at `/home/andy-spike/code/mikasa` holds the work branches and `main`. Work on a branch, and check out `main` only to merge and push. Never commit work directly to `main`.
 
 1. On the work branch: everything committed and pushed, with `pnpm test`, `pnpm typecheck`, and `pnpm lint` green. Leave local-only churn uncommitted, never ship it: `.impeccable/hook.cache.json` and dependency install drift in `pnpm-lock.yaml` / `package.json`.
 2. If the branch changes `lib/db/schema.ts`: apply the new migrations to both databases before the push, `pnpm db:migrate` for dev and then `pnpm db:migrate:main` for production.
-3. In the main worktree: stash any local drift, `git fetch origin`, then `git merge --ff-only <branch>`. Main must be strictly behind the work branch. If it is not a fast-forward, stop and ask instead of forcing anything.
+3. `git switch main`, stash any local drift, `git fetch origin`, then `git merge --ff-only <branch>`. Main must be strictly behind the work branch. If it is not a fast-forward, stop and ask instead of forcing anything.
 4. `git push origin main`. That push is the deploy. Confirm main matches origin/main afterwards.
-5. Come back to the work branch.
+5. `git switch <branch>` to come back to the work branch.
 
-Never `push --force` to main. Stash refs are shared between the two worktrees, so always pop by name (`git stash pop stash@{n}`), never a bare `pop`.
+Never `push --force` to main. Stash entries are repository-wide, so pop by name (`git stash pop stash@{n}`), never a bare `pop`.
