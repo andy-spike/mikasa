@@ -94,7 +94,7 @@ The name "Mikasa" is fixed.
 
 The Flexoki Paper Desk in `DESIGN.md` is the authoritative interface direction. It uses a calm, conventional application register inspired by products such as Linear and Notion, warmed with Flexoki paper and ink. The earlier literary Reading Room direction was rejected.
 
-Mikasa ships warm paper and warm charcoal grounds. Neither is secondary. One accent marks the Lesson the Learner is up to, and the interface uses the design tokens, layout rules, typography, and component behavior recorded in `DESIGN.md`.
+Mikasa ships warm paper and warm charcoal grounds. Neither is secondary. One accent marks the Lesson the Learner is up to; on the landing, the same accent also does wayfinding, one mark per section. The interface uses the design tokens, layout rules, typography, and component behavior recorded in `DESIGN.md`.
 
 The frontend mockup is the product interface, not a disposable prototype. Backend work must replace authored demo state with real behavior without redesigning the screens or weakening their interaction and accessibility rules.
 
