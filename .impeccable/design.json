@@ -1,6 +1,22 @@
 {
   "components": [
     {
+      "css": ".ds-landing-hero { background: var(--canvas); color: var(--fg); } .ds-landing-hero h1 { font-size: 4rem; font-weight: 600; line-height: 1.04; letter-spacing: -0.035em; } .ds-landing-hero .wash { background: radial-gradient(42rem 30rem at 78% 10%, color-mix(in srgb, var(--over) 60%, transparent), transparent 70%); }",
+      "description": "Landing hero. Display XL statement beside the desk scene, over a token-drawn light wash and rule rhythm.",
+      "html": "<section class=\"ds-landing-hero\"><div class=\"wash\"></div><h1>What do you want to be able to do?</h1></section>",
+      "kind": "custom",
+      "name": "Landing Hero",
+      "refersTo": "landing-hero"
+    },
+    {
+      "css": ".ds-desk-scene { color: var(--fg-dim); } .ds-desk-scene .sheet { fill: var(--panel); stroke: var(--hair); } .ds-desk-scene .live { stroke: var(--live); }",
+      "description": "Hero illustration. A sheet mid-outline, a pencil, a cup with steam; every fill is a surface token and the only colour is the live olive.",
+      "html": "<svg class=\"ds-desk-scene\" viewBox=\"0 0 420 340\"><path class=\"sheet\" d=\"M96 92h196v205H96z\"/><path class=\"live\" d=\"M116 270h48\" stroke-width=\"2\"/></svg>",
+      "kind": "custom",
+      "name": "Desk Scene",
+      "refersTo": "desk-scene"
+    },
+    {
       "css": ".ds-btn-primary { background: var(--raised); color: var(--fg); padding: 0.625rem 1rem; font-size: 0.8125rem; font-weight: 500; border: none; border-radius: 6px; transition: background 0.16s cubic-bezier(0.2,0,0,1); } .ds-btn-primary:hover { background: var(--over); } .ds-btn-primary:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }",
       "description": "Most important action on an Operate screen. Greyscale, one luminance step on hover.",
       "html": "<button class=\"ds-btn-primary\">Mark the Exercise done</button>",

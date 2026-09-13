@@ -1,0 +1,99 @@
+/* Landing leftovers: only what Tailwind utilities cannot express. All layout,
+   typography, spacing, and color on the landing reads from utilities in
+   `app/page.tsx`, `components/landing-course-demo.tsx`, and
+   `components/landing-motion.tsx`. */
+
+/* Notebook-paper tokens. The grid holds still while content slides over it,
+   the way a page's ruling does. */
+.landing-page {
+  --grid-line: color-mix(in srgb, var(--hair) 20%, transparent);
+  --grid-cell: 2.5rem;
+}
+@media (max-width: 640px) {
+  .landing-page {
+    --grid-cell: 2rem;
+  }
+}
+
+/* Notebook paper: a faint ruled grid in the hairline token over the canvas.
+   Positioning rides Tailwind (`fixed inset-0`) on the element. */
+.landing-texture {
+  background:
+    repeating-linear-gradient(to right, var(--grid-line) 0 1px, transparent 1px var(--grid-cell)),
+    repeating-linear-gradient(to bottom, var(--grid-line) 0 1px, transparent 1px var(--grid-cell));
+}
+
+/* Hero entrance and subject-change assembly. Applied from markup through
+   Tailwind arbitrary `animate-[...]` classes. */
+@keyframes hero-typeset {
+  from {
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(12px);
+  }
+  to {
+    clip-path: inset(-0.25em);
+    transform: translateY(0);
+  }
+}
+@keyframes hero-underline {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes course-assemble {
+  from {
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(8px);
+  }
+  to {
+    clip-path: inset(0);
+    transform: translateY(0);
+  }
+}
+
+/* Demo spine: the hairline joining the rail numerals. A pseudo-element is the
+   only way to draw it behind the numeral badges, so it stays here. The
+   `.demo-stage` class survives purely as this hook; the step layout itself is
+   Tailwind on the same element. Offsets track the step padding (2rem base,
+   1.75rem ≤1000px, 1.5rem ≤640px) so the line tucks behind the first and last
+   badges instead of stubbing past them. */
+.demo-stage::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2.875rem;
+  width: 1px;
+  background: var(--hair);
+}
+.demo-stage:first-child::before {
+  top: 2.75rem;
+}
+.demo-stage:last-child::before {
+  bottom: calc(100% - 2.75rem);
+}
+@media (max-width: 1000px) {
+  .demo-stage::before {
+    left: 2.625rem;
+  }
+  .demo-stage:first-child::before {
+    top: 2.5rem;
+  }
+  .demo-stage:last-child::before {
+    bottom: calc(100% - 2.5rem);
+  }
+}
+@media (max-width: 640px) {
+  .demo-stage::before {
+    left: 2.375rem;
+  }
+  .demo-stage:first-child::before {
+    top: 2.25rem;
+  }
+  .demo-stage:last-child::before {
+    bottom: calc(100% - 2.25rem);
+  }
+}

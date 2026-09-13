@@ -64,6 +64,24 @@ typography:
     fontWeight: 600
     lineHeight: 1.16
     letterSpacing: "-0.026em"
+  display-xl:
+    fontFamily: "Geist, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "4rem"
+    fontWeight: 600
+    lineHeight: 1.04
+    letterSpacing: "-0.035em"
+  display-xl-md:
+    fontFamily: "Geist, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "3.5rem"
+    fontWeight: 600
+    lineHeight: 1.04
+    letterSpacing: "-0.035em"
+  display-xl-sm:
+    fontFamily: "Geist, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "2.75rem"
+    fontWeight: 600
+    lineHeight: 1.04
+    letterSpacing: "-0.035em"
   display-lg:
     fontFamily: "Geist, ui-sans-serif, system-ui, sans-serif"
     fontSize: "3rem"
@@ -144,6 +162,15 @@ spacing:
   gutter-lg: "2.5rem"
   measure: "36rem"
 components:
+  landing-hero:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.fg}"
+    typography: "{typography.display-xl}"
+    padding: "3.5rem 0 4rem"
+  desk-scene:
+    backgroundColor: "transparent"
+    textColor: "{colors.fg-dim}"
+    width: "30rem"
   outline-row:
     backgroundColor: "transparent"
     textColor: "{colors.fg-2}"
@@ -259,15 +286,18 @@ Depth comes from light, and light has two warm settings. Paper runs four steps d
 
 Colour is rationed. `#4a6b0a` on paper, `#9cb52d` on charcoal, marks the Lesson you are up to and nothing else outside code. Which Lesson is _open_ is carried by a raised ground, so position and progress never compete for the same signal. Everything the learner has already finished is neutral, and everything still ahead of them carries no mark at all. Inside code blocks alone, a full Flexoki syntax palette is spent on keywords, strings, numbers, functions, and comments, each clearing 4.5:1 on the reading ground it sits on. A Course is generated in one pass, so a generated Course has no missing Lesson; the dashed rule belongs to a Course still sitting at its Outline, where nothing has been written yet. This world replaced a square-cornered graphite instrument; that precision is evidence, not heritage. The rejected serif Reading Room stays rejected.
 
+One surface is allowed to spend the accent as wayfinding: the landing is the desk seen from the visitor's side, so it carries one olive moment per section — a triangle beside a section heading, the pencil band and the half-written line in the hero's illustrated scene. It is the same mark, borrowed to say _this is where you are_, never a colour for an action: `Start a Course` stays greyscale in both grounds.
+
 **Key Characteristics:**
 
 - Two warm grounds, one system: paper and charcoal, four surface steps each, zero cards as page structure, one shadow, one grain wash.
-- One accent with exactly one meaning outside code, spent on roughly one row per screen. Code alone carries syntax colour.
+- One accent with exactly one meaning in the workspace, spent on roughly one row per screen; the landing borrows the same mark once per section as wayfinding. Code alone carries syntax colour.
 - Fewest facts per row: three in the Outline rail, three in the Courses list, everything else a click away.
 - Geist and Geist Mono only; no serif anywhere in the product.
 - A viewport-centred Lesson at a 36rem measure, with fixed edge tools that never move it.
 - Both rails are the shadcn Sidebar, adapted rather than reinvented.
 - Command palette as primary navigation, not a power-user shortcut.
+- The landing is the one Persuade surface: a hero with an illustrated desk, a scroll settle, and one olive mark per section.
 
 ## Colors
 
@@ -283,7 +313,7 @@ A colour is defined in `:root` and, if it moves, redefined in `.dark`. Nothing i
 
 ### Primary
 
-- **Live Olive** (`{colors.live}`): The accent. It marks the Lesson you are up to — the first Lesson that is set and not done — as a small solid triangle in the Outline rail, drawn in `components/workspace/marks.tsx`. It also paints the focus ring, the text caret, and the selection wash, because those are the browser surfaces the workspace still owns. It is never spent on done, on hover, on a button, or on a second meaning outside code. `#4a6b0a` on paper clears 6.01:1 on the canvas; `#9cb52d` on charcoal clears 7.50:1, so the same mark clears the graphics floor on both grounds.
+- **Live Olive** (`{colors.live}`): The accent. It marks the Lesson you are up to — the first Lesson that is set and not done — as a small solid triangle in the Outline rail, drawn in `components/workspace/marks.tsx`. It also paints the focus ring, the text caret, and the selection wash, because those are the browser surfaces the workspace still owns. It is never spent on done, on hover, on a button, or on a second meaning inside the workspace. The landing borrows it once per section as wayfinding, described under Named Rules. `#4a6b0a` on paper clears 6.01:1 on the canvas; `#9cb52d` on charcoal clears 7.50:1, so the same mark clears the graphics floor on both grounds.
 
 ### Neutral — surfaces
 
@@ -331,7 +361,9 @@ One graphic in the product is exempt from everything above: Google's G on the si
 
 ### Named Rules
 
-**The One Accent Rule.** Olive means exactly one thing outside code: the Lesson you are up to. Roughly one row per screen carries it. If a second element wants the accent, the answer is a luminance step, not a hue. Inside code blocks, syntax roles carry their own hues and never leak out. The one colour on screen that is not the accent is Google's G on the sign-in button, which belongs to Google.
+**The One Accent Rule.** Olive means exactly one thing inside the workspace: the Lesson you are up to. Roughly one row per screen carries it. If a second element wants the accent, the answer is a luminance step, not a hue. Inside code blocks, syntax roles carry their own hues and never leak out. The one colour on screen that is not the accent is Google's G on the sign-in button, which belongs to Google.
+
+**The Landing Wayfinding Rule.** The landing is not the workspace, and it may spend the same olive once per section as wayfinding: the triangle beside a section heading or the hero scene's own marks (the sheet's live triangle, the line it is writing, the pencil band). One moment per section, never two, and never on an action — both `Start a Course` controls stay greyscale. The scene and the wash are drawn from the surface tokens, so both grounds get their own light and no new colour enters the system.
 
 **The Light, Not Line Rule.** Surfaces separate by luminance. A hairline divides two regions; it never wraps one to make an object. The one exception is code, which sits on the reading ground inside a single hairline so its syntax roles stay legible. If any other thing needs a border on all four sides to read, it is drawn wrong.
 
@@ -348,9 +380,10 @@ One graphic in the product is exempt from everything above: Google's G on the si
 
 ### Hierarchy
 
-- **Display Large** (600, 3rem, 1.08, -0.03em) and **Display Large Small** (600, 2.5rem, same leading and tracking, below 640px): The Persuade surfaces only — the landing's opening statement and its closing one. It exists because a 2.25rem line reads as a section heading at the top of a page that has nothing above it, and the answer to that is a size step, not a second weight or a colour. Two consumers, both on `app/page.tsx`. It is recorded as a pair for the same reason Display is — the system holds one size per named step, and a step that moves at a breakpoint names both ends.
+- **Display XL** (600, 4rem, 1.04, -0.035em), **Display XL Medium** (3.5rem) and **Display XL Small** (2.75rem): The landing hero headline only, across three ends. It exists because the hero is the one line in the product that must carry a whole page on its own, and the answer to that is a size step. Recorded as a set for the same reason Display Large is a pair: a step that moves at a breakpoint names every end it lands on.
+- **Display Large** (600, 3rem, 1.08, -0.03em) and **Display Large Small** (600, 2.5rem, same leading and tracking, below 640px): The landing's closing statement, and the level a heading takes when it must stop a reader. It exists because a 2.25rem line reads as a section heading at the top of a page that has nothing above it, and the answer to that is a size step, not a second weight or a colour. One consumer remains in `app/page.tsx`; the opening statement moved up to Display XL. It is recorded as a pair — the system holds one size per named step, and a step that moves at a breakpoint names both ends.
 - **Display** (600, 2.25rem, 1.16, -0.026em): The Lesson title at ≥640px, capped at 22 characters per line and balanced.
-- **Display Small** (600, 1.875rem, 1.16, -0.026em): The same title below 640px. One of the system's two responsive steps; Display Large is the other, and both live at the top of the ramp where a line has room to be wrong.
+- **Display Small** (600, 1.875rem, 1.16, -0.026em): The same title below 640px. One of the system's responsive steps; the Display XL set and Display Large are the others, and all live at the top of the ramp where a line has room to be wrong.
 - **Title** (600, 0.9375rem, ~1.4, -0.011em): The Course Topic at the head of the Outline rail. The only other place this weight/size pairing appears is the palette's own input.
 - **Body** (400, 1rem, 1.72): Lesson prose and the Exercise task, held to a 36rem measure that reads at 64–75 characters per line. At 600 with -0.011em it is also the item heading inside a landing list — a weight on a size the scale already owns, not a new step.
 - **Body Small** (400, 0.9375rem, 1.62–1.66): Set-in note blocks, the Exercise check line, the Next-Lesson title.
@@ -370,6 +403,26 @@ One graphic in the product is exempt from everything above: Google's G on the si
 
 ## Layout
 
+### Landing update: living course demo
+
+The hero is centered: headline, supporting copy, and actions, with no diagram beneath it, and it fills the first viewport — `min-height: calc(100dvh − 3.5rem)` with the content vertically centered — so the demonstration begins exactly at the fold. The living course demonstration follows directly as the first section, with its own subject tabs updating the goal, background, outline, and exercise through shared state. The headline reveals through a mask and its olive underline draws once. Animations replay on subject selection, finish in under a second, and do not loop. At the user's explicit request, the landing hero and course-demo motion are exceptions to the app's reduced-motion rules. This replaces the earlier static-hero, reduced-motion, and hero-diagram descriptions in this landing section.
+
+The landing's scroll motion runs on Motion (`motion/react` in `components/landing-motion.tsx`). The exercise band wipes in through a clip path with a spring when it first enters view or remounts on a subject change, the quality list staggers its four terms by 70ms on springs, and a greyscale hairline tracks reading progress at the viewport top with a spring. All Motion work keeps content visible by default, so a failed script leaves a readable page; the CSS entrance and assembly animations are unchanged and carry the reduced-motion exception the user requested.
+
+The landing now uses a living course demonstration in place of the illustrated hero and static photography outline. This section supersedes the earlier landing-specific composition and motion descriptions.
+
+The landing frame is 77rem including gutters. "Create a course about anything" uses fluid Geist display type capped at 6rem, with a single olive hand-drawn underline. Desktop display runs from 3.25rem to 6rem; mobile runs from 2.75rem to 4.5rem. Supporting feature titles may use 1.125rem, and course goals and section headings may use 2rem at narrow widths. These are landing-only additions to the type ramp.
+
+Visitors choose Photography, Jazz harmony, or Databases with pressed-state buttons. The selected example reads top to bottom as three numbered steps on a hairline spine — the goal with its starting point, the outline with its modules, and one lesson exercise. All three steps share one ground, closed by a hairline below. Examples are labeled illustrative. Steps are separated by generous whitespace with no enclosing borders, rounded cards, or shadows; mono numerals carry the sequence and the section's one olive mark sits on the outline approval. The subject selector uses a neutral bottom rule for its selected state.
+
+Changing subjects reveals module rows with a short clip and 8px settle, staggered by 65ms. It runs on entry or subject selection. Reduced motion shows the complete content immediately. The hero stays visible without animation. The steps stack in reading order at every width, and subject controls remain visible together.
+
+The quality section explains course-wide sequencing, exercises, review and correction, and sources. It precedes the workflow and learning-support content. The primary hero action is "Create your course" and uses the existing Google sign-in flow; the closing action repeats it verbatim with the Google mark, so both ends of the page carry the same CTA.
+
+The navbar is fixed to the viewport top: a compact translucent canvas bar with a backdrop blur and a bottom hairline. "Sign in" is a compact primary control carrying the Google mark at 16px. Anchor targets carry scroll margins that clear the bar. The footer carries "© 2026 Mikasa · Developed by Andrés Sanabria".
+
+The demonstration's subject tabs join without gaps. Section headings carry no wayfinding triangle. The page sits over a notebook-paper ground: a faint ruled grid in the hairline token at 20% over canvas, holding still while content scrolls over it. It keeps animating nothing of its own and stays clear of reading text.
+
 **The shell.** Full viewport height, full viewport width, and never scrolled: Outline rail, reading column, panel, each region owning its own overflow. Both rails are fixed to the viewport's own edges, so the shell is not capped or centred — the room a wide screen has going spare is spent on the rail and the reading column's margins instead of on a boxed page.
 
 **The rail.** 20rem, and 23rem from `xl` up. Its rows are a three-column grid (`0.75rem 1.25rem 1fr`) carrying mark, number and title — three facts, one line, no wrap. The completion date and the minute estimate used to sit in a fourth column and were dropped: neither is a thing a learner scanning for their place acts on. Row padding is 0.375rem on a pointer and 0.75rem on touch, so a long Course scrolls rather than compressing. Collapsed, the rail leaves a 2.75rem stub carrying the reopen control and the done count — `collapsible="icon"`, because a rail that vanishes entirely takes the shell's left edge with it. The header carries the Topic and the Goal and nothing else; Depth, Grounding and the done fraction came off it, and the route to the Outline screen lives in the command palette.
@@ -378,7 +431,11 @@ One graphic in the product is exempt from everything above: Google's G on the si
 
 The column holds still by keeping the region around it a constant size, from both ends. When the rail collapses, the region takes a left pad of `calc(rail − 2.75rem)`. From `2xl` up, where there is room to spare, a closed panel keeps its 21rem in reserve as a right pad and the article centres in what is left — so the sentence sits in the middle of the space it will still occupy once the panel opens. Measured 0px drift at 1280, 1440, 1600 and 1920 when either the rail or the panel toggles.
 
-**The landing.** The one surface that is not the shell: a 60rem frame with the shell's own gutters. Prose stays on the 36rem measure, the numbered steps and the definition rows cap their painted edges at 44rem so no hairline runs past the words it divides, and the two-column Outline demonstration is the single element that spends the full 60rem. That contrast is the page's only width rhythm.
+**The landing.** The one surface that is not the shell: a 60rem frame with the shell's own gutters. Prose stays on the 36rem measure, the numbered steps and the definition rows cap their painted edges at 44rem so no hairline runs past the words it divides, and the Outline demonstration is the single element that spends the full 60rem. That contrast is the page's only width rhythm.
+
+The hero is the page's one composition: the statement on the left, an illustrated desk on the right (`components/desk-scene.tsx`), and behind both a light wash drawn from `--over` and `--raised` plus a faint rule rhythm at 110px, masked to the top right. The scene is drawn, not photographed: a sheet mid-outline, a pencil laid where the writing stopped, a cup with steam. Its strokes reuse the Lucide weight (1.25–1.5px) so it sits in the same world as the icons, and every fill is a surface token, so both grounds are lit separately. It has no card and no frame; the drawing sits on the page the way it would sit on the desk. Below 768px the scene follows the text in the same column at 19rem, because welcome is the landing's whole job and a text-only phone hero is not welcoming.
+
+Each section below the hero carries exactly one olive moment — the live triangle beside its heading (`SectionMark`), matching the mark the Outline rail uses — and settles into place once, the first time it enters the viewport (`components/reveal.tsx`). The settle is 16px of rise and a fade over 560ms on the system ease; stagger is 90ms within a section and never between sections. The page's motion is otherwise still: the hero's lines rise on arrival, the scene's lines draw and its steam breathes, and nothing else moves.
 
 **The Tailor column.** On the Outline screen the right column is not a rail; it is a second column in the page's own flow, 20rem from `lg` up. Once a plan has more than a few changes in it, that column is taller than the viewport, and `position: sticky` can hold a tall element by its top or by its bottom but never both. So `hooks/use-sticky-follow.ts` moves the sticky `top` with the scroll and clamps it at each end: scroll down and the column rides up until its last change sits on the viewport floor, then stops; scroll up and it rides back down until its first row meets the header, then stops. It has no scrollport of its own — an inner scrollbar beside a scrolling page is two scroll surfaces competing for the same wheel. Below `lg` the column stacks under the Outline and the hook no-ops.
 
@@ -458,6 +515,15 @@ Four adaptations are recorded in the file, at the lines they change:
 
 One control in the chrome, holding no React state: the class on `<html>` is the state, which icon shows is a CSS question, and the choice is written to `localStorage` under `mk-theme`. It renders identically on the server and the client, so it needs no mounted flag and produces no hydration seam.
 
+### Desk Scene (signature, landing)
+
+The landing hero's illustration, drawn as one SVG in `components/desk-scene.tsx`. Not an icon set and not a photo: a sheet mid-outline with a live triangle on its first row, the line it is writing in `--live`, a pencil laid where that line stopped with a single olive band, a cup with two steam lines, a desk rule, and two angled light wedges. It tells the product's story in one image: the Outline is being shaped, the Lesson you are up to is marked, the work is not finished.
+
+- **Drawn from tokens:** every fill and stroke reads `--panel`, `--raised`, `--over`, `--fg-dim`, `--mark`, `--rule` or `--live`, so the paper and charcoal grounds each light the scene. The light wedges are `--over` wash and drop to 0.13 opacity on charcoal (`.dark .desk-ray`), where the same value would read heavier.
+- **One stroke family:** 1.25–1.5px, square or round caps to match the thing drawn — the same weight band as the Lucide icons at 14–16px.
+- **Alive once:** the steam strokes draw in on the scene's settle (`mk-steam`) and then breathe between its own opacity and 0.8 (`mk-breathe`, 7s alternate). Under `prefers-reduced-motion` the steam is drawn at rest and no animation runs.
+- **No frame:** the scene carries no card, hairline or shadow around it; it sits on the page the way its objects sit on the desk.
+
 ### Outline Rail (signature)
 
 The Outline is a live, editable object beside the Lesson, not a table of contents, and the rail is built to look like one. Module headings are labels with a `done/total` count; Lesson rows are a fixed four-column grid.
@@ -505,6 +571,8 @@ One panel, two modes, an explicit segmented switch at the top on a canvas-inset 
 
 Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bounce — at 120ms for row and colour changes, 160ms for the default, 240ms for entrances. The authored moment is marking an Exercise done: one handoff in two halves, the check stroking itself onto the row just finished (340ms dash) while the accent lifts into place on the next Lesson (300ms). It fires on a real mark, never on first paint or a revisit. Under `prefers-reduced-motion`, both end states remain and all movement is dropped.
 
+The landing adds two motions and no more. The hero settles on arrival: its lines rise one breath after another (`mk-rise`, 600ms, 90ms stagger), the scene settles at 220ms, and the scene's steam draws itself in at 420ms, then breathes between its own opacity and 0.8 on a 7s alternate — the page's only loop. Scrolling, each section fades up 16px once (`mk-settle`, 560ms) when it first enters the viewport, through `components/reveal.tsx`: `rootMargin: 0px 0px -8% 0px`, disconnect after the first intersect. The hero wash drifts 2% over 22s. Nothing settles twice, nothing enters twice, and reduced motion resolves every element to its end state.
+
 ### Named Rules
 
 **The Stays In Place Rule.** A Course whose Lessons have not been generated draws every one of them, ruled and inert. They are never hidden, never faded out, and never disabled buttons — they hold their positions so the shape of the Course is legible before a word of it exists. The state is a property of the Course, not of a Lesson within it: generation is one pass, so a Course is either written or it is not.
@@ -518,8 +586,10 @@ Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bo
 ### Do:
 
 - **Do** separate surfaces with luminance — `{colors.canvas}` → `{colors.panel}` → `{colors.raised}` → `{colors.over}` — and use hairlines only to divide, except for the single enclosure around code.
-- **Do** spend `{colors.live}` outside code on exactly one thing: the Lesson the learner is up to.
+- **Do** spend `{colors.live}` outside code on exactly one thing: the Lesson the learner is up to — and on the landing, once per section as wayfinding.
 - **Do** carry the open state with a raised ground and `aria-current`, never with colour.
+- **Do** draw the landing's scene and wash from the surface tokens, so paper and charcoal are lit separately and no colour is hardcoded into an illustration.
+- **Do** resolve every landing animation to its end state once the observer fires, and give reduced motion the same end state with no movement.
 - **Do** hold body copy to the 36rem measure and land every painted edge in the reading column on it.
 - **Do** set every number that is data in Geist Mono or with `.tnum`, so columns of counts, dates and estimates line up.
 - **Do** keep the Lessons of an unapproved Outline in place, ruled at `--mark` and inert, with no hover and no click target.
@@ -535,7 +605,9 @@ Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bo
 
 - **Don't** build cards. No bordered, radiused, shadowed boxes as page structure — the Tailor's change list included.
 - **Don't** introduce a second accent, a coloured status pill, a progress ring, a percentage, a streak, or an XP counter.
-- **Don't** spend the accent on done, on hover, on a button, or on anything but the live Lesson outside code. Syntax roles stay inside code blocks.
+- **Don't** spend the accent on done, on hover, on a button, or on anything but the live Lesson inside the workspace. On the landing it is wayfinding, one moment per section, and it still never colours an action. Syntax roles stay inside code blocks.
+- **Don't** give the landing a second illustrated world or a card around its scene; the desk scene is drawn from the same tokens as everything else and sits on the page unframed.
+- **Don't** animate a landing section twice, or let anything move that the reader is currently reading. The settle fires once; the steam is the only loop.
 - **Don't** set any part of this product in a serif, or reintroduce paper, vellum, ink stamps, folds, brass or a book metaphor. That world was tried and rejected outright.
 - **Don't** use `--mark` for text; it clears 3:1, not 4.5:1.
 - **Don't** render an unwritten Lesson as a disabled button, and don't list one in the command palette. Every Lesson of a generated Course is listed, because there are no unwritten ones left in it.

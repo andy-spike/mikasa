@@ -237,6 +237,13 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Anchor hops glide instead of jumping. The landing's own entrance and
+     assembly animations are the project's explicit reduced-motion exception;
+     scrolling is browser chrome and honors the preference. */
+  html {
+    scroll-behavior: smooth;
+  }
+
   /* The parts we did not draw still belong to the workspace. */
   ::selection {
     background: var(--select);
@@ -391,9 +398,122 @@
     mix-blend-mode: overlay;
   }
 
+  /* The scene's light wedges read heavier on charcoal; ease them down. */
+  .dark .desk-ray {
+    opacity: 0.13;
+  }
+
+  /* Landing hero light. Morning light on the same desk: two warm washes plus
+     a faint rule rhythm, all drawn from the surface tokens so both grounds
+     get their own light. No hue, no edges, nothing behind text that text
+     cannot already sit on. */
+  .landing-hero {
+    position: relative;
+    isolation: isolate;
+  }
+  .landing-glow {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: clip;
+    pointer-events: none;
+  }
+  .landing-glow::before {
+    content: "";
+    position: absolute;
+    inset: -20% -15% auto;
+    height: 130%;
+    background:
+      radial-gradient(
+        42rem 30rem at 78% 10%,
+        color-mix(in srgb, var(--over) 60%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        30rem 22rem at 8% 0%,
+        color-mix(in srgb, var(--raised) 65%, transparent),
+        transparent 70%
+      );
+    animation: mk-drift 22s ease-in-out infinite alternate;
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      black 5rem,
+      black calc(100% - 7rem),
+      transparent 100%
+    );
+  }
+  .landing-glow::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 52% 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--hair) 45%, transparent) 0 1px,
+      transparent 1px 110px
+    );
+    opacity: 0.6;
+    mask-image: radial-gradient(34rem 20rem at 78% 0%, black, transparent 70%);
+  }
+
+  /* The landing's one authored moment: the hero settles on arrival, each
+     line a breath after the last. Delays ride inline per element. */
+  .mk-rise {
+    opacity: 0;
+    animation: mk-rise 600ms var(--ease) forwards;
+  }
+
+  /* Narrow screens get a thinner wash: the same wide glow would sit as a
+     slab across the whole viewport instead of light in a corner. */
+  @media (max-width: 639px) {
+    .landing-glow {
+      mask-image: linear-gradient(
+        to right,
+        transparent 0,
+        black 1.5rem,
+        black calc(100% - 1.5rem),
+        transparent 100%
+      );
+    }
+    .landing-glow::before {
+      opacity: 0.55;
+    }
+    .landing-glow::after {
+      display: none;
+    }
+  }
+
+  /* The landing's scroll settle: hidden until its observer marks it
+     settled, then one fade and rise. Nothing re-triggers, nothing moves
+     again. Reduced motion skips both classes entirely. */
+  .mk-settle {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  .mk-settle.mk-settled {
+    animation: mk-rise 560ms var(--ease) forwards;
+  }
+  .mk-steam {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+  .mk-settled .mk-steam {
+    animation:
+      mk-steam 1200ms var(--ease) 420ms forwards,
+      mk-breathe 7000ms var(--ease) 2s infinite alternate;
+  }
+
+  /* No scripts: the observer cannot run, so the end state is the default
+     and the page reads without motion. */
+  @media (scripting: none) {
+    .mk-settle {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
   /* Syntax roles. Only inside code blocks on the reading ground, where each
-     role clears 4.5:1 on the canvas in both themes. */
-  .tok-key {
+     role clears 4.5:1 on the canvas in both themes. */  .tok-key {
     color: var(--code-green);
     font-weight: 600;
   }
@@ -416,6 +536,41 @@
    Marking an Exercise done is one handoff in two halves: the check strokes
    itself onto the row you finished, and the accent lifts to the next one.
    ------------------------------------------------------------------------ */
+
+@keyframes mk-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-2%, 3%, 0) scale(1.05);
+  }
+}
+
+@keyframes mk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mk-steam {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes mk-breathe {
+  to {
+    opacity: 0.8;
+  }
+}
 
 @keyframes mk-check {
   from {
@@ -462,9 +617,30 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   .mk-check,
   .mk-handoff,
-  .mk-open {
+  .mk-open,
+  .mk-rise {
+    animation: none;
+  }
+  .mk-rise {
+    opacity: 1;
+  }
+  .mk-settle {
+    opacity: 1;
+    transform: none;
+  }
+  .mk-settle.mk-settled,
+  .mk-settled .mk-steam {
+    animation: none;
+  }
+  .mk-steam {
+    stroke-dashoffset: 0;
+  }
+  .landing-glow::before {
     animation: none;
   }
   * {
