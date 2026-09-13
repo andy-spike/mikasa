@@ -4,7 +4,9 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "transition-colors duration-150 outline-none select-none disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  // No outline reset here: the global :focus-visible ring in app/globals.css
+  // owns keyboard focus for every control, per the DESIGN focus-ring rule.
+  "transition-colors duration-150 select-none disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
