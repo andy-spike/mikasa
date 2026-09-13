@@ -3,7 +3,7 @@ import type { LanguageModel } from "ai";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { designProviderOptions, groundingProviderOptions } from "@/lib/model";
-import { depthBounds, type CourseInput, type DepthId } from "./limits";
+import { depthBounds, depthTargetShape, type CourseInput, type DepthId } from "./limits";
 import { languageName as courseLanguageName } from "./prompt-blocks";
 import { outlineLessonsWithModule } from "./spec-graph";
 import { validateSpecification } from "./spec-validate";
@@ -206,16 +206,8 @@ function describeBounds(depth: string): string {
   return `${b.minModules}–${b.maxModules} Modules with ${b.minLessonsPerModule}–${b.maxLessonsPerModule} Lessons each`;
 }
 
-function exactOutlineCounts(depth: string): { modules: number; lessonsPerModule: number } {
-  const { minModules, maxModules, minLessonsPerModule, maxLessonsPerModule } = depthBounds(depth);
-  return {
-    modules: Math.round((minModules + maxModules) / 2),
-    lessonsPerModule: Math.round((minLessonsPerModule + maxLessonsPerModule) / 2),
-  };
-}
-
 function describeExactCounts(depth: string): string {
-  const exact = exactOutlineCounts(depth);
+  const exact = depthTargetShape(depth);
   return `exactly ${exact.modules} Modules with exactly ${exact.lessonsPerModule} Lessons each`;
 }
 

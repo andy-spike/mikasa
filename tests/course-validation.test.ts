@@ -6,6 +6,7 @@ import {
   DEPTH_IDS,
   GOAL_MAX_LENGTH,
   TOPIC_MAX_LENGTH,
+  depthTargetShape,
   validateCourseInput,
 } from "@/lib/course/limits";
 
@@ -137,5 +138,24 @@ describe("DEPTH_BOUNDS", () => {
       minLessonsPerModule: 4,
       maxLessonsPerModule: 5,
     });
+  });
+});
+
+describe("depthTargetShape", () => {
+  it("is the Lesson count each Depth option shows", () => {
+    expect(depthTargetShape("reach")).toEqual({ modules: 4, lessonsPerModule: 3, lessons: 12 });
+    expect(depthTargetShape("working")).toEqual({ modules: 6, lessonsPerModule: 4, lessons: 24 });
+    expect(depthTargetShape("mastery")).toEqual({ modules: 9, lessonsPerModule: 5, lessons: 45 });
+  });
+
+  it("stays inside every bound", () => {
+    for (const id of DEPTH_IDS) {
+      const bounds = DEPTH_BOUNDS[id];
+      const target = depthTargetShape(id);
+      expect(target.modules).toBeGreaterThanOrEqual(bounds.minModules);
+      expect(target.modules).toBeLessThanOrEqual(bounds.maxModules);
+      expect(target.lessonsPerModule).toBeGreaterThanOrEqual(bounds.minLessonsPerModule);
+      expect(target.lessonsPerModule).toBeLessThanOrEqual(bounds.maxLessonsPerModule);
+    }
   });
 });

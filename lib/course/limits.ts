@@ -60,6 +60,18 @@ export function depthBounds(depth: string) {
   return DEPTH_BOUNDS[depth as DepthId];
 }
 
+// The exact shape course design asks the model for: the midpoint of each bound.
+// The Outline may legally land anywhere inside the bounds, so the interface
+// presents this as the size to expect rather than a guarantee.
+export function depthTargetShape(depth: string) {
+  const bounds = depthBounds(depth);
+  const modules = Math.round((bounds.minModules + bounds.maxModules) / 2);
+  const lessonsPerModule = Math.round(
+    (bounds.minLessonsPerModule + bounds.maxLessonsPerModule) / 2,
+  );
+  return { modules, lessonsPerModule, lessons: modules * lessonsPerModule };
+}
+
 export type CourseInput = {
   topic: string;
   goal: string;

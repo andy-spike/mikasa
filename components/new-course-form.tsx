@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { field } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,7 @@ import {
   DEPTH_CHOICES,
   GOAL_MAX_LENGTH,
   TOPIC_MAX_LENGTH,
+  depthTargetShape,
   validateCourseInput,
   type CourseInput,
   type CourseInputErrors,
@@ -198,21 +199,29 @@ export function NewCourseForm() {
             onValueChange={(v) => set("depth", v as CourseInput["depth"])}
             className="mt-3"
           >
-            {DEPTH_CHOICES.map((d) => (
-              <RadioGroupItem key={d.id} value={d.id}>
-                <span
-                  className={cn(
-                    "block text-[0.8125rem] leading-snug",
-                    values.depth === d.id ? "font-medium text-fg" : "text-fg-2",
-                  )}
-                >
-                  {d.title}
-                </span>
-                <span className="mt-1 block text-[0.75rem] leading-[1.5] text-fg-3">
-                  {d.detail}
-                </span>
-              </RadioGroupItem>
-            ))}
+            {DEPTH_CHOICES.map((d) => {
+              const target = depthTargetShape(d.id);
+              return (
+                <RadioGroupItem key={d.id} value={d.id}>
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span
+                      className={cn(
+                        "text-[0.8125rem] leading-snug",
+                        values.depth === d.id ? "font-medium text-fg" : "text-fg-2",
+                      )}
+                    >
+                      {d.title}
+                    </span>
+                    <span className="tnum shrink-0 text-[0.75rem] leading-[1.5] text-fg-3">
+                      {target.lessons} Lessons
+                    </span>
+                  </span>
+                  <span className="mt-1 block text-[0.75rem] leading-[1.5] text-fg-3">
+                    {d.detail}
+                  </span>
+                </RadioGroupItem>
+              );
+            })}
           </RadioGroup>
         </div>
 
@@ -272,20 +281,23 @@ export function NewCourseForm() {
 
         <div className="flex flex-wrap items-start justify-between gap-4 border-t border-b border-hair py-6">
           <div className="min-w-0">
-            <p className="label text-fg-3">Grounding</p>
-            <p className="mt-1.5 max-w-[24rem] text-[0.75rem] leading-[1.5] text-fg-3">
+            <label id="nc-grounding-label" htmlFor="nc-grounding" className="label block text-fg-3">
+              Grounding
+            </label>
+            <p
+              id="nc-grounding-note"
+              className="mt-1.5 max-w-[24rem] text-[0.75rem] leading-[1.5] text-fg-3"
+            >
               Consult live web search while generating. Fixed once the Course is created.
             </p>
           </div>
-          <ToggleGroup
-            multiple={false}
-            value={[values.grounding ? "on" : "off"]}
-            onValueChange={(v) => set("grounding", v[0] !== "off")}
-            aria-label="Grounding"
-          >
-            <ToggleGroupItem value="on">On</ToggleGroupItem>
-            <ToggleGroupItem value="off">Off</ToggleGroupItem>
-          </ToggleGroup>
+          <Switch
+            id="nc-grounding"
+            aria-labelledby="nc-grounding-label"
+            aria-describedby="nc-grounding-note"
+            checked={values.grounding}
+            onCheckedChange={(checked) => set("grounding", checked)}
+          />
         </div>
 
         {errors.form && (

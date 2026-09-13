@@ -182,6 +182,7 @@ describe("draftOutline and buildOutline", () => {
     expect(prompt).toContain("build my own AI chat app");
     expect(prompt).toContain("English");
     expect(prompt).toContain("3–4 Modules with 2–3 Lessons each");
+    expect(prompt).toContain("exactly 4 Modules with exactly 3 Lessons each");
     expect(prompt).toContain("https://sdk.vercel.example/docs");
     expect(prompt).toContain("exampleContract");
   });

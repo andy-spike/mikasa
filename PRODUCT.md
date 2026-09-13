@@ -33,6 +33,7 @@ The Outline is a checkpoint before the expensive work starts. After approval, Mi
 - Course Language is required and cannot change. Initial values are English, Spanish, French, German, and Portuguese.
 - Grounding is on by default and can be turned off when the Course is created.
 - Depth controls the generated Outline bounds. Reach uses 3 to 4 Modules with 2 to 3 Lessons each. Working knowledge uses 5 to 7 Modules with 3 to 4 Lessons each. Mastery uses 8 to 10 Modules with 4 to 5 Lessons each.
+- Each Depth choice states its target Lesson count: Reach 12, Working knowledge 24, Mastery 45.
 - Manual Outline changes are not restricted to those generated bounds.
 
 ## Course design and generation
