@@ -7,6 +7,22 @@ related_targets: []
 
 # Surface brief: landing
 
+## Current direction: living course demo
+
+Follow-up hero direction: center the headline, copy, and actions with no diagram beneath them, and fill the first viewport exactly (100dvh minus the fixed bar) with the content vertically centered. An earlier goal-to-course hero diagram and its lead question were removed by user decision; the living course demonstration carries the interaction with its own subject tabs. The headline mask reveal and underline draw remain. The user explicitly requested a landing-only exception to reduced-motion behavior for the hero and course-demo animations; app behavior remains unchanged. No continuous animation loops.
+
+Follow-up polish: the demo subject tabs join with no gaps, section headings drop the wayfinding triangle, and the page sits over a notebook-paper ground — a faint ruled grid in the hairline token at 20% that holds still while content scrolls over it. The navbar is a compact fixed bar on translucent blurred canvas with a hairline; Sign in is a primary button with the Google mark at 16px; the closing CTA repeats the hero CTA verbatim (Google mark plus "Create your course"); the footer records the copyright line.
+
+Follow-up motion: scroll-linked motion runs through Motion in `components/landing-motion.tsx`. The exercise band clips in on a spring when first seen or on subject change, the quality terms stagger on springs, and a greyscale hairline tracks reading progress at the viewport top. Content renders visible by default so scripts failing leaves the page readable. The same landing reduced-motion exception covers these.
+
+The user selected this direction for the landing overdrive pass. This section supersedes the earlier hero, illustrative course, width, and motion descriptions below.
+
+Lead with "Create a course about anything" in large Geist type with one olive underline. Retain warm paper and charcoal themes. Replace the desk illustration with an interactive demonstration of Photography, Jazz harmony, and Databases. Each selection updates the goal, learner background, three-module outline, and sample exercise together. All examples are explicitly illustrative. Subject buttons expose their pressed state and work by keyboard or pointer.
+
+Use a 77rem frame including gutters, an open editorial hero, joined tonal goal and outline columns, and an inverse-tone exercise band. Mobile stacks the demonstration. The quality section explains connected lessons, practice, course-wide review with corrections, and linked sources. Preserve the existing course-creation workflow, Tutor and Tailor facts, language and depth details, and Google OAuth behavior.
+
+The authored motion is the short staggered reveal of outline rows on subject selection, with a reduced-motion fallback. The hero content is visible at rest. See `app/landing.css` and `components/landing-course-demo.tsx`. Earlier review rasters document the previous design and are not current acceptance captures.
+
 Route: `/`. Visitor mode **Persuade**. Direction: **Flexoki Paper Desk, morning light**. The landing is the desk seen from the visitor's side: it keeps every token, type step and hairline of `DESIGN.md`, and spends them on making a visitor feel welcome and start a Course. It may spend the accent as wayfinding, one olive moment per section, recorded in `DESIGN.md` under The Landing Wayfinding Rule. It is not a separate marketing world.
 
 ## Job and audience

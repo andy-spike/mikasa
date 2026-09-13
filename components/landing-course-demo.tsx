@@ -122,14 +122,14 @@ export function LandingCourseDemo({
               >
                 01
               </span>
-              <div className="min-w-0 max-w-xl">
+              <Reveal className="min-w-0 max-w-xl">
                 <p className="label flex items-baseline text-fg-3">Start with your goal</p>
                 <h3 className="mt-3 text-[1.75rem] leading-[1.2] font-medium tracking-[-0.026em] text-balance max-sm:text-2xl">
                   {example.goal}
                 </h3>
                 <p className="mt-2.5 text-sm leading-[1.66] text-fg-2">{example.background}</p>
                 <p className="tnum mt-2.5 text-xs text-fg-3">Depth · Reach the Goal</p>
-              </div>
+              </Reveal>
             </li>
             <li className="demo-stage relative grid grid-cols-[2.5rem_1fr] items-baseline gap-3 p-8 max-[1000px]:p-7 max-sm:p-6">
               <span

@@ -96,7 +96,7 @@ export default function Landing() {
         Skip to content
       </a>
       <header className="fixed inset-x-0 top-0 z-30 border-b border-hair bg-canvas/80 backdrop-blur">
-        <div className="mx-auto flex max-w-[65rem] items-center gap-4 px-5 py-2.5 sm:px-8 lg:px-10">
+        <div className="mx-auto flex max-w-[77rem] items-center gap-4 px-5 py-2.5 sm:px-8 lg:px-10">
           <Link
             href="/"
             aria-label="Mikasa home"
@@ -120,7 +120,12 @@ export default function Landing() {
             >
               Capabilities
             </a>
-            <Button variant="quiet" onClick={signIn} disabled={signingIn} className="min-h-9 gap-2">
+            <Button
+              variant="primary"
+              onClick={signIn}
+              disabled={signingIn}
+              className="min-h-9 gap-2 px-4 py-1"
+            >
               <GoogleMark className="block h-4 w-4" />
               Sign in
             </Button>
@@ -160,12 +165,18 @@ export default function Landing() {
                 </span>
                 .
               </h1>
-              <p className="mx-auto mt-6 max-w-[36rem] text-base leading-[1.72] text-fg-2">
+              <p
+                style={{ animationDelay: "90ms" }}
+                className="mk-rise mx-auto mt-6 max-w-[36rem] text-base leading-[1.72] text-fg-2"
+              >
                 The thing you have always wanted to understand. The skill you finally want to learn.
                 Turn it into a complete AI-generated course, built around your goal and what you
                 already know.
               </p>
-              <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+              <div
+                style={{ animationDelay: "180ms" }}
+                className="mk-rise mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
+              >
                 <StartCourseButton signingIn={signingIn} onSignIn={signIn}>
                   <GoogleMark />
                   {signingIn ? "Connecting to Google…" : "Create your course"}
@@ -183,7 +194,10 @@ export default function Landing() {
                   />
                 </a>
               </div>
-              <p className="mt-3 text-xs leading-normal text-fg-3">
+              <p
+                style={{ animationDelay: "260ms" }}
+                className="mk-rise mt-3 text-xs leading-normal text-fg-3"
+              >
                 Continue with Google. Your Courses are private and self-paced.
               </p>
               {failed && (

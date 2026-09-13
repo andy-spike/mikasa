@@ -237,6 +237,13 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Anchor hops glide instead of jumping. The landing's own entrance and
+     assembly animations are the project's explicit reduced-motion exception;
+     scrolling is browser chrome and honors the preference. */
+  html {
+    scroll-behavior: smooth;
+  }
+
   /* The parts we did not draw still belong to the workspace. */
   ::selection {
     background: var(--select);
@@ -610,6 +617,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   .mk-check,
   .mk-handoff,
   .mk-open,

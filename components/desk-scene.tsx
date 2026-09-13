@@ -3,15 +3,14 @@ import { cn } from "@/lib/utils";
 /* The landing's illustrated scene: a warm desk with a sheet mid-outline, a
    pencil, and a cup with steam. Strokes reuse the interface stroke width so
    the drawing sits in the same world as the icons. The pencil band is the
-   page's one olive mark; the steam is the only thing that moves after load,
-   and it is a scroll-driven reveal, not a loop. Each layer carries
-   .mk-settle so the whole scene settles in when it enters the viewport. */
+   page's one olive mark; the steam draws in on settle, then breathes on a 7s
+   loop, the page's only loop. The parent Reveal owns the settle. */
 export function DeskScene({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 420 340"
       fill="none"
-      aria-hidden
+      aria-hidden="true"
       className={cn("w-full", className)}
     >
       {/* soft light from the upper right */}
