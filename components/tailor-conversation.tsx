@@ -381,9 +381,7 @@ export function TailorConversation({
                 ))}
               </ul>
               {applySlot && acceptedCount > 0 && <div className="mt-4">{applySlot}</div>}
-              {applyAllSlot && proposedCount > 0 && (
-                <div className="mt-4">{applyAllSlot}</div>
-              )}
+              {applyAllSlot && proposedCount > 0 && <div className="mt-4">{applyAllSlot}</div>}
             </div>
           )}
           {publishedSlot}

@@ -21,8 +21,6 @@ export const metadata: Metadata = {
     "Turn your Goal into a private Course. Shape the Outline, learn through connected Lessons and Exercises, and ask the Tutor and Tailor for support.",
 };
 
-
-
 /* Runs before first paint, so the shell is never briefly the wrong ground. */
 const THEME_SCRIPT = `try{var t=localStorage.getItem("mk-theme"),d=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);var p=document.querySelector('link[data-mk-favicon="paper"]'),g=document.querySelector('link[data-mk-favicon="graphite"]');if(p&&g){p.media=d?"not all":"all";g.media=d?"all":"not all"}}catch(e){}`;
 
@@ -50,9 +48,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="grain h-full">
-        {children}
-      </body>
+      <body className="grain h-full">{children}</body>
     </html>
   );
 }

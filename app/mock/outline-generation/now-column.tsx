@@ -65,11 +65,12 @@ function frameAt(t: number): Frame {
     SOURCES.length,
     t < 1000 ? 0 : Math.floor((t - 1000) / SOURCE_MS) + 1,
   );
-  const lessonsShown = ready || saving || connections
-    ? TOTAL_LESSONS
-    : outline
-      ? Math.min(TOTAL_LESSONS, Math.floor((t - T.outlineStart) / LESSON_MS) + 1)
-      : 0;
+  const lessonsShown =
+    ready || saving || connections
+      ? TOTAL_LESSONS
+      : outline
+        ? Math.min(TOTAL_LESSONS, Math.floor((t - T.outlineStart) / LESSON_MS) + 1)
+        : 0;
 
   const stepIndex = ready || saving ? 3 : connections ? 2 : outline ? 1 : 0;
 
@@ -274,7 +275,7 @@ export function NowColumnMock() {
               idleIcon={<X className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />}
               confirmLabel="Discard this Course?"
               pendingLabel="Discarding…"
-              onConfirm={async () => ({ ok: false, reason: "not-found" } as const)}
+              onConfirm={async () => ({ ok: false, reason: "not-found" }) as const}
               onDone={() => {}}
             />
           </div>
@@ -286,9 +287,7 @@ export function NowColumnMock() {
           <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
             {TOPIC}
           </h1>
-          <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-            {GOAL}
-          </p>
+          <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">{GOAL}</p>
 
           <div className="mt-12">
             {visible.length === 0 ? (
@@ -410,9 +409,7 @@ export function NowColumnMock() {
                 <div className="max-w-(--measure) space-y-6">
                   <div>
                     <p className="label text-fg-dim">The premise</p>
-                    <p className="mt-3 text-[0.8125rem] leading-[1.6] text-fg-3">
-                      {WHY.premise}
-                    </p>
+                    <p className="mt-3 text-[0.8125rem] leading-[1.6] text-fg-3">{WHY.premise}</p>
                   </div>
                   <div>
                     <p className="label text-fg-dim">Running example</p>

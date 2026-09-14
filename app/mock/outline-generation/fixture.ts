@@ -100,7 +100,11 @@ export const MODULES: Module[] = [
 export const TOTAL_LESSONS = MODULES.reduce((n, m) => n + m.lessons.length, 0);
 
 export const SOURCES = [
-  { title: "AI SDK Core: Generating text", url: "https://sdk.vercel.ai/docs", domain: "sdk.vercel.ai" },
+  {
+    title: "AI SDK Core: Generating text",
+    url: "https://sdk.vercel.ai/docs",
+    domain: "sdk.vercel.ai",
+  },
   { title: "Tool calling", url: "https://sdk.vercel.ai/docs/tools", domain: "sdk.vercel.ai" },
   { title: "OpenRouter model routing", url: "https://openrouter.ai/docs", domain: "openrouter.ai" },
   { title: "Streaming UI protocol", url: "https://ai-sdk.dev/docs", domain: "ai-sdk.dev" },

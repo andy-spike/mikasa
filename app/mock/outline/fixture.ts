@@ -114,7 +114,11 @@ export const MODULES: MockModule[] = [
 ];
 
 export const SOURCES = [
-  { title: "AI SDK Core: Generating text", url: "https://sdk.vercel.ai/docs", domain: "sdk.vercel.ai" },
+  {
+    title: "AI SDK Core: Generating text",
+    url: "https://sdk.vercel.ai/docs",
+    domain: "sdk.vercel.ai",
+  },
   { title: "Tool calling", url: "https://sdk.vercel.ai/docs/tools", domain: "sdk.vercel.ai" },
   { title: "OpenRouter model routing", url: "https://openrouter.ai/docs", domain: "openrouter.ai" },
   { title: "Streaming UI protocol", url: "https://ai-sdk.dev/docs", domain: "ai-sdk.dev" },
@@ -163,7 +167,8 @@ export const PLAN_OPERATIONS: MockOperation[] = [
     id: "op-reframe",
     verb: "Rewrite",
     entry: "IV.1",
-    detail: "“useChat and the parts it hands you” drops the plumbing — a fast pass over the hook's contract.",
+    detail:
+      "“useChat and the parts it hands you” drops the plumbing — a fast pass over the hook's contract.",
     status: "proposed",
     effect: {
       kind: "retitle",
@@ -219,7 +224,6 @@ export const SCRIPTED_REPLIES: { text: string; operation?: MockOperation }[] = [
         afterLessonId: "l11",
         title: "Render the tool result in place",
         summary: "Keep the thread readable when a tool answers mid-stream.",
-
       },
     },
   },

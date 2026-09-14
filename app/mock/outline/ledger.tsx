@@ -3,7 +3,17 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MotionConfig, Reorder, motion, useDragControls, type DragControls } from "motion/react";
-import { ArrowDown, ArrowLeft, ArrowUp, GripVertical, MoreHorizontal, Pencil, Plus, Scissors, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  GripVertical,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Scissors,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CancelRunButton } from "@/components/cancel-run-button";
 import { DoneCheck, LiveMark, UnsetMark } from "@/components/workspace/marks";
@@ -352,7 +362,9 @@ export function LedgerMock() {
       current
         ? {
             ...current,
-            operations: current.operations.map((o) => (o.id === operationId ? { ...o, status } : o)),
+            operations: current.operations.map((o) =>
+              o.id === operationId ? { ...o, status } : o,
+            ),
           }
         : current,
     );
@@ -481,7 +493,9 @@ export function LedgerMock() {
               <Count value={`${lessonCount} Lessons`} />
             </p>
             <p className="tnum text-[0.75rem] text-fg-3">
-              {edits > 0 ? `${edits} ${edits === 1 ? "change" : "changes"} saved` : "No changes yet"}
+              {edits > 0
+                ? `${edits} ${edits === 1 ? "change" : "changes"} saved`
+                : "No changes yet"}
             </p>
           </>
         ) : (
@@ -496,14 +510,13 @@ export function LedgerMock() {
                   idleIcon={<X className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />}
                   confirmLabel="Discard the partial Course?"
                   pendingLabel="Discarding…"
-                  onConfirm={async () => ({ ok: false, reason: "not-found" } as const)}
+                  onConfirm={async () => ({ ok: false, reason: "not-found" }) as const}
                   onDone={() => {}}
                 />
               </div>
             )}
           </>
         )}
-
       </div>
     </div>
   );
@@ -659,7 +672,12 @@ export function LedgerMock() {
                       as="ul"
                       axis="y"
                       values={m.lessons}
-                      onReorder={(next) => reorderLessons(m.id, next.map((l) => l.id))}
+                      onReorder={(next) =>
+                        reorderLessons(
+                          m.id,
+                          next.map((l) => l.id),
+                        )
+                      }
                     >
                       {m.lessons.map((l, li) => {
                         const rowDone = phase !== "review" && l.n <= written;
@@ -669,7 +687,12 @@ export function LedgerMock() {
                             key={l.id}
                             value={l}
                             current={doing ? "true" : undefined}
-                            onDragStart={() => beginReorder(m.id, m.lessons.map((x) => x.id))}
+                            onDragStart={() =>
+                              beginReorder(
+                                m.id,
+                                m.lessons.map((x) => x.id),
+                              )
+                            }
                             onDragEnd={() => endReorder(m.id)}
                             className={cn(
                               "group row grid grid-cols-[1.25rem_1.5rem_minmax(0,1fr)_auto] items-center gap-x-2.5 border-b border-hair px-2 py-2.5 transition-colors duration-500 hover:bg-panel",
@@ -678,157 +701,159 @@ export function LedgerMock() {
                           >
                             {(controls) => (
                               <>
-                          <span className="flex h-4 w-5 items-center justify-center text-fg-3">
-                            {phase === "review" ? (
-                              <Button
-                                variant="icon-raised"
-                                aria-label={`Reorder ${l.title}`}
-                                title="Drag to reorder"
-                                className="cursor-grab touch-none p-0.5 text-fg-dim active:cursor-grabbing"
-                                onPointerDown={(event) => controls.start(event)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "ArrowUp") {
-                                    event.preventDefault();
-                                    moveLesson(m.id, li, -1);
-                                  }
-                                  if (event.key === "ArrowDown") {
-                                    event.preventDefault();
-                                    moveLesson(m.id, li, 1);
-                                  }
-                                }}
-                              >
-                                <GripVertical className="h-3.5 w-3.5" strokeWidth={1.75} />
-                              </Button>
-                            ) : rowDone ? (
-                              <DoneCheck striking />
-                            ) : doing ? (
-                              <LiveMark />
-                            ) : (
-                              <UnsetMark />
-                            )}
-                          </span>
+                                <span className="flex h-4 w-5 items-center justify-center text-fg-3">
+                                  {phase === "review" ? (
+                                    <Button
+                                      variant="icon-raised"
+                                      aria-label={`Reorder ${l.title}`}
+                                      title="Drag to reorder"
+                                      className="cursor-grab touch-none p-0.5 text-fg-dim active:cursor-grabbing"
+                                      onPointerDown={(event) => controls.start(event)}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "ArrowUp") {
+                                          event.preventDefault();
+                                          moveLesson(m.id, li, -1);
+                                        }
+                                        if (event.key === "ArrowDown") {
+                                          event.preventDefault();
+                                          moveLesson(m.id, li, 1);
+                                        }
+                                      }}
+                                    >
+                                      <GripVertical className="h-3.5 w-3.5" strokeWidth={1.75} />
+                                    </Button>
+                                  ) : rowDone ? (
+                                    <DoneCheck striking />
+                                  ) : doing ? (
+                                    <LiveMark />
+                                  ) : (
+                                    <UnsetMark />
+                                  )}
+                                </span>
 
-                          <span className="tnum text-[0.75rem] leading-5 text-fg-dim">{l.n}</span>
+                                <span className="tnum text-[0.75rem] leading-5 text-fg-dim">
+                                  {l.n}
+                                </span>
 
-                          <span className="min-w-0 lg:flex lg:items-baseline lg:gap-x-3">
-                            {editing === l.id ? (
-                              <RenameInput
-                                initial={l.title}
-                                label="Lesson title"
-                                className={`${renameField} w-full px-1.5 py-0 text-[0.8125rem] leading-5 lg:w-[18rem] lg:shrink-0`}
-                                onCommit={(value) => rename(l.id, value)}
-                                onCancel={() => setEditing(null)}
-                              />
-                            ) : phase === "review" ? (
-                              <Button
-                                variant="bare"
-                                onClick={() => setEditing(l.id)}
-                                title="Rename this Lesson"
-                                className="block max-w-full truncate text-left text-[0.8125rem] leading-5 font-medium text-fg lg:w-[18rem] lg:shrink-0"
-                              >
-                                {l.title}
-                              </Button>
-                            ) : (
-                              <span
-                                className={cn(
-                                  "block truncate text-[0.8125rem] leading-5 lg:w-[18rem] lg:shrink-0",
-                                  doing ? "font-medium text-fg" : "text-fg-2",
+                                <span className="min-w-0 lg:flex lg:items-baseline lg:gap-x-3">
+                                  {editing === l.id ? (
+                                    <RenameInput
+                                      initial={l.title}
+                                      label="Lesson title"
+                                      className={`${renameField} w-full px-1.5 py-0 text-[0.8125rem] leading-5 lg:w-[18rem] lg:shrink-0`}
+                                      onCommit={(value) => rename(l.id, value)}
+                                      onCancel={() => setEditing(null)}
+                                    />
+                                  ) : phase === "review" ? (
+                                    <Button
+                                      variant="bare"
+                                      onClick={() => setEditing(l.id)}
+                                      title="Rename this Lesson"
+                                      className="block max-w-full truncate text-left text-[0.8125rem] leading-5 font-medium text-fg lg:w-[18rem] lg:shrink-0"
+                                    >
+                                      {l.title}
+                                    </Button>
+                                  ) : (
+                                    <span
+                                      className={cn(
+                                        "block truncate text-[0.8125rem] leading-5 lg:w-[18rem] lg:shrink-0",
+                                        doing ? "font-medium text-fg" : "text-fg-2",
+                                      )}
+                                    >
+                                      {l.title}
+                                    </span>
+                                  )}
+                                  <span className="mt-0.5 block truncate text-[0.8125rem] leading-[1.5] text-fg-3 lg:mt-0 lg:min-w-0 lg:flex-1">
+                                    {l.summary}
+                                  </span>
+                                </span>
+
+                                {phase === "review" ? (
+                                  <>
+                                    <span className="hidden items-center justify-end sm:flex sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100!">
+                                      <RowAction
+                                        label={`Move ${l.title} up`}
+                                        title="Move this Lesson up"
+                                        onClick={() => moveLesson(m.id, li, -1)}
+                                        disabled={li === 0}
+                                        className="p-1 disabled:opacity-20"
+                                      >
+                                        <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.75} />
+                                      </RowAction>
+                                      <RowAction
+                                        label={`Move ${l.title} down`}
+                                        title="Move this Lesson down"
+                                        onClick={() => moveLesson(m.id, li, 1)}
+                                        disabled={li === m.lessons.length - 1}
+                                        className="p-1 disabled:opacity-20"
+                                      >
+                                        <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.75} />
+                                      </RowAction>
+                                      <RowAction
+                                        label={`Split ${l.title}`}
+                                        title="Split this Lesson in two"
+                                        onClick={() => setSplitting(l)}
+                                        className="p-1"
+                                      >
+                                        <Scissors className="h-3.5 w-3.5" strokeWidth={1.75} />
+                                      </RowAction>
+                                      <RowAction
+                                        label={`Remove ${l.title}`}
+                                        title="Remove this Lesson"
+                                        onClick={() => removeLesson(l.id)}
+                                        className="p-1"
+                                      >
+                                        <X className="h-3.5 w-3.5" strokeWidth={1.75} />
+                                      </RowAction>
+                                    </span>
+                                    <RowMenu
+                                      label={`Actions for ${l.title}`}
+                                      items={[
+                                        {
+                                          key: "rename",
+                                          label: "Rename",
+                                          icon: <Pencil strokeWidth={1.75} />,
+                                          onSelect: () => setEditing(l.id),
+                                        },
+                                        {
+                                          key: "up",
+                                          label: "Move up",
+                                          icon: <ArrowUp strokeWidth={1.75} />,
+                                          onSelect: () => moveLesson(m.id, li, -1),
+                                          disabled: li === 0,
+                                        },
+                                        {
+                                          key: "down",
+                                          label: "Move down",
+                                          icon: <ArrowDown strokeWidth={1.75} />,
+                                          onSelect: () => moveLesson(m.id, li, 1),
+                                          disabled: li === m.lessons.length - 1,
+                                        },
+                                        {
+                                          key: "split",
+                                          label: "Split in two",
+                                          icon: <Scissors strokeWidth={1.75} />,
+                                          onSelect: () => setSplitting(l),
+                                        },
+                                        {
+                                          key: "remove",
+                                          label: "Remove Lesson",
+                                          icon: <X strokeWidth={1.75} />,
+                                          onSelect: () => removeLesson(l.id),
+                                        },
+                                      ]}
+                                    />
+                                  </>
+                                ) : (
+                                  <span
+                                    className={cn(
+                                      "text-[0.75rem] leading-[1.5]",
+                                      doing ? "text-fg-2" : "text-fg-3",
+                                    )}
+                                  >
+                                    {rowDone ? "Done" : doing ? "Doing" : "Queued"}
+                                  </span>
                                 )}
-                              >
-                                {l.title}
-                              </span>
-                            )}
-                            <span className="mt-0.5 block truncate text-[0.8125rem] leading-[1.5] text-fg-3 lg:mt-0 lg:min-w-0 lg:flex-1">
-                              {l.summary}
-                            </span>
-                          </span>
-
-                          {phase === "review" ? (
-                            <>
-                              <span className="hidden items-center justify-end sm:flex sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100!">
-                                <RowAction
-                                  label={`Move ${l.title} up`}
-                                  title="Move this Lesson up"
-                                  onClick={() => moveLesson(m.id, li, -1)}
-                                  disabled={li === 0}
-                                  className="p-1 disabled:opacity-20"
-                                >
-                                  <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.75} />
-                                </RowAction>
-                                <RowAction
-                                  label={`Move ${l.title} down`}
-                                  title="Move this Lesson down"
-                                  onClick={() => moveLesson(m.id, li, 1)}
-                                  disabled={li === m.lessons.length - 1}
-                                  className="p-1 disabled:opacity-20"
-                                >
-                                  <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.75} />
-                                </RowAction>
-                                <RowAction
-                                  label={`Split ${l.title}`}
-                                  title="Split this Lesson in two"
-                                  onClick={() => setSplitting(l)}
-                                  className="p-1"
-                                >
-                                  <Scissors className="h-3.5 w-3.5" strokeWidth={1.75} />
-                                </RowAction>
-                                <RowAction
-                                  label={`Remove ${l.title}`}
-                                  title="Remove this Lesson"
-                                  onClick={() => removeLesson(l.id)}
-                                  className="p-1"
-                                >
-                                  <X className="h-3.5 w-3.5" strokeWidth={1.75} />
-                                </RowAction>
-                              </span>
-                              <RowMenu
-                                label={`Actions for ${l.title}`}
-                                items={[
-                                  {
-                                    key: "rename",
-                                    label: "Rename",
-                                    icon: <Pencil strokeWidth={1.75} />,
-                                    onSelect: () => setEditing(l.id),
-                                  },
-                                  {
-                                    key: "up",
-                                    label: "Move up",
-                                    icon: <ArrowUp strokeWidth={1.75} />,
-                                    onSelect: () => moveLesson(m.id, li, -1),
-                                    disabled: li === 0,
-                                  },
-                                  {
-                                    key: "down",
-                                    label: "Move down",
-                                    icon: <ArrowDown strokeWidth={1.75} />,
-                                    onSelect: () => moveLesson(m.id, li, 1),
-                                    disabled: li === m.lessons.length - 1,
-                                  },
-                                  {
-                                    key: "split",
-                                    label: "Split in two",
-                                    icon: <Scissors strokeWidth={1.75} />,
-                                    onSelect: () => setSplitting(l),
-                                  },
-                                  {
-                                    key: "remove",
-                                    label: "Remove Lesson",
-                                    icon: <X strokeWidth={1.75} />,
-                                    onSelect: () => removeLesson(l.id),
-                                  },
-                                ]}
-                              />
-                            </>
-                          ) : (
-                            <span
-                              className={cn(
-                                "text-[0.75rem] leading-[1.5]",
-                                doing ? "text-fg-2" : "text-fg-3",
-                              )}
-                            >
-                              {rowDone ? "Done" : doing ? "Doing" : "Queued"}
-                            </span>
-                          )}
                               </>
                             )}
                           </DragRow>

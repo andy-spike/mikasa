@@ -154,10 +154,12 @@ for await (const chunk of result.textStream) {
     ],
     recall: "At what moment does the first chunk leave the model?",
     explain: "Why does streaming change when the answer is seen, not what the answer is?",
-    bridge: "One stream is the smallest turn. The next Lesson is what happens when a turn has history.",
+    bridge:
+      "One stream is the smallest turn. The next Lesson is what happens when a turn has history.",
     exercise: {
       task: "Call `streamText` from a script and write every chunk to the terminal as it arrives.",
-      check: "The output appears in several pieces, in order, with no final string assembled first.",
+      check:
+        "The output appears in several pieces, in order, with no final string assembled first.",
     },
   },
   l2: {
@@ -186,10 +188,12 @@ for await (const chunk of result.textStream) {
     ],
     recall: "Where does the conversation live between two calls to the model?",
     explain: "Why is a message list a better model of a chat than one growing string?",
-    bridge: "A list of messages can be resent. The next Lesson is what to do when that resend fails mid-answer.",
+    bridge:
+      "A list of messages can be resent. The next Lesson is what to do when that resend fails mid-answer.",
     exercise: {
       task: "Send a three-message history with `generateText` and print the answer.",
-      check: "The answer responds to the last message and the earlier turns are visibly in the request.",
+      check:
+        "The answer responds to the last message and the earlier turns are visibly in the request.",
     },
   },
   l3: {
@@ -218,10 +222,12 @@ for await (const chunk of result.textStream) {
     ],
     recall: "What should happen to the last message when a stream fails?",
     explain: "Why is retrying the last message better than starting the turn over?",
-    bridge: "Turns survive failures now. The next Module gives the model something to do besides talk.",
+    bridge:
+      "Turns survive failures now. The next Module gives the model something to do besides talk.",
     exercise: {
       task: "Make the provider fail on purpose and catch it in the UI.",
-      check: "The partial answer stays, the last message is still there, and a retry continues from it.",
+      check:
+        "The partial answer stays, the last message is still there, and a retry continues from it.",
     },
   },
   l4: {
@@ -280,7 +286,8 @@ for await (const chunk of result.textStream) {
     bridge: "The loop ends. The next Module keeps what it said, across turns and across reloads.",
     exercise: {
       task: "Give the model two tools and a step ceiling, then run a turn that uses both.",
-      check: "The loop stops on its own after the last tool call and the final text arrives without another call.",
+      check:
+        "The loop stops on its own after the last tool call and the final text arrives without another call.",
     },
     correctedBody: [
       {
@@ -331,7 +338,8 @@ for await (const chunk of result.textStream) {
     ],
     recall: "Which half of a message must reach the database?",
     explain: "Why does storing the text alone break the thread on reload?",
-    bridge: "The thread survives a reload. The next Lesson is what happens when it grows too long to send.",
+    bridge:
+      "The thread survives a reload. The next Lesson is what happens when it grows too long to send.",
     exercise: {
       task: "Reload a thread from storage and render it without sending a new request.",
       check: "The same turns appear in the same order, tool calls included.",
@@ -359,10 +367,12 @@ const sent = [summaryMessage(older), ...recent];`,
     ],
     recall: "Which part of the history must stay exact?",
     explain: "Why is a summary the wrong place to keep a fact the learner just used?",
-    bridge: "The context has a floor now. The next Module puts the whole loop in front of the learner.",
+    bridge:
+      "The context has a floor now. The next Module puts the whole loop in front of the learner.",
     exercise: {
       task: "Send a long thread with the head summarized and the last turns exact.",
-      check: "The answer still knows the recent turns word for word and the earlier context well enough to stay on topic.",
+      check:
+        "The answer still knows the recent turns word for word and the earlier context well enough to stay on topic.",
     },
   },
   l8: {
@@ -445,7 +455,8 @@ messages.map((message) =>
     ],
     recall: "What happens to the text already rendered when the stream stops?",
     explain: "Why does an optimistic turn need a rollback path?",
-    bridge: "The learner can interrupt. The next Module asks the model for something stricter than prose.",
+    bridge:
+      "The learner can interrupt. The next Module asks the model for something stricter than prose.",
     exercise: {
       task: "Add a stop control and send a follow-up while the stopped answer is still on screen.",
       check: "The partial answer stays in the thread and the follow-up continues from it.",
@@ -480,7 +491,8 @@ messages.map((message) =>
     bridge: "Text and objects arrive now. The next Lesson sends something in.",
     exercise: {
       task: "Extract a title and tags from a paragraph with `generateObject`.",
-      check: "The result is typed, validated, and rejects a malformed model answer instead of rendering it.",
+      check:
+        "The result is typed, validated, and rejects a malformed model answer instead of rendering it.",
     },
   },
   l11: {
@@ -516,7 +528,8 @@ messages.map((message) =>
     bridge: "The model reads now. The last Module is what it costs, and who holds the key.",
     exercise: {
       task: "Attach a PDF and ask a question whose answer names the page.",
-      check: "The answer quotes or cites the page it came from, and the file part persists in the thread.",
+      check:
+        "The answer quotes or cites the page it came from, and the file part persists in the thread.",
     },
   },
   l12: {
@@ -599,7 +612,8 @@ export async function POST(request: Request) {
     ],
     recall: "Which two ceilings does one turn carry?",
     explain: "Why does a tool loop change the cost of a turn more than a longer answer does?",
-    bridge: "That is the whole Course. You have a chat app that streams, remembers, reaches for tools, and fails honestly.",
+    bridge:
+      "That is the whole Course. You have a chat app that streams, remembers, reaches for tools, and fails honestly.",
     exercise: {
       task: "Set a token ceiling and a step ceiling, then read one day of failures from the logs.",
       check: "A runaway turn stops at the ceiling and the log names which ceiling it hit.",

@@ -17,7 +17,7 @@ describe("code highlighting", () => {
   it("maps a Lesson's scopes onto the design system's roles", async () => {
     const tokens = roles(
       await highlightCode(
-        ['// the entry point', 'const answer = stream("hi", 3);'].join("\n"),
+        ["// the entry point", 'const answer = stream("hi", 3);'].join("\n"),
         "ts",
       ),
     );

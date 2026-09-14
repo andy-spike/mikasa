@@ -513,7 +513,8 @@
   }
 
   /* Syntax roles. Only inside code blocks on the reading ground, where each
-     role clears 4.5:1 on the canvas in both themes. */  .tok-key {
+     role clears 4.5:1 on the canvas in both themes. */
+  .tok-key {
     color: var(--code-green);
     font-weight: 600;
   }
