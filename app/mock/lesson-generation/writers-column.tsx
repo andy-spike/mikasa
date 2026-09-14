@@ -66,9 +66,7 @@ type FlatLesson = {
 /* One flat reading order, the same order the run writes in. */
 const FLAT: FlatLesson[] = (() => {
   let n = 0;
-  return MODULES.flatMap((m) =>
-    m.lessons.map((l) => ({ ...l, n: ++n, doc: DOCS[l.id] })),
-  );
+  return MODULES.flatMap((m) => m.lessons.map((l) => ({ ...l, n: ++n, doc: DOCS[l.id] })));
 })();
 
 type Frame =
@@ -92,7 +90,7 @@ function frameAt(t: number): Frame {
     const local = t - CHECK_END;
     const fixed = Math.floor(local / CORRECT_MS);
     const landed = Math.min(
-      fixed + ((local % CORRECT_MS) >= CORRECT_LAND_MS ? 1 : 0),
+      fixed + (local % CORRECT_MS >= CORRECT_LAND_MS ? 1 : 0),
       FINDINGS.length,
     );
     return { phase: "correcting", fixed: Math.min(fixed, FINDINGS.length), landed };
@@ -127,7 +125,7 @@ export function WritersColumnMock({ docs }: { docs: Record<string, LessonDoc> })
   const lastFinding = FINDINGS[FINDINGS.length - 1];
   const findingInHand =
     frame.phase === "correcting"
-      ? FINDINGS[frame.fixed] ?? lastFinding
+      ? (FINDINGS[frame.fixed] ?? lastFinding)
       : frame.phase === "check"
         ? frame.found > 0
           ? FINDINGS[frame.found - 1]
@@ -137,8 +135,7 @@ export function WritersColumnMock({ docs }: { docs: Record<string, LessonDoc> })
           : null;
   const lessonFor = (f: (typeof FINDINGS)[number]) =>
     FLAT.find((l) => l.id === f.lessonRef) ?? FLAT[FLAT.length - 1];
-  const runPage =
-    frontier ?? (findingInHand ? lessonFor(findingInHand) : FLAT[FLAT.length - 1]);
+  const runPage = frontier ?? (findingInHand ? lessonFor(findingInHand) : FLAT[FLAT.length - 1]);
   const open = pinned ? (FLAT.find((l) => l.id === pinned) ?? runPage) : runPage;
   /* The page's blocks arrive pre-highlighted from the server; the fixture's own
      copy is the plain fallback. */
@@ -159,14 +156,14 @@ export function WritersColumnMock({ docs }: { docs: Record<string, LessonDoc> })
      corrected body for a beat before the run turns to the next finding. */
   const fixingId =
     frame.phase === "correcting" && frame.landed === frame.fixed
-      ? FINDINGS[frame.fixed]?.id ?? null
+      ? (FINDINGS[frame.fixed]?.id ?? null)
       : null;
 
   const finding = FINDINGS.find((f) => f.lessonRef === open.id) ?? null;
   /* A finding may only show once the check has reached it in the list. */
   const findingFound = finding ? FINDINGS.indexOf(finding) < foundCount : false;
   const corrected = finding ? fixedIds.has(finding.id) : false;
-  const body = corrected ? doc.correctedBody ?? doc.body : doc.body;
+  const body = corrected ? (doc.correctedBody ?? doc.body) : doc.body;
 
   const progress = frontierOpen
     ? frame.phase === "writing"
@@ -273,11 +270,13 @@ export function WritersColumnMock({ docs }: { docs: Record<string, LessonDoc> })
     ? "You can leave this page. The Course will be here when you come back."
     : null;
 
+  /* Every scrolling region reserves the scrollbar's lane, so a page that grows
+     past the fold never reflows the moment the bar appears. */
   return (
     <div className="flex min-h-full flex-col lg:h-full lg:min-h-0 lg:flex-row">
       <aside
         aria-label="The run"
-        className="scroll-thin shrink-0 border-b border-hair bg-panel px-5 py-7 sm:px-8 lg:h-full lg:w-[20rem] lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-5 lg:py-8"
+        className="scroll-thin shrink-0 border-b border-hair bg-panel px-5 py-7 sm:px-8 lg:h-full lg:w-[20rem] lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-5 lg:py-8 [scrollbar-gutter:stable]"
       >
         <div className="flex min-h-full flex-col">
           <div className="mb-1">
@@ -330,7 +329,7 @@ export function WritersColumnMock({ docs }: { docs: Record<string, LessonDoc> })
                 idleIcon={<X className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />}
                 confirmLabel="Discard the partial Course?"
                 pendingLabel="Discarding…"
-                onConfirm={async () => ({ ok: false, reason: "not-found" } as const)}
+                onConfirm={async () => ({ ok: false, reason: "not-found" }) as const}
                 onDone={() => {}}
               />
             </div>
@@ -403,7 +402,10 @@ export function WritersColumnMock({ docs }: { docs: Record<string, LessonDoc> })
                 })}
               </ol>
 
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2.5 lg:hidden" aria-hidden>
+              <div
+                className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2.5 lg:hidden"
+                aria-hidden
+              >
                 {MODULES.map((m) => {
                   const first = FLAT.find((l) => l.id === m.lessons[0].id)?.n ?? 1;
                   return (
@@ -534,7 +536,7 @@ export function WritersColumnMock({ docs }: { docs: Record<string, LessonDoc> })
         </div>
       </aside>
 
-      <div className="scroll-thin min-w-0 lg:h-full lg:flex-1 lg:overflow-y-auto">
+      <div className="scroll-thin min-w-0 lg:h-full lg:flex-1 lg:overflow-y-auto [scrollbar-gutter:stable]">
         <article className="mx-auto w-full max-w-[41rem] px-5 pt-6 pb-24 sm:px-8 sm:pt-9 lg:px-10">
           <AnimatePresence initial={false}>
             {pinned && (
@@ -597,12 +599,7 @@ export function WritersColumnMock({ docs }: { docs: Record<string, LessonDoc> })
                           fixed — the strip's own line carries the accent and the
                           live mark, and the fix in flight is written in the accent
                           too; the moment it lands, all three go quiet. */}
-                      <p
-                        className={cn(
-                          "label min-h-3",
-                          corrected ? "text-fg-dim" : "text-live",
-                        )}
-                      >
+                      <p className={cn("label min-h-3", corrected ? "text-fg-dim" : "text-live")}>
                         <Settle
                           key={corrected ? "fixed" : "checking"}
                           className="inline-flex items-center gap-2"
@@ -616,9 +613,7 @@ export function WritersColumnMock({ docs }: { docs: Record<string, LessonDoc> })
                       </p>
                       <p className="mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
                         <Settle
-                          key={
-                            corrected ? "fixed" : fixingId === finding.id ? "fixing" : "queued"
-                          }
+                          key={corrected ? "fixed" : fixingId === finding.id ? "fixing" : "queued"}
                           className="inline-flex items-center gap-2"
                         >
                           {corrected ? (
@@ -678,7 +673,7 @@ export function WritersColumnMock({ docs }: { docs: Record<string, LessonDoc> })
 
       <aside
         aria-label="Written Lessons"
-        className="scroll-thin hidden shrink-0 border-l border-hair bg-panel xl:block xl:h-full xl:w-[20rem] xl:overflow-y-auto"
+        className="scroll-thin hidden shrink-0 border-l border-hair bg-panel xl:block xl:h-full xl:w-[20rem] xl:overflow-y-auto [scrollbar-gutter:stable]"
       >
         <div className="px-5 py-8">
           <div className="flex items-baseline justify-between gap-3 border-b border-hair pb-2">
@@ -731,7 +726,13 @@ function Count({ value, className }: { value: string; className?: string }) {
 }
 
 /* Text the run rewrites settles into place instead of blinking. */
-function Settle({ children, className = "inline-block" }: { children: ReactNode; className?: string }) {
+function Settle({
+  children,
+  className = "inline-block",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   const reduce = usePrefersReducedMotion();
   return (
     <motion.span
