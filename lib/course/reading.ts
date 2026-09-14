@@ -1,9 +1,14 @@
+import type { ReactNode } from "react";
 import type { ContentBlock } from "./content";
 import type { OutlineData } from "./types";
 import type { Course, LessonRow, SourceRow } from "@/lib/db/schema";
 import { formatDayStamp } from "@/lib/utils";
 
-export type ReadingBlock = ContentBlock | { kind: "sql"; code: string };
+/* `rendered` is the highlighter's work: a tree of role spans assembled on the
+   server, carried to the client beside the code it belongs to. */
+export type ReadingBlock = (ContentBlock | { kind: "sql"; code: string }) & {
+  rendered?: ReactNode;
+};
 
 export type ReadingLesson = {
   id: string;

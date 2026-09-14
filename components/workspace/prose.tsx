@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import type { ReadingBlock, SourceLink } from "@/lib/course/reading";
 
@@ -63,47 +63,6 @@ export function Inline({ text }: { text: string }) {
   );
 }
 
-const SQL_TOKEN =
-  /(--[^\n]*)|('(?:[^']|'')*')|\b(\d+(?:\.\d+)?)\b|\b(select|from|where|group|order|by|partition|over|as|with|sum|avg|count|min|max|rows|range|between|unbounded|preceding|following|current|row|and|or|not|null|nulls|first|last|interval|on|join|left|inner|case|when|then|else|end|distinct|having|limit|desc|asc|insert|into|values|delete|update|set|create|table)\b/gi;
-
-function highlightSql(code: string): ReactNode[] {
-  const out: ReactNode[] = [];
-  let last = 0;
-  let key = 0;
-  for (const m of code.matchAll(SQL_TOKEN)) {
-    if (m.index > last) out.push(code.slice(last, m.index));
-    if (m[1]) {
-      out.push(
-        <span key={key++} className="tok-com">
-          {m[1]}
-        </span>,
-      );
-    } else if (m[2]) {
-      out.push(
-        <span key={key++} className="tok-str">
-          {m[2]}
-        </span>,
-      );
-    } else if (m[3]) {
-      out.push(
-        <span key={key++} className="tok-num">
-          {m[3]}
-        </span>,
-      );
-    } else {
-      out.push(
-        <span key={key++} className="tok-key">
-          {m[4]}
-        </span>,
-      );
-    }
-    last = m.index + m[0].length;
-    key++;
-  }
-  if (last < code.length) out.push(code.slice(last));
-  return out;
-}
-
 export function LessonBlock({
   block,
   sourceFor,
@@ -143,7 +102,7 @@ export function LessonBlock({
             style={{ "--scroll-bg": "var(--canvas)" } as CSSProperties}
           >
             <code className="block w-max min-w-full px-3.5 py-3.5 font-mono text-[0.8125rem] leading-[1.72] text-fg-2">
-              {language === "sql" ? highlightSql(block.code) : block.code}
+              {block.rendered ?? block.code}
             </code>
           </pre>
         </div>

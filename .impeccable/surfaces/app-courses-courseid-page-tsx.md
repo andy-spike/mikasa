@@ -33,4 +33,6 @@ FORM: Flexoki paper desk, 1 of 7 grounded candidates, seed key 44ddd994, kind pi
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 
-Unresolved: exact grain opacity on low-end screens. Exact syntax roles for non-SQL languages.
+Unresolved: exact grain opacity on low-end screens.
+
+Syntax roles: resolved where the Course is assembled. Shiki runs on the server (`lib/course/highlight.tsx`), themes each grammar scope into the five roles through the `--code-*` tokens, and hands `LessonBlock` a rendered tree, so the browser ships no highlighter and both grounds answer from one palette. A language the highlighter does not carry renders as plain code.

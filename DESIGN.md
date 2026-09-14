@@ -341,7 +341,7 @@ Every text step is legal body text on all four surfaces; the ramp is a hierarchy
 
 ### Syntax — code blocks only
 
-Code sits on the reading ground inside one hairline, with a panel-ground language strip, so every role below clears 4.5:1 on its own ground. The highlighter lives in `components/workspace/prose.tsx`: keywords in green semibold (`.tok-key`), strings in orange (`.tok-str`), numbers in purple (`.tok-num`), SQL functions in blue (`.tok-func`), comments in third ink italic (`.tok-com`). No syntax colour leaks into chrome, rows, buttons, or the palette.
+Code sits on the reading ground inside one hairline, with a panel-ground language strip, so every role below clears 4.5:1 on its own ground. Shiki runs on the server (`lib/course/highlight.tsx`) and hands `components/workspace/prose.tsx` a rendered tree: keywords in green semibold (`.tok-key`), strings in orange (`.tok-str`), numbers and constants in purple (`.tok-num`), functions, tags and types in blue (`.tok-func`), comments in third ink italic (`.tok-com`). The theme carries the tokens rather than a palette of its own, so each role's ink is edited in one place and both grounds answer; operators and punctuation stay in the block's own ink, and a language the highlighter does not carry renders as plain code. No syntax colour leaks into chrome, rows, buttons, or the palette.
 
 ### Neutral — browser surfaces
 
