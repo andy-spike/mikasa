@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { Button } from "./ui/button";
 import type { CancelResult } from "@/lib/actions/courses";
 
 type Props = {
   idleLabel: string;
+  /** Optional mark before the idle label, for callers that pair it with a sign. */
+  idleIcon?: ReactNode;
   confirmLabel: string;
   pendingLabel: string;
   keepLabel?: string;
@@ -16,6 +18,7 @@ type Props = {
 /** Two clicks to discard: arm, then confirm. Stays quiet until armed. */
 export function CancelRunButton({
   idleLabel,
+  idleIcon,
   confirmLabel,
   pendingLabel,
   keepLabel = "Keep waiting",
@@ -34,6 +37,7 @@ export function CancelRunButton({
   if (!armed) {
     return (
       <Button variant="discard" onClick={() => setArmed(true)}>
+        {idleIcon}
         {idleLabel}
       </Button>
     );
