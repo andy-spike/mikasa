@@ -292,6 +292,7 @@ export function TailorConversation({
   onRestore,
   empty,
   applySlot,
+  applyAllSlot,
   publishedSlot,
   scrollport = true,
   revisionSlot,
@@ -308,12 +309,14 @@ export function TailorConversation({
   onRestore: (operationId: string) => void;
   empty?: ReactNode;
   applySlot?: ReactNode;
+  applyAllSlot?: ReactNode;
   publishedSlot?: ReactNode;
   scrollport?: boolean;
   revisionSlot?: ReactNode;
 }) {
   const open = plan?.operations ?? [];
   const acceptedCount = open.filter((o) => o.status === "accepted").length;
+  const proposedCount = open.filter((o) => o.status === "proposed").length;
 
   return (
     <Conversation
@@ -378,6 +381,9 @@ export function TailorConversation({
                 ))}
               </ul>
               {applySlot && acceptedCount > 0 && <div className="mt-4">{applySlot}</div>}
+              {applyAllSlot && proposedCount > 0 && (
+                <div className="mt-4">{applyAllSlot}</div>
+              )}
             </div>
           )}
           {publishedSlot}
