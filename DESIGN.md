@@ -1,6 +1,6 @@
 ---
 name: Mikasa
-description: A warm desk for structured courses, where everything on screen is information and the only colour outside code is where you are.
+description: A warm desk for structured courses, where everything on screen is information and the only colour outside code is where the work is.
 colors:
   canvas: "#1b1a18"
   panel: "#262522"
@@ -284,14 +284,14 @@ The Course is a warm desk, not a grey instrument. It keeps the working-shell pos
 
 Depth comes from light, and light has two warm settings. Paper runs four steps down from `#fffcf0`; charcoal runs four steps up from `#1b1a18`. The ground flips, the system does not: in both, the sidebars sit one step off the reading ground, the open row sits two, and what floats sits at the top of the stack. A stored choice decides which ground a learner gets, and with no stored choice the operating system does; the class is set on `<html>` before first paint, so the shell is never briefly the wrong colour. A fixed grain wash lies over the shell at very low opacity, multiply on paper and overlay on charcoal, so the surface has tooth without ever sitting behind body text at reading opacity. Hairlines divide but never enclose, except for code, which sits on the reading ground inside one hairline so its syntax roles stay legible. Type does the structural work that borders would do elsewhere: one sans for every word, one mono for every number that is data, and a single small tracked label style for the few things that need naming rather than reading.
 
-Colour is rationed. `#4a6b0a` on paper, `#9cb52d` on charcoal, marks the Lesson you are up to and nothing else outside code. Which Lesson is _open_ is carried by a raised ground, so position and progress never compete for the same signal. Everything the learner has already finished is neutral, and everything still ahead of them carries no mark at all. Inside code blocks alone, a full Flexoki syntax palette is spent on keywords, strings, numbers, functions, and comments, each clearing 4.5:1 on the reading ground it sits on. A Course is generated in one pass, so a generated Course has no missing Lesson; the dashed rule belongs to a Course still sitting at its Outline, where nothing has been written yet. This world replaced a square-cornered graphite instrument; that precision is evidence, not heritage. The rejected serif Reading Room stays rejected.
+Colour is rationed. `#4a6b0a` on paper, `#9cb52d` on charcoal, marks where the work is — the Lesson you are up to, the page the run still owes work on, the one action a surface turns on — and nothing else outside code. Which Lesson is _open_ is carried by a raised ground, so position and progress never compete for the same signal. Everything the learner has already finished is neutral, and everything still ahead of them carries no mark at all. Inside code blocks alone, a full Flexoki syntax palette is spent on keywords, strings, numbers, functions, and comments, each clearing 4.5:1 on the reading ground it sits on. A Course is generated in one pass, so a generated Course has no missing Lesson; the dashed rule belongs to a Course still sitting at its Outline, where nothing has been written yet. This world replaced a square-cornered graphite instrument; that precision is evidence, not heritage. The rejected serif Reading Room stays rejected.
 
 One surface is allowed to spend the accent as wayfinding: the landing is the desk seen from the visitor's side, so it carries one olive moment per section — a triangle beside a section heading, the pencil band and the half-written line in the hero's illustrated scene. It is the same mark, borrowed to say _this is where you are_, never a colour for an action: `Start a Course` stays greyscale in both grounds.
 
 **Key Characteristics:**
 
 - Two warm grounds, one system: paper and charcoal, four surface steps each, zero cards as page structure, one shadow, one grain wash.
-- One accent with exactly one meaning in the workspace, spent on roughly one row per screen; the landing borrows the same mark once per section as wayfinding. Code alone carries syntax colour.
+- One accent, spent on where the work is — the Lesson you are up to, the page a run still owes work on — and on the one action a surface turns on, roughly one moment per screen; the landing borrows the same mark once per section as wayfinding. Code alone carries syntax colour.
 - Fewest facts per row: three in the Outline rail, three in the Courses list, everything else a click away.
 - Geist and Geist Mono only; no serif anywhere in the product.
 - A viewport-centred Lesson at a 36rem measure, with fixed edge tools that never move it.
@@ -313,7 +313,7 @@ A colour is defined in `:root` and, if it moves, redefined in `.dark`. Nothing i
 
 ### Primary
 
-- **Live Olive** (`{colors.live}`): The accent. It marks the Lesson you are up to — the first Lesson that is set and not done — as a small solid triangle in the Outline rail, drawn in `components/workspace/marks.tsx`. It also paints the focus ring, the text caret, and the selection wash, because those are the browser surfaces the workspace still owns. It is never spent on done, on hover, on a button, or on a second meaning inside the workspace. The landing borrows it once per section as wayfinding, described under Named Rules. `#4a6b0a` on paper clears 6.01:1 on the canvas; `#9cb52d` on charcoal clears 7.50:1, so the same mark clears the graphics floor on both grounds.
+- **Live Olive** (`{colors.live}`): The accent, and the workspace's only chrome colour. It is spent on where the work is: the Lesson you are up to — the first Lesson that is set and not done — as a small solid triangle in the Outline rail, drawn in `components/workspace/marks.tsx`; and, while a Course is being generated, the page the run still owes work on, whose finding strip carries the accent with the live mark while its finding is queued or being corrected and goes quiet the moment the fix lands. When a surface turns on one important action, that action may take it too. It is never decoration: not done, not hover, not a status badge, and never a second hue for a second meaning. It also paints the focus ring, the text caret, and the selection wash, because those are the browser surfaces the workspace still owns. The landing borrows it once per section as wayfinding, described under Named Rules. `#4a6b0a` on paper clears 6.01:1 on the canvas; `#9cb52d` on charcoal clears 7.50:1, so the same olive is legal as a mark and as small text on either ground.
 
 ### Neutral — surfaces
 
@@ -353,7 +353,7 @@ Code sits on the reading ground inside one hairline, with a panel-ground languag
 
 ### Third-party marks
 
-One graphic in the product is exempt from everything above: Google's G on the sign-in button, drawn in `components/google-mark.tsx`. Its four hexes are hardcoded and are answered in neither ground, because it is an identity mark under someone else's brand terms rather than an interface icon — recolouring it to `--fg` would be the wrong kind of consistency. It is the single place a literal colour is legal at a call site, and the single place colour on screen does not mean "the Lesson you are up to". Nothing else earns this; a second exception is a design problem, not a precedent.
+One graphic in the product is exempt from everything above: Google's G on the sign-in button, drawn in `components/google-mark.tsx`. Its four hexes are hardcoded and are answered in neither ground, because it is an identity mark under someone else's brand terms rather than an interface icon — recolouring it to `--fg` would be the wrong kind of consistency. It is the single place a literal colour is legal at a call site, and the single place colour on screen does not mean "this is where the work is". Nothing else earns this; a second exception is a design problem, not a precedent.
 
 ### Declared but unspent
 
@@ -361,7 +361,7 @@ One graphic in the product is exempt from everything above: Google's G on the si
 
 ### Named Rules
 
-**The One Accent Rule.** Olive means exactly one thing inside the workspace: the Lesson you are up to. Roughly one row per screen carries it. If a second element wants the accent, the answer is a luminance step, not a hue. Inside code blocks, syntax roles carry their own hues and never leak out. The one colour on screen that is not the accent is Google's G on the sign-in button, which belongs to Google.
+**The One Accent Rule.** Olive is the workspace's one chrome colour, and it is spent on where the work is: the Lesson you are up to, the page a run still owes work on, and the one important action a surface turns on. Roughly one moment per screen carries it — two views of the same fact, a row and the strip that mirrors it, count as one. It is never decoration and never on done or hover; if a surface wants more emphasis than that, the answer is a luminance step, not a second hue. Inside code blocks, syntax roles carry their own hues and never leak out. The one colour on screen that is not the accent is Google's G on the sign-in button, which belongs to Google.
 
 **The Landing Wayfinding Rule.** The landing is not the workspace, and it may spend the same olive once per section as wayfinding: the triangle beside a section heading or the hero scene's own marks (the sheet's live triangle, the line it is writing, the pencil band). One moment per section, never two, and never on an action — both `Start a Course` controls stay greyscale. The scene and the wash are drawn from the surface tokens, so both grounds get their own light and no new colour enters the system.
 
@@ -491,7 +491,7 @@ Anything with real interaction behaviour comes from the registry and is adapted 
 
 - **`Toggle` / `ToggleGroup`** — the shipped variants are uppercase at `tracking-widest` with a focus ring, which spends the one label style on a control and adds a ring this world does not have. Restyled to the segmented switch: a canvas-inset track, the chosen segment on a raised ground, at 0.8125rem/500.
 - **`RadioGroup`** — the shipped item is a round dot. Nothing here is circular and a chosen state is a ground step, never a mark (the Two Signals rule), so the item is a full-width row that steps up when checked, and the label lives inside the control so the whole row is the hit target.
-- **`Switch`** — the shipped track is a bordered block with focus and invalid rings. The Light, Not Line Rule keeps the border off and the One Accent Rule keeps olive off controls, so the track is a luminance step — `raised` off, `over` on — with a block thumb at third ink off and full ink on.
+- **`Switch`** — the shipped track is a bordered block with focus and invalid rings. The Light, Not Line Rule keeps the border off and a switch is not where the work is, so the accent stays off it, the track is a luminance step — `raised` off, `over` on — with a block thumb at third ink off and full ink on.
 - **`Select`** — the trigger becomes a field on the panel ground rather than a bottom underline; the popup drops its `ring-1` for `lift`, because it is one of the two things in the product that genuinely leaves the document, and it always opens below its trigger rather than over it, capping its height and scrolling when the room below is short.
 - **`Textarea`** — a canvas-inset field that steps up on focus, not an underline.
 - **`Button`** — the shipped variants are uppercase at `tracking-widest` with a ring and a press translate. Replaced with the controls this file names — `primary`, `hero`, `compact`, `quiet`, `discard`, `icon`, `icon-raised` — plus `bare` for a control whose shape is its container (the rename trigger, the Next-Lesson row) and two aliases, `ghost` and `outline`, because Dialog, Sheet and Sidebar reach for those names by hand. Padding rides the variant, since each control has its own. `nativeButton` defaults to `false` whenever `render` is passed: `render` here is almost always a Link, and an anchor is navigation, not an action.
@@ -587,7 +587,7 @@ The landing adds two motions and no more. The hero settles on arrival: its lines
 ### Do:
 
 - **Do** separate surfaces with luminance — `{colors.canvas}` → `{colors.panel}` → `{colors.raised}` → `{colors.over}` — and use hairlines only to divide, except for the single enclosure around code.
-- **Do** spend `{colors.live}` outside code on exactly one thing: the Lesson the learner is up to — and on the landing, once per section as wayfinding.
+- **Do** spend `{colors.live}` outside code on where the work is — the Lesson the learner is up to, the page a run still owes work on, the one important action a surface turns on — and on the landing, once per section as wayfinding.
 - **Do** carry the open state with a raised ground and `aria-current`, never with colour.
 - **Do** draw the landing's scene and wash from the surface tokens, so paper and charcoal are lit separately and no colour is hardcoded into an illustration.
 - **Do** resolve every landing animation to its end state once the observer fires, and give reduced motion the same end state with no movement.
@@ -606,7 +606,7 @@ The landing adds two motions and no more. The hero settles on arrival: its lines
 
 - **Don't** build cards. No bordered, radiused, shadowed boxes as page structure — the Tailor's change list included.
 - **Don't** introduce a second accent, a coloured status pill, a progress ring, a percentage, a streak, or an XP counter.
-- **Don't** spend the accent on done, on hover, on a button, or on anything but the live Lesson inside the workspace. On the landing it is wayfinding, one moment per section, and it still never colours an action. Syntax roles stay inside code blocks.
+- **Don't** spend the accent on decoration, on done, on hover, or on more than one moment per screen; a control earns it only when it is the surface's one important action. On the landing it is wayfinding, one moment per section, and it still never colours an action. Syntax roles stay inside code blocks.
 - **Don't** give the landing a second illustrated world or a card around its scene; the desk scene is drawn from the same tokens as everything else and sits on the page unframed.
 - **Don't** animate a landing section twice, or let anything move that the reader is currently reading. The settle fires once; the steam is the only loop.
 - **Don't** set any part of this product in a serif, or reintroduce paper, vellum, ink stamps, folds, brass or a book metaphor. That world was tried and rejected outright.
