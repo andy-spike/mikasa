@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import type { ReadingBlock, SourceLink } from "@/lib/course/reading";
+import { CopyButton } from "./copy-button";
 
 export function SourceLinks({ sources }: { sources: SourceLink[] }) {
   return (
@@ -92,9 +93,10 @@ export function LessonBlock({
     const language = block.kind === "sql" ? "sql" : block.language;
     return (
       <figure className="max-w-(--measure)">
-        <div className="overflow-hidden rounded-md border border-hair bg-canvas">
-          <div className="flex items-center border-b border-hair bg-panel px-3.5 py-2">
+        <div className="overflow-hidden border border-hair bg-canvas">
+          <div className="flex items-center justify-between gap-3 border-b border-hair bg-panel py-1.5 pr-1.5 pl-3.5">
             <span className="label text-fg-3">{language}</span>
+            <CopyButton text={block.code} />
           </div>
           <pre
             tabIndex={0}
