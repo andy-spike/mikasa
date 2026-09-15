@@ -257,6 +257,18 @@
     border-radius: 0;
   }
 
+  /* A rail under the pointer is direct manipulation, not motion: while the
+     Resizer has `data-resizing` on <html>, nothing on the page transitions
+     and the whole page holds the resize cursor, so the dragged edge and
+     everything that follows it track the cursor exactly. */
+  html[data-resizing] * {
+    transition: none !important;
+  }
+  html[data-resizing],
+  html[data-resizing] * {
+    cursor: col-resize !important;
+  }
+
   textarea,
   input {
     caret-color: var(--live);

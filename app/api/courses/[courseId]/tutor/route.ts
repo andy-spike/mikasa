@@ -13,11 +13,14 @@ import { tutorPrompt, tutorSystemPrompt } from "@/lib/course/tutor";
 import { tutorTools } from "@/lib/course/tutor-tools";
 import { embedQuery, tutorModel, tutorProviderOptions } from "@/lib/model";
 import { webSearch } from "@/lib/web/firecrawl";
-import { collectStreamText, jsonError, textStreamResponse } from "@/lib/api/stream";
+import { collectStreamText, jsonError, uiMessageStreamResponse } from "@/lib/api/stream";
 
 const turnSchema = z.object({
   lessonId: z.string().min(1),
   message: z.string().min(1).max(4000),
+  /* The passage a selection grew the question from; the reader's quote
+     rides with the turn so it can be found in the Lesson again. */
+  anchor: z.string().min(1).max(600).optional(),
   effort: z.enum(["low", "medium", "high"]).default("low"),
 });
 
@@ -30,7 +33,7 @@ export async function POST(
 
   const parsed = turnSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError(400, "That request was not a Tutor turn.");
-  const { lessonId, message, effort } = parsed.data;
+  const { lessonId, message, effort, anchor } = parsed.data;
 
   const { courseId } = await params;
   const published = await findOwnedPublishedCourse(db, session.user.id, courseId);
@@ -81,9 +84,10 @@ export async function POST(
       await appendTutorTurn(db, session.user.id, courseId, lessonId, {
         learner: message,
         tutor: text,
+        anchor: anchor ?? null,
       });
     },
   });
 
-  return textStreamResponse(result.textStream);
+  return uiMessageStreamResponse(result.stream, "The Tutor could not finish that answer.");
 }

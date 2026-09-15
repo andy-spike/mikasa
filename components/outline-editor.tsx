@@ -6,20 +6,23 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, Combine, Plus, Scissors, X } from "lucide-react";
 import { applyOutlineOpAction, approveOutlineAction } from "@/lib/actions/outline";
 import { cancelGenerationAction } from "@/lib/actions/courses";
-import { applyPlanToOutlineAction, reviewTailorOperationAction } from "@/lib/actions/tailor";
+import {
+  acceptProposedOperationsAction,
+  applyPlanToOutlineAction,
+  reviewTailorOperationAction,
+} from "@/lib/actions/tailor";
 import type { OutlineEditorCourse } from "@/lib/course/view";
 import type { OutlineOp } from "@/lib/course/structure";
 import { TailorConversation, type PlanView, type Turn } from "./tailor-conversation";
 import { Button } from "./ui/button";
 import { CancelRunButton } from "./cancel-run-button";
+import { Hint } from "./workspace/hint";
 import { DoneCheck, UnsetMark } from "./workspace/marks";
 import { field } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { Textarea } from "./ui/textarea";
 import { useStickyFollow } from "@/hooks/use-sticky-follow";
 import { useSyncedState } from "@/hooks/use-synced-state";
-import { postStream } from "@/lib/api/post";
-import type { ReasoningEffort } from "@/lib/model";
 import {
   Dialog,
   DialogContent,
@@ -56,16 +59,17 @@ function RowAction({
   children: React.ReactNode;
 }) {
   return (
-    <Button
-      variant="icon-raised"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={title}
-      className={className}
-    >
-      {children}
-    </Button>
+    <Hint label={title}>
+      <Button
+        variant="icon-raised"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        className={className}
+      >
+        {children}
+      </Button>
+    </Hint>
   );
 }
 
@@ -184,25 +188,11 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     });
   }
 
-  async function askTailor(
-    text: string,
-    effort: ReasoningEffort,
-    onDelta: (chunk: string) => void,
-  ): Promise<boolean> {
-    const done = await postStream(
-      `/api/courses/${course.id}/tailor`,
-      { message: text, effort },
-      onDelta,
-    );
-    if (!done) return false;
+  async function tailorFinished() {
     if (onRefreshPlan) setPlan(await onRefreshPlan());
-    return true;
   }
 
-  async function reviewOperation(
-    operationId: string,
-    status: "accepted" | "discarded" | "proposed",
-  ) {
+  async function reviewOperation(operationId: string, status: "discarded" | "proposed") {
     if (!plan) return;
     const result = await reviewTailorOperationAction(plan.id, operationId, status);
     if (result.ok) {
@@ -219,8 +209,15 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
 
   function applyPlan() {
     if (!plan) return;
+    const planId = plan.id;
     submit(async () => {
-      const result = await applyPlanToOutlineAction(course.id, plan.id);
+      const accepted = await acceptProposedOperationsAction(planId);
+      if (!accepted.ok) {
+        if (onRefreshPlan) setPlan(await onRefreshPlan());
+        failWith(accepted.message ?? "The plan could not be accepted.", "invalid");
+        return;
+      }
+      const result = await applyPlanToOutlineAction(course.id, planId);
       if (result.ok) {
         setEdits((n) => n + result.appliedCount);
         setPlan(null);
@@ -364,14 +361,15 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
                       onCancel={() => setEditing(null)}
                     />
                   ) : (
-                    <Button
-                      variant="bare"
-                      onClick={() => setEditing(m.id)}
-                      title="Rename this Module"
-                      className="label block truncate text-fg-3"
-                    >
-                      {m.numeral}. {m.title}
-                    </Button>
+                    <Hint label="Rename this Module">
+                      <Button
+                        variant="bare"
+                        onClick={() => setEditing(m.id)}
+                        className="label block truncate text-fg-3"
+                      >
+                        {m.numeral}. {m.title}
+                      </Button>
+                    </Hint>
                   )}
 
                   <span className="flex shrink-0 items-center">
@@ -423,14 +421,15 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
                             onCancel={() => setEditing(null)}
                           />
                         ) : (
-                          <Button
-                            variant="bare"
-                            onClick={() => setEditing(l.id)}
-                            title="Rename this Lesson"
-                            className="block w-full truncate text-left text-[0.8125rem] leading-5 font-medium text-fg"
-                          >
-                            {l.title}
-                          </Button>
+                          <Hint label="Rename this Lesson">
+                            <Button
+                              variant="bare"
+                              onClick={() => setEditing(l.id)}
+                              className="block w-full truncate text-left text-[0.8125rem] leading-5 font-medium text-fg"
+                            >
+                              {l.title}
+                            </Button>
+                          </Hint>
                         )}
                         <span className="mt-1 block text-[0.8125rem] leading-[1.5] text-fg-3">
                           {l.summary}
@@ -567,18 +566,16 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
           </p>
           <div className="mt-5">
             <TailorConversation
+              chatId={`outline-${course.id}`}
+              endpoint={`/api/courses/${course.id}/tailor`}
               turns={tailorTurns ?? []}
-              onAsk={askTailor}
+              onFinish={tailorFinished}
               plan={plan ?? undefined}
-              onAccept={(id) => reviewOperation(id, "accepted")}
+              onApply={applyPlan}
+              applying={pending}
               onDiscard={(id) => reviewOperation(id, "discarded")}
               onRestore={(id) => reviewOperation(id, "proposed")}
               scrollport={false}
-              applySlot={
-                <Button onClick={applyPlan} disabled={pending} className="w-full">
-                  Apply the accepted changes
-                </Button>
-              }
             />
           </div>
         </aside>

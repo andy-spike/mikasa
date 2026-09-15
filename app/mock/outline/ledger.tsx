@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/workspace/hint";
 import { CancelRunButton } from "@/components/cancel-run-button";
 import { DoneCheck, LiveMark, UnsetMark } from "@/components/workspace/marks";
 import {
@@ -26,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TailorConversation } from "@/components/tailor-conversation";
+import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +38,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { field } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { useStickyFollow } from "@/hooks/use-sticky-follow";
-import type { ReasoningEffort } from "@/lib/model";
 import {
   DRAFTED_IN,
   GOAL,
@@ -64,7 +65,6 @@ const renameField = "bg-panel text-fg outline-none transition-colors focus:bg-ra
 
 type Phase = "review" | "writing";
 type MockPlan = { id: string; operations: MockOperation[] };
-type AppliedOperation = { id: string; before: MockModule[]; touched: string[] };
 
 /* Motion's own useReducedMotion captures the media value before its listener
    is initialized in Next's SSR path, so it can return null on first paint.
@@ -116,6 +116,42 @@ function uid(prefix: string): string {
   return `${prefix}-${uidCounter}`;
 }
 
+/* The fixture streams the way the route does: the same UI message chunks a
+   `useChat` client reads from SSE, with no network behind them. */
+function mockTailorTransport(
+  onReply: (reply: (typeof SCRIPTED_REPLIES)[number]) => void,
+): ChatTransport<UIMessage> {
+  let asked = 0;
+  return {
+    async sendMessages({ abortSignal }) {
+      const reply = SCRIPTED_REPLIES[Math.min(asked, SCRIPTED_REPLIES.length - 1)];
+      asked += 1;
+      const id = uid("reply");
+      return new ReadableStream<UIMessageChunk>({
+        async start(controller) {
+          const abort = () => controller.error(new DOMException("Aborted", "AbortError"));
+          abortSignal?.addEventListener("abort", abort, { once: true });
+          controller.enqueue({ type: "start" });
+          controller.enqueue({ type: "text-start", id });
+          await sleep(650);
+          for (const chunk of chunkText(reply.text)) {
+            if (abortSignal?.aborted) return;
+            controller.enqueue({ type: "text-delta", id, delta: chunk });
+            await sleep(18);
+          }
+          controller.enqueue({ type: "text-end", id });
+          controller.enqueue({ type: "finish" });
+          controller.close();
+          onReply(reply);
+        },
+      });
+    },
+    async reconnectToStream() {
+      return null;
+    },
+  };
+}
+
 function cloneModules(mods: MockModule[]): MockModule[] {
   return mods.map((m) => ({ ...m, lessons: m.lessons.map((l) => ({ ...l })) }));
 }
@@ -158,9 +194,23 @@ export function LedgerMock() {
   const [editing, setEditing] = useState<string | null>(null);
   const [splitting, setSplitting] = useState<MockLesson | null>(null);
   const [plan, setPlan] = useState<MockPlan | null>({ id: PLAN_ID, operations: PLAN_OPERATIONS });
-  const [askCount, setAskCount] = useState(0);
   const [flash, setFlash] = useState<string[]>([]);
-  const [applied, setApplied] = useState<AppliedOperation[]>([]);
+
+  /* A scripted reply can carry a proposed operation, exactly as a real plan
+     arrives through the tool result. */
+  const transport = useMemo(
+    () =>
+      mockTailorTransport((reply) => {
+        if (!reply.operation) return;
+        const operation = reply.operation;
+        setPlan((current) =>
+          current
+            ? { ...current, operations: [...current.operations, operation] }
+            : { id: PLAN_ID, operations: [operation] },
+        );
+      }),
+    [],
+  );
 
   const reduce = usePrefersReducedMotion();
   const tailorRef = useRef<HTMLElement | null>(null);
@@ -372,111 +422,20 @@ export function LedgerMock() {
 
   /* Accepting is applying: the change lands on the register at once, and the
      snapshot taken before it is the Undo. */
-  function acceptOperation(operationId: string) {
-    if (!plan) return;
-    const operation = plan.operations.find((o) => o.id === operationId);
-    if (!operation || operation.status !== "proposed") return;
-    const before = cloneModules(modules);
-    const touched: string[] = [];
-    const next = applyEffect(modules, operation.effect, touched);
-    setModules(next);
-    setApplied((current) => [...current, { id: operationId, before, touched }]);
-    setPlan({
-      ...plan,
-      operations: plan.operations.map((o) =>
-        o.id === operationId ? { ...o, status: "accepted" as const } : o,
-      ),
-    });
-    setEdits((n) => n + 1);
-    setFlash(touched);
-  }
-
-  /* Undo restores the register as it stood before that operation, then replays
-     the operations accepted after it so their changes survive. */
-  function undoOperation(operationId: string) {
-    if (!plan) return;
-    const index = applied.findIndex((a) => a.id === operationId);
-    if (index === -1) return;
-    const entry = applied[index];
-    const touched = [...entry.touched];
-    let next = cloneModules(entry.before);
-    const kept: AppliedOperation[] = [];
-    for (const past of applied.slice(index + 1)) {
-      const operation = plan.operations.find((o) => o.id === past.id);
-      if (!operation) continue;
-      const seen: string[] = [];
-      kept.push({ id: past.id, before: cloneModules(next), touched: seen });
-      next = applyEffect(next, operation.effect, seen);
-      touched.push(...seen);
-    }
-    setModules(next);
-    setApplied([...applied.slice(0, index), ...kept]);
-    setPlan({
-      ...plan,
-      operations: plan.operations.map((o) =>
-        o.id === operationId ? { ...o, status: "proposed" as const } : o,
-      ),
-    });
-    setEdits((n) => Math.max(0, n - 1));
-    setFlash(touched);
-  }
-
-  /* The plan's one Restore control means Undo for an applied change and plain
-     un-discard for a discarded one. */
-  function restoreOperation(operationId: string) {
-    const operation = plan?.operations.find((o) => o.id === operationId);
-    if (!operation) return;
-    if (operation.status === "accepted") undoOperation(operationId);
-    else statusOperation(operationId, "proposed");
-  }
-
+  /* The plan is the unit of consent: applying lands every row still standing. */
   function applyAllOperations() {
     if (!plan) return;
-    const proposed = plan.operations.filter((o) => o.status === "proposed");
+    const proposed = plan.operations.filter((o) => o.status !== "discarded");
     if (proposed.length === 0) return;
-    const additions: AppliedOperation[] = [];
     const touched: string[] = [];
     let next = cloneModules(modules);
     for (const operation of proposed) {
-      const seen: string[] = [];
-      const before = cloneModules(next);
-      next = applyEffect(next, operation.effect, seen);
-      additions.push({ id: operation.id, before, touched: seen });
-      touched.push(...seen);
+      next = applyEffect(next, operation.effect, touched);
     }
     setModules(next);
-    setApplied((current) => [...current, ...additions]);
-    setPlan({
-      ...plan,
-      operations: plan.operations.map((o) =>
-        o.status === "proposed" ? { ...o, status: "accepted" as const } : o,
-      ),
-    });
+    setPlan(null);
     setEdits((n) => n + proposed.length);
     setFlash(touched);
-  }
-
-  async function askTailor(
-    _text: string,
-    _effort: ReasoningEffort,
-    onDelta: (chunk: string) => void,
-  ): Promise<boolean> {
-    const reply = SCRIPTED_REPLIES[Math.min(askCount, SCRIPTED_REPLIES.length - 1)];
-    await sleep(650);
-    for (const chunk of chunkText(reply.text)) {
-      onDelta(chunk);
-      await sleep(18);
-    }
-    setAskCount((n) => n + 1);
-    if (reply.operation) {
-      const operation = reply.operation;
-      setPlan((current) =>
-        current
-          ? { ...current, operations: [...current.operations, operation] }
-          : { id: PLAN_ID, operations: [operation] },
-      );
-    }
-    return true;
   }
 
   /* One bar per breakpoint: inside the register column on wide screens, and
@@ -583,14 +542,15 @@ export function LedgerMock() {
                         onCancel={() => setEditing(null)}
                       />
                     ) : phase === "review" ? (
-                      <Button
-                        variant="bare"
-                        onClick={() => setEditing(m.id)}
-                        title="Rename this Module"
-                        className="label block truncate text-fg-3"
-                      >
-                        {roman(mi + 1)}. {m.title}
-                      </Button>
+                      <Hint label="Rename this Module">
+                        <Button
+                          variant="bare"
+                          onClick={() => setEditing(m.id)}
+                          className="label block truncate text-fg-3"
+                        >
+                          {roman(mi + 1)}. {m.title}
+                        </Button>
+                      </Hint>
                     ) : (
                       <span className="label block truncate text-fg-3">
                         {roman(mi + 1)}. {m.title}
@@ -703,25 +663,26 @@ export function LedgerMock() {
                               <>
                                 <span className="flex h-4 w-5 items-center justify-center text-fg-3">
                                   {phase === "review" ? (
-                                    <Button
-                                      variant="icon-raised"
-                                      aria-label={`Reorder ${l.title}`}
-                                      title="Drag to reorder"
-                                      className="cursor-grab touch-none p-0.5 text-fg-dim active:cursor-grabbing"
-                                      onPointerDown={(event) => controls.start(event)}
-                                      onKeyDown={(event) => {
-                                        if (event.key === "ArrowUp") {
-                                          event.preventDefault();
-                                          moveLesson(m.id, li, -1);
-                                        }
-                                        if (event.key === "ArrowDown") {
-                                          event.preventDefault();
-                                          moveLesson(m.id, li, 1);
-                                        }
-                                      }}
-                                    >
-                                      <GripVertical className="h-3.5 w-3.5" strokeWidth={1.75} />
-                                    </Button>
+                                    <Hint label="Drag to reorder">
+                                      <Button
+                                        variant="icon-raised"
+                                        aria-label={`Reorder ${l.title}`}
+                                        className="cursor-grab touch-none p-0.5 text-fg-dim active:cursor-grabbing"
+                                        onPointerDown={(event) => controls.start(event)}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "ArrowUp") {
+                                            event.preventDefault();
+                                            moveLesson(m.id, li, -1);
+                                          }
+                                          if (event.key === "ArrowDown") {
+                                            event.preventDefault();
+                                            moveLesson(m.id, li, 1);
+                                          }
+                                        }}
+                                      >
+                                        <GripVertical className="h-3.5 w-3.5" strokeWidth={1.75} />
+                                      </Button>
+                                    </Hint>
                                   ) : rowDone ? (
                                     <DoneCheck striking />
                                   ) : doing ? (
@@ -745,14 +706,15 @@ export function LedgerMock() {
                                       onCancel={() => setEditing(null)}
                                     />
                                   ) : phase === "review" ? (
-                                    <Button
-                                      variant="bare"
-                                      onClick={() => setEditing(l.id)}
-                                      title="Rename this Lesson"
-                                      className="block max-w-full truncate text-left text-[0.8125rem] leading-5 font-medium text-fg lg:w-[18rem] lg:shrink-0"
-                                    >
-                                      {l.title}
-                                    </Button>
+                                    <Hint label="Rename this Lesson">
+                                      <Button
+                                        variant="bare"
+                                        onClick={() => setEditing(l.id)}
+                                        className="block max-w-full truncate text-left text-[0.8125rem] leading-5 font-medium text-fg lg:w-[18rem] lg:shrink-0"
+                                      >
+                                        {l.title}
+                                      </Button>
+                                    </Hint>
                                   ) : (
                                     <span
                                       className={cn(
@@ -946,18 +908,14 @@ export function LedgerMock() {
             </p>
             <div className="mt-5">
               <TailorConversation
+                chatId="mock-outline-tailor"
+                transport={transport}
                 turns={TAILOR_TURNS}
-                onAsk={askTailor}
                 plan={plan ?? undefined}
-                onAccept={acceptOperation}
+                onApply={applyAllOperations}
                 onDiscard={(id) => statusOperation(id, "discarded")}
-                onRestore={restoreOperation}
+                onRestore={(id) => statusOperation(id, "proposed")}
                 scrollport={false}
-                applyAllSlot={
-                  <Button onClick={applyAllOperations} className="w-full">
-                    Apply all changes
-                  </Button>
-                }
               />
             </div>
           </aside>
@@ -1030,16 +988,17 @@ function RowAction({
   children: React.ReactNode;
 }) {
   return (
-    <Button
-      variant="icon-raised"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={title}
-      className={className}
-    >
-      {children}
-    </Button>
+    <Hint label={title}>
+      <Button
+        variant="icon-raised"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        className={className}
+      >
+        {children}
+      </Button>
+    </Hint>
   );
 }
 
@@ -1058,13 +1017,15 @@ function RowMenu({
 }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="icon-raised" aria-label={label} title={label} className="p-1 sm:hidden">
-            <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
-          </Button>
-        }
-      />
+      <Hint label={label}>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="icon-raised" aria-label={label} className="p-1 sm:hidden">
+              <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
+            </Button>
+          }
+        />
+      </Hint>
       <DropdownMenuContent align="end" className="min-w-44">
         {items.map((item) => (
           <DropdownMenuItem

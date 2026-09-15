@@ -37,6 +37,7 @@ const { setRequestCookie } = await import("./helpers/request-context");
 const { makeOutline, makeSpec } = await import("./helpers/fixtures");
 const { OWNER, seedPublishedCourse } = await import("./helpers/published-course");
 const { streamingModel } = await import("./helpers/fake-model");
+const { readUIMessageStream } = await import("./helpers/ui-stream");
 const { POST } = await import("@/app/api/courses/[courseId]/tutor/route");
 
 const ORIGIN = "http://localhost:3000";
@@ -72,19 +73,22 @@ async function turn(
   courseId: string,
   lessonId: string,
   message: string,
-): Promise<{ status: number; text: string }> {
+  anchor?: string,
+): Promise<{ status: number; text: string; errors: string[] }> {
   /* next/headers resolves the route's cookies from the request. */
   setRequestCookie(cookie || null);
   const response = await POST(
     new Request(`${ORIGIN}/api/courses/${courseId}/tutor`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ lessonId, message }),
+      body: JSON.stringify({ lessonId, message, anchor }),
     }),
     { params: Promise.resolve({ courseId }) },
   );
-  const text = response.body ? await response.text() : "";
-  return { status: response.status, text };
+  const stream = response.body
+    ? await readUIMessageStream(response)
+    : { text: "", errors: [] };
+  return { status: response.status, ...stream };
 }
 
 let ownerCookie = "";
@@ -142,6 +146,36 @@ describe("a completed turn", () => {
     ]);
   });
 
+  it("keeps the passage a question grew from, and refuses an oversized one", async () => {
+    const courseId = await seedCourse(OWNER);
+    const passage = "The window does not fold.";
+    const asked = await turn(ownerCookie, courseId, "l1", "Why does WHERE change this?", passage);
+    expect(asked.status).toBe(200);
+
+    const [conversation] = await db
+      .select()
+      .from(tutorConversations)
+      .where(eq(tutorConversations.courseId, courseId));
+    const rows = await db
+      .select()
+      .from(tutorMessages)
+      .where(eq(tutorMessages.conversationId, conversation.id))
+      .orderBy(tutorMessages.seq);
+    expect(rows.map((r) => r.anchor)).toEqual([passage, null]);
+
+    const typed = await turn(ownerCookie, courseId, "l1", "And WHERE?");
+    expect(typed.status).toBe(200);
+    const after = await db
+      .select()
+      .from(tutorMessages)
+      .where(eq(tutorMessages.conversationId, conversation.id))
+      .orderBy(tutorMessages.seq);
+    expect(after.map((r) => r.anchor)).toEqual([passage, null, null, null]);
+
+    const tooLong = await turn(ownerCookie, courseId, "l1", "And?", "x".repeat(601));
+    expect(tooLong.status).toBe(400);
+  });
+
   it("gives the Tutor the Lesson, the Outline, the spec, the Sources, and the history", async () => {
     const courseId = await seedCourse(OWNER);
     await turn(ownerCookie, courseId, "l1", "Is PARTITION BY just GROUP BY?");
@@ -192,6 +226,7 @@ describe("an interrupted turn", () => {
     tutorModelState.current = streamingModel([{ error: true }]);
     const failed = await turn(ownerCookie, courseId, "l1", "Why did my totals change?");
     expect(failed.text).toBe("");
+    expect(failed.errors.join(" ")).toContain("could not");
     expect(
       (await db.select().from(tutorConversations).where(eq(tutorConversations.courseId, courseId)))
         .length,
