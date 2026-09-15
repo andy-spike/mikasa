@@ -12,6 +12,7 @@ import { findProposedPlanAction, findStagedPlanAction } from "@/lib/actions/tail
 import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
 import { highlightReading } from "@/lib/course/highlight";
 import { turnViews } from "@/lib/course/tutor";
+import type { Turn } from "@/components/workspace/panel";
 import { requireLearner } from "@/lib/session";
 
 export default async function CoursePage({ params }: { params: Promise<{ courseId: string }> }) {
@@ -30,7 +31,7 @@ export default async function CoursePage({ params }: { params: Promise<{ courseI
   const sources = toSourceLinks(published.sourceRows);
 
   const stored = await loadTutorHistory(db, user.id, courseId);
-  const tutorHistory: Record<string, { from: "learner" | "tutor"; text: string }[]> = {};
+  const tutorHistory: Record<string, Turn[]> = {};
   for (const [lessonRef, turns] of stored) {
     tutorHistory[lessonRef] = turnViews(turns);
   }

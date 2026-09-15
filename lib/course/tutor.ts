@@ -116,7 +116,7 @@ export function historyMessages(
 }
 
 export function turnViews<R extends string>(
-  turns: { role: R; content: string }[],
-): { from: R; text: string }[] {
-  return turns.map((t) => ({ from: t.role, text: t.content }));
+  turns: { role: R; content: string; anchor?: string | null }[],
+): { from: R; text: string; anchor: string | null }[] {
+  return turns.map((t) => ({ from: t.role, text: t.content, anchor: t.anchor ?? null }));
 }

@@ -366,6 +366,9 @@ export const tutorMessages = pgTable(
     seq: integer("seq").notNull(),
     role: text("role").notNull(),
     content: text("content").notNull(),
+    /* The passage the learner asked about, when the question grew from a
+       selection. Null for typed questions. */
+    anchor: text("anchor"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [

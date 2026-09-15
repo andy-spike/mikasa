@@ -1,13 +1,31 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import type { ReadingLesson, SourceLink } from "@/lib/course/reading";
+import type { ReadingBlock, ReadingLesson, SourceLink } from "@/lib/course/reading";
+import { useMediaQuery } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DoneCheck } from "./marks";
 import { Inline, LessonBlock } from "./prose";
 
 type NavTarget = { id: string; n: number; title: string };
+
+const normalize = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/* The text a quoted passage is matched against, whichever block it lands in. */
+function blockText(block: ReadingBlock): string {
+  switch (block.kind) {
+    case "p":
+    case "note":
+      return block.text;
+    case "code":
+    case "sql":
+      return [block.code, "caption" in block ? (block.caption ?? "") : ""].join(" ");
+    case "table":
+      return [block.head.join(" "), ...block.rows.flat(), block.caption].join(" ");
+  }
+}
 
 function LessonNav({
   direction,
@@ -84,6 +102,10 @@ type Props = {
   previous: NavTarget | null;
   next: NavTarget | null;
   sourceFor?: (ref: string) => SourceLink | undefined;
+  /** A passage to find in the Lesson, bumped with a fresh token to fire again. */
+  reveal?: { quote: string; token: number } | null;
+  /** Called with a selected passage when the Learner asks about it. */
+  onAskAbout?: (text: string) => void;
   onMark: () => void;
   onUnmark: () => void;
   onOpen: (id: string) => void;
@@ -97,13 +119,88 @@ export function LessonPane({
   previous,
   next,
   sourceFor,
+  reveal,
+  onAskAbout,
   onMark,
   onUnmark,
   onOpen,
 }: Props) {
+  const articleRef = useRef<HTMLElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [picked, setPicked] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const flashTimer = useRef<number | null>(null);
+  const reduce = useMediaQuery("(prefers-reduced-motion: reduce)");
+
+  /* A selection inside the article raises the Ask control. */
+  useEffect(() => {
+    if (!onAskAbout) return;
+    function readSelection() {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+        setPicked(null);
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      const article = articleRef.current;
+      if (!article || !article.contains(range.commonAncestorContainer)) {
+        setPicked(null);
+        return;
+      }
+      const text = selection.toString().replace(/\s+/g, " ").trim();
+      if (text.length < 2) {
+        setPicked(null);
+        return;
+      }
+      const rect = range.getBoundingClientRect();
+      setPicked({
+        text: text.slice(0, 600),
+        x: Math.min(rect.right + 10, window.innerWidth - 152),
+        y: Math.min(rect.bottom + 8, window.innerHeight - 44),
+      });
+    }
+    document.addEventListener("selectionchange", readSelection);
+    return () => document.removeEventListener("selectionchange", readSelection);
+  }, [onAskAbout]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const clear = () => setPicked(null);
+    el.addEventListener("scroll", clear, { passive: true });
+    return () => el.removeEventListener("scroll", clear);
+  }, []);
+
+  /* A quoted passage in the Tutor thread finds its sentence and marks it. */
+  useEffect(() => {
+    if (!reveal) return;
+    const article = articleRef.current;
+    if (!article) return;
+    const wanted = normalize(reveal.quote);
+    if (!wanted) return;
+    for (const el of article.querySelectorAll<HTMLElement>("[data-block]")) {
+      if (normalize(el.dataset.block ?? "").includes(wanted)) {
+        el.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+        setFlash(wanted);
+        if (flashTimer.current) window.clearTimeout(flashTimer.current);
+        flashTimer.current = window.setTimeout(() => setFlash(null), 1400);
+        return;
+      }
+    }
+  }, [reveal, reduce]);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimer.current) window.clearTimeout(flashTimer.current);
+    };
+  }, []);
+
   return (
-    <div className="scroll-thin h-full overflow-y-auto">
-      <article className="mx-auto w-full max-w-[41rem] px-5 pt-6 pb-20 sm:px-8 sm:pt-9 lg:px-10">
+    <div ref={scrollRef} className="scroll-thin h-full overflow-y-auto">
+      <article
+        ref={articleRef}
+        className="mx-auto w-full max-w-[41rem] px-5 pt-6 pb-20 sm:px-8 sm:pt-9 lg:px-10"
+      >
         <p className="tnum text-[0.75rem] text-fg-3">
           Lesson {lesson.n} of {total}
         </p>
@@ -113,9 +210,21 @@ export function LessonPane({
         </h2>
 
         <div className="mt-9 space-y-6">
-          {lesson.body?.map((block, i) => (
-            <LessonBlock key={i} block={block} sourceFor={sourceFor} />
-          ))}
+          {lesson.body?.map((block, i) => {
+            const text = normalize(blockText(block));
+            return (
+              <div
+                key={i}
+                data-block={text}
+                className={cn(
+                  "relative -mx-2 rounded-sm px-2 transition-colors duration-200",
+                  flash !== null && text.includes(flash) && "bg-raised",
+                )}
+              >
+                <LessonBlock block={block} sourceFor={sourceFor} />
+              </div>
+            );
+          })}
         </div>
 
         {lesson.exercise && (
@@ -150,6 +259,23 @@ export function LessonPane({
           {next && <LessonNav direction="next" nav={next} onOpen={onOpen} />}
         </footer>
       </article>
+
+      {picked && onAskAbout && (
+        <button
+          type="button"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            onAskAbout(picked.text);
+            window.getSelection()?.removeAllRanges();
+            setPicked(null);
+          }}
+          style={{ left: picked.x, top: picked.y }}
+          className="lift fixed z-50 flex items-center gap-2 border border-hair bg-float px-2 py-1 text-[0.75rem] text-fg-2 transition-colors hover:text-fg"
+        >
+          <span aria-hidden className="block h-3.5 w-px bg-rule" />
+          Ask the Tutor
+        </button>
+      )}
     </div>
   );
 }

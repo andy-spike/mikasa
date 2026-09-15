@@ -1,0 +1,1 @@
+ALTER TABLE "tutor_messages" ADD COLUMN "anchor" text;
