@@ -85,8 +85,8 @@ export function CommandPalette({
           ))}
         </CommandList>
 
-        <div className="flex items-center gap-4 border-t border-hair px-4 py-2.5">
-          <Key hint="move">↑</Key>
+        <div className="flex items-center gap-6 border-t border-hair px-4 py-2.5">
+          <Key hint="move">↑ ↓</Key>
           <Key hint="open">↵</Key>
           <Key hint="close">esc</Key>
         </div>
@@ -97,7 +97,7 @@ export function CommandPalette({
 
 function Key({ children, hint }: { children: string; hint: string }) {
   return (
-    <span className="flex items-center gap-1.5">
+    <span className="flex items-center gap-2">
       <kbd className="tnum bg-raised px-1.5 py-0.5 font-mono text-[0.6875rem] text-fg-dim">
         {children}
       </kbd>

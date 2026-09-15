@@ -1,0 +1,20 @@
+/* A scroll port whose bar rides with the scroll. The engines do not animate
+   scrollbar pseudo-elements, so the native thumb cannot fade itself: the lane
+   carries a cover in the port's own ground instead, and the cover fades away
+   while the port is moving. use-scroll-activity marks the port with
+   `data-scrolling` for a beat after its last scroll event; the cover must be
+   the port's next sibling for the mark to find it. */
+.cover {
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+:global([data-scrolling]) + .cover {
+  opacity: 0;
+}
+
+/* The end states stay; only the fade goes. */
+@media (prefers-reduced-motion: reduce) {
+  .cover {
+    transition: none;
+  }
+}
