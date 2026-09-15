@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 vi.mock("server-only", () => ({}));
 
@@ -66,10 +66,14 @@ vi.mock("@/lib/course/reconcile", () => ({
 }));
 
 const { db } = await import("@/lib/db");
-const { changePlans, courseSpecs, courses, outlines, users } = await import("@/lib/db/schema");
+const { changeOperations, changePlans, courseSpecs, courses, outlines, users } =
+  await import("@/lib/db/schema");
 const { applyOutlineOpAction, approveOutlineAction } = await import("@/lib/actions/outline");
-const { applyPlanToOutlineAction, reviewTailorOperationAction } =
-  await import("@/lib/actions/tailor");
+const {
+  acceptProposedOperationsAction,
+  applyPlanToOutlineAction,
+  reviewTailorOperationAction,
+} = await import("@/lib/actions/tailor");
 const { createChangePlan } = await import("@/lib/db/tailor");
 const { signInWithGoogle } = await import("./helpers/auth");
 const { setRequestCookie } = await import("./helpers/request-context");
@@ -123,7 +127,7 @@ function asOwner() {
 
 async function proposeThree(
   courseId: string,
-  reviews: ("accepted" | "discarded")[],
+  reviews: ("accepted" | "discarded" | "proposed")[],
 ): Promise<string> {
   const userId = (await db.select().from(users).where(eq(users.email, OWNER)))[0].id;
   const created = await createChangePlan(db, userId, courseId, [
@@ -161,6 +165,25 @@ describe("applyPlanToOutlineAction", () => {
 
     const [plan] = await db.select().from(changePlans).where(eq(changePlans.id, planId));
     expect(plan.status).toBe("applied");
+  });
+
+  it("accepts every row still standing when the plan is applied as a whole", async () => {
+    asOwner();
+    const courseId = await seedAwaitingApproval(OWNER);
+    const planId = await proposeThree(courseId, ["discarded", "proposed", "proposed"]);
+
+    const accepted = await acceptProposedOperationsAction(planId);
+    expect(accepted.ok).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(changeOperations)
+      .where(eq(changeOperations.planId, planId))
+      .orderBy(asc(changeOperations.position));
+    expect(rows.map((r) => r.status)).toEqual(["discarded", "accepted", "accepted"]);
+
+    const result = await applyPlanToOutlineAction(courseId, planId);
+    expect(result).toMatchObject({ ok: true, appliedCount: 2 });
   });
 
   it("marks the specification stale, and approval reconciles it with the accepted content demands", async () => {

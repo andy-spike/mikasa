@@ -338,6 +338,31 @@ export async function setOperationStatus(
   return { ok: true };
 }
 
+/** The plan is the unit of consent: applying accepts every row still standing,
+ *  so the review UI only has to strike out the rows the Learner does not want. */
+export async function acceptProposedOperations(
+  db: Db,
+  ownerId: string,
+  planId: string,
+): Promise<{ ok: boolean; message?: string }> {
+  const [plan] = await db
+    .select({ id: changePlans.id, status: changePlans.status })
+    .from(changePlans)
+    .innerJoin(courses, eq(courses.id, changePlans.courseId))
+    .where(and(eq(changePlans.id, planId), eq(courses.ownerId, ownerId)))
+    .limit(1);
+  if (!plan) return { ok: false, message: "Plan not found." };
+  if (plan.status !== "proposed") {
+    return { ok: false, message: "This plan is no longer under review." };
+  }
+
+  await db
+    .update(changeOperations)
+    .set({ status: "accepted" })
+    .where(and(eq(changeOperations.planId, planId), eq(changeOperations.status, "proposed")));
+  return { ok: true };
+}
+
 export async function findPlan(
   db: Db,
   ownerId: string,
