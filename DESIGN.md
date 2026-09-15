@@ -148,10 +148,10 @@ typography:
     fontWeight: 400
     lineHeight: 1.72
     letterSpacing: "normal"
-rounded:
-  sm: "3px"
-  md: "6px"
-  lg: "10px"
+rounded: # held at zero: this world is square
+  sm: "0px"
+  md: "0px"
+  lg: "0px"
 spacing:
   row: "0.22rem"
   row-touch: "0.75rem"
@@ -341,11 +341,11 @@ Every text step is legal body text on all four surfaces; the ramp is a hierarchy
 
 ### Syntax — code blocks only
 
-Code sits on the reading ground inside one hairline, with a panel-ground language strip, so every role below clears 4.5:1 on its own ground. Shiki runs on the server (`lib/course/highlight.tsx`) and hands `components/workspace/prose.tsx` a rendered tree: keywords in green semibold (`.tok-key`), strings in orange (`.tok-str`), numbers and constants in purple (`.tok-num`), functions, tags and types in blue (`.tok-func`), comments in third ink italic (`.tok-com`). The theme carries the tokens rather than a palette of its own, so each role's ink is edited in one place and both grounds answer; operators and punctuation stay in the block's own ink, and a language the highlighter does not carry renders as plain code. No syntax colour leaks into chrome, rows, buttons, or the palette.
+Code sits on the reading ground inside one hairline, with a panel-ground language strip, so every role below clears 4.5:1 on its own ground. Shiki runs on the server (`lib/course/highlight.tsx`) and hands `components/workspace/prose.tsx` a rendered tree: keywords in green semibold (`.tok-key`), strings in orange (`.tok-str`), numbers and constants in purple (`.tok-num`), functions, tags and types in blue (`.tok-func`), comments in third ink italic (`.tok-com`). The theme carries the tokens rather than a palette of its own, so each role's ink is edited in one place and both grounds answer; operators and punctuation stay in the block's own ink, and a language the highlighter does not carry renders as plain code. The strip's right edge carries the copy control: an icon button in the strip's own third ink, stepping to raised and full ink on hover, confirming with a check at full ink and a spoken line — a luminance step, never the accent. No syntax colour leaks into chrome, rows, buttons, or the palette.
 
 ### Neutral — browser surfaces
 
-- **Selection** (`{colors.select}`), **Scrollbar Thumb** (`{colors.thumb}` / `{colors.thumb-hover}`), **Scroll Shade** (`{colors.scroll-shade}`), **Scrim** (`{colors.scrim}`): The parts the workspace does not draw but still owns. Thin scrollbars, an accent selection, the shade that fades a horizontal scroller's edge while content sits past it, and the ground the command palette sits on. `color-scheme` moves with the theme, so the form controls and scrollbars the browser draws itself follow.
+- **Selection** (`{colors.select}`), **Scrollbar Thumb** (`{colors.thumb}` / `{colors.thumb-hover}`), **Scroll Shade** (`{colors.scroll-shade}`), **Scrim** (`{colors.scrim}`): The parts the workspace does not draw but still owns. Thin scrollbars, an accent selection, the shade that fades a horizontal scroller's edge while content sits past it, and the ground the command palette sits on. `color-scheme` moves with the theme, so the form controls and scrollbars the browser draws itself follow. A bar is never parked on screen: it rides with the scroll, lingers a beat after the last event, then fades out and comes back on the next scroll. The engines do not animate scrollbar pseudo-elements, so the thumb cannot fade itself — the port hides it under a cover in its own ground and reserves the lane (`scrollbar-gutter: stable`) so the cover never crosses content and the column never shifts.
 
 ### Tertiary
 
@@ -357,7 +357,7 @@ One graphic in the product is exempt from everything above: Google's G on the si
 
 ### Declared but unspent
 
-`--live-dim`, `--live-wash` and `--warn` are declared in the token layer. `--live-dim` and `--live-wash` back focus and selection depth; `--warn` stays reserved. `--radius` was declared and unread, and has been deleted; the ramp is `--radius-sm/md/lg`, now at `3px`, `6px`, and `10px`.
+`--live-dim`, `--live-wash` and `--warn` are declared in the token layer. `--live-dim` and `--live-wash` back focus and selection depth; `--warn` stays reserved. `--radius` was declared and unread, and has been deleted; the ramp is `--radius-sm/md/lg`, all three held at `0px` — this world is square.
 
 ### Named Rules
 
@@ -463,25 +463,25 @@ Exactly one shadow ships, on the only thing that genuinely floats.
 
 ### Shadow Vocabulary
 
-- **Lift** (`--lift`): The layers that actually leave the document — the command palette and the Select popup. Offset and blur, never a halo. Two values: `0 18px 44px -12px rgba(0,0,0,0.72), 0 3px 10px -3px rgba(0,0,0,0.55)` on graphite, and a shorter, lighter pair on paper — a shadow tuned for a dark ground reads as soot on a white one.
+- **Lift** (`--lift`): The layers that actually leave the document — the command palette, the Select popup, and the hints and the selection pill that hang over a Lesson. Offset and blur, never a halo. Two values: `0 18px 44px -12px rgba(0,0,0,0.72), 0 3px 10px -3px rgba(0,0,0,0.55)` on graphite, and a shorter, lighter pair on paper — a shadow tuned for a dark ground reads as soot on a white one.
 
 ### Named Rules
 
-**The Flat Shell Rule.** One shadow exists in this system and it belongs to whatever genuinely leaves the document — the command palette, the Select popup. Everything else earns its depth from light.
+**The Flat Shell Rule.** One shadow exists in this system and it belongs to whatever genuinely leaves the document — the command palette, the Select popup, a hint. Everything else earns its depth from light.
 
 ## Shapes
 
-Corners are small and soft. Rows, chips, buttons, fields, code blocks, the command palette, the focus ring and the scrollbar thumb use the named ramp: `3px` for inline and compact things, `6px` for blocks and controls, `10px` for the floating palette. A call site still says which kind of thing it is, and one edit would bring the square world back if this world ever wanted it.
+Every corner in the product is square. Rows, chips, buttons, fields, code blocks, the command palette, the focus ring and the scrollbar thumb read the named ramp, and every step of it — `--radius-sm/md/lg` — is held at `0px`: a corner never has to soften what light and a hairline already separated. A call site still says which kind of thing it is, and one edit would soften this world again if it ever wanted to.
 
-The soft corner is not decoration; it is the desk register. Depth here is light plus a faint grain wash, and division is a hairline. Nothing is pill-shaped, nothing is circular, and no element carries a full border for decoration, except code on its reading ground.
+The square corner is not decoration; it is the desk register — the instrument's precision rather than paper's softness. Depth here is light plus a faint grain wash, and division is a hairline. Nothing is pill-shaped, nothing is circular, and no element carries a full border for decoration, except code on its reading ground.
 
-Marks are drawn, not iconified in a font: a 12px solid triangle in live olive for the current Lesson, a 12px stroked check for done, a 12px dashed rule for unset — all on the same 12px box so a column of rows never shifts. Interface icons are Lucide at 14–16px, `strokeWidth` 1.75. The one exception to this whole section is Google's G on the sign-in button, a third-party mark that keeps its own geometry as well as its own colours.
+Marks are drawn, not iconified in a font: a solid triangle in live olive for the current Lesson, a stroked check for done, a dashed rule for unset — all drawn on the same 12px box so a column of rows never shifts, and drawn at 10px in the Outline rail, where a mark sits beside a 12px number and a 13px title. Interface icons are Lucide at 14–16px, `strokeWidth` 1.75. The one exception to this whole section is Google's G on the sign-in button, a third-party mark that keeps its own geometry as well as its own colours.
 
-The focus ring is a 2px solid olive outline at 2px offset, following the corner of the thing it surrounds.
+The focus ring is a 2px solid olive outline at 2px offset, following the shape of the thing it surrounds.
 
 ### Named Rules
 
-**The Small Corner Rule.** Radius stays at 3, 6, and 10px. An element that needs to read as separate takes a luminance step or a hairline first; the corner only softens what light already separated. Uppercase stays inside the one 0.6875rem label.
+**The Square Corner Rule.** Nothing carries a radius: the ramp is held at `0px`, so one edit could soften the world, but a corner is never what separates two things. An element that needs to read as separate takes a luminance step or a hairline first. Uppercase stays inside the one 0.6875rem label.
 
 ## Components
 
@@ -495,6 +495,7 @@ Anything with real interaction behaviour comes from the registry and is adapted 
 - **`Select`** — the trigger becomes a field on the panel ground rather than a bottom underline; the popup drops its `ring-1` for `lift`, because it is one of the two things in the product that genuinely leaves the document, and it always opens below its trigger rather than over it, capping its height and scrolling when the room below is short.
 - **`Textarea`** — a canvas-inset field that steps up on focus, not an underline.
 - **`Button`** — the shipped variants are uppercase at `tracking-widest` with a ring and a press translate. Replaced with the controls this file names — `primary`, `hero`, `compact`, `quiet`, `discard`, `icon`, `icon-raised` — plus `bare` for a control whose shape is its container (the rename trigger, the Next-Lesson row) and two aliases, `ghost` and `outline`, because Dialog, Sheet and Sidebar reach for those names by hand. Padding rides the variant, since each control has its own. `nativeButton` defaults to `false` whenever `render` is passed: `render` here is almost always a Link, and an anchor is navigation, not an action.
+- **`Tooltip`** — the shipped hint is a raised chip with square corners, no shadow and a pointer, and a raised box vanishes over a raised row. Restyled to the layer a hint is — `float` ground, `lift` — and the pointer comes off with the arrow.
 - **`Command` / `Dialog`** — the palette. The scrim loses its blur (DESIGN.md gives the blurred scrim to the mobile sheet, and the two are not the same layer), the popup trades `shadow-md ring-1` for `lift`, the input becomes a plain field over a hairline instead of an InputGroup with a search glyph, the group heading takes the one label style, the active option takes a raised ground, and the trailing check comes off the item because nothing in this palette is a checked state. cmdk's fuzzy scorer is replaced with a substring filter: this palette is navigation, not search, so a query either appears in the entry or the entry is not a result. This registry's `CommandDialog` does not wrap its children in the cmdk root, so `palette.tsx` supplies it, with `loop` for the wrapping arrow keys.
 
 Hand-rolled controls were deleted as each primitive landed. `switchTrack`/`switchSeg` went when `ToggleGroup` replaced them and the five `btn*` constants went when `Button` did, leaving `lib/ui.ts` holding one idiom: the inset `field` that a few inputs still wear directly. The palette's own dialog, filter, active-option tracking and key handling went with `Command` — what remains in `palette.tsx` is the surface, the grouping and the footer.
@@ -541,13 +542,21 @@ The Outline is a live, editable object beside the Lesson, not a table of content
 - **Hero** (`Start a Course`, `Continue with Google`): over ground, full ink, 0.875rem/500, 1.25rem × 0.75rem padding, hover to rule. One luminance step above Primary, because an Operate screen has several actions competing and a Persuade surface has one. The step is the system answering "this needs more weight" the way it always does — with light, never with a hue.
 - **Compact** (`Approve`): over ground, full ink, 0.75rem/500. Hover steps to rule.
 - **Quiet** (`Undo`, `Discard`): no ground, third ink, hover to full ink. Discard alone hovers to bad red.
-- **Icon** (rail toggle, panel close, palette trigger): third ink on no ground, hover to a panel or raised step and full ink.
+- **Icon** (rail toggle, panel close, palette trigger, code copy): third ink on no ground, hover to a panel or raised step and full ink.
+
+### Hints
+
+Where a title has to be cut — a Lesson in the rail, a count, a control that carries only an icon — hovering names the thing in full. The box wears what any small floating layer here wears: `float` ground, `lift`, 0.75rem at second ink, and no pointer, because nothing in this world draws one. It opens 400ms after the pointer stops, fades in on the 160ms default, and opens instantly while the pointer stays inside one group of them, so walking a rail reads as one gesture rather than a row of separate ones. Focus opens it too, so the pointerless reader is not left out. The browser's own black box is never the answer: nothing in the product names itself with a native `title`.
+
+- **One wrapper:** `Hint` in `components/workspace/hint.tsx` puts the trigger on its child, so a call site costs one line and no wrapper element, and the layout it sits in cannot move.
+- **Where a reveal already exists, no hint:** the New Course button slides its own label out on hover, so it carries none.
 
 ### Command Palette (signature)
 
 Navigation, not a shortcut: every set Lesson and every action is reachable without the pointer. ⌘K/Ctrl-K toggles it globally.
 
 - **Surface:** float ground, square, 34rem wide, `lift` shadow, on the scrim, 12vh from the top.
+- **Trigger:** a panel-ground field in the shell bar, square, holding the search glyph and the `⌘K` cap; the footer's keycaps are drawn the same way.
 - **Composition:** search input over a hairline, grouped results (Actions, then Lessons) with label-style group headers, a hairline-topped keycap footer. A hint beside an option identifies it — the Module a Lesson sits in — and never explains it, so the action rows carry a label alone.
 - **Behaviour is the primitive's:** cmdk inside a base-ui Dialog owns filtering, the active option, arrow keys, Enter, Escape, the focus trap, the inert background and returning focus. Opened by `⌘K` from anywhere there is no trigger to return to, so focus lands on the body.
 - **Active option:** raised ground, full ink; arrow keys wrap, Enter runs, Escape closes.
@@ -557,20 +566,20 @@ Navigation, not a shortcut: every set Lesson and every action is reachable witho
 
 One panel, two modes, an explicit segmented switch at the top on a canvas-inset ground with the active segment raised. It owns its own close, so the shell shows no second control naming the same thing. A one-line subtitle states the contract: the Tutor changes nothing, the Tailor writes nothing until approved.
 
-- **Tutor thread:** the learner's turns sit one luminance step up in a right-shouldered rounded block; the Tutor's answers are unadorned prose at second ink. Pending state is a live-region line, not a spinner.
+- **Tutor thread:** the learner's turns sit one luminance step up in a raised block; the Tutor's answers are unadorned prose at second ink. Pending state is a live-region line, not a spinner.
 - **Composer:** canvas-inset field that steps up to raised on focus-within; Enter sends, Shift-Enter breaks.
 - **Tailor plan:** hairline-divided rows on the panel's own ground — verb label, target, change, reason, then Approve/Discard or Applied/Undo. Deliberately not a card list. Once every change has a decision and at least one is approved, the Course revision starts immediately; a neutral live status names its current stage while the published Course remains readable.
 
 ### Prose Blocks
 
 - **Paragraph:** second ink, 1rem/1.72, capped at the measure.
-- **Code:** reading-ground block inside one hairline, 6px corners, a panel-ground label strip over a hairline, and a horizontally scrolling body with edge fades that appear only while there is content past the edge. Highlighting is syntax roles that each clear 4.5:1 on the canvas; comments fall back to third ink italic. **No syntax colour outside code.**
+- **Code:** reading-ground block inside one hairline, square corners, a panel-ground label strip over a hairline, and a horizontally scrolling body with edge fades that appear only while there is content past the edge. Highlighting is syntax roles that each clear 4.5:1 on the canvas; comments fall back to third ink italic. **No syntax colour outside code.**
 - **Note:** a left rule at `--rule` with a label heading. Not a callout, not a box.
 - **Table:** mono, tabular, label-style headers over a rule, hairline row dividers, last column at full ink. Scrolls inside the measure with the same edge fades.
 
 ### Motion
 
-Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bounce — at 120ms for row and colour changes, 160ms for the default, 240ms for entrances. The authored moment is marking an Exercise done: one handoff in two halves, the check stroking itself onto the row just finished (340ms dash) while the accent lifts into place on the next Lesson (300ms). It fires on a real mark, never on first paint or a revisit. Under `prefers-reduced-motion`, both end states remain and all movement is dropped.
+Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bounce — at 120ms for row and colour changes, 160ms for the default, 240ms for entrances. A port's scrollbar rides on the same ease: inked with the first scroll event, lingering 1.6s after the last one, gone over 240ms, and back the moment the port moves again. The authored moment is marking an Exercise done: one handoff in two halves, the check stroking itself onto the row just finished (340ms dash) while the accent lifts into place on the next Lesson (300ms). It fires on a real mark, never on first paint or a revisit. Under `prefers-reduced-motion`, both end states remain and all movement is dropped.
 
 The landing adds two motions and no more. The hero settles on arrival: its lines rise one breath after another (`mk-rise`, 600ms, 90ms stagger), the scene settles at 220ms, and the scene's steam draws itself in at 420ms, then breathes between its own opacity and 0.8 on a 7s alternate — the page's only loop. Scrolling, each section fades up 16px once (`mk-settle`, 560ms) when it first enters the viewport, through `components/reveal.tsx`: `rootMargin: 0px 0px -8% 0px`, disconnect after the first intersect. The hero wash drifts 2% over 22s. Nothing settles twice, nothing enters twice, and reduced motion resolves every element to its end state.
 
@@ -595,7 +604,9 @@ The landing adds two motions and no more. The hero settles on arrival: its lines
 - **Do** set every number that is data in Geist Mono or with `.tnum`, so columns of counts, dates and estimates line up.
 - **Do** keep the Lessons of an unapproved Outline in place, ruled at `--mark` and inert, with no hover and no click target.
 - **Do** give a scrolling code block or table its own edge fade rather than letting it bleed past the measure.
+- **Do** let a port's scrollbar ride with the scroll — inked on the first scroll event, gone a beat after the last one — and reserve its lane, so the bar never crosses content and the column never shifts when it comes and goes.
 - **Do** cut a row to the fewest facts that let a reader act on it, and put the rest one click away.
+- **Do** give a title that had to be cut, and a control that carries only an icon, a `Hint` — the same box on hover and on focus.
 - **Do** move focus into a full-screen overlay, close it on Escape, mark the layers behind `inert`, and return focus to the control that opened it.
 - **Do** keep both end states and drop the movement under `prefers-reduced-motion`.
 - **Do** answer every new `:root` colour in `.dark`, and check both grounds against the contrast floors before shipping either.
@@ -613,9 +624,10 @@ The landing adds two motions and no more. The hero settles on arrival: its lines
 - **Don't** use `--mark` for text; it clears 3:1, not 4.5:1.
 - **Don't** render an unwritten Lesson as a disabled button, and don't list one in the command palette. Every Lesson of a generated Course is listed, because there are no unwritten ones left in it.
 - **Don't** add a shadow to anything that is not a floating modal layer; step the luminance instead.
+- **Don't** let a native `title` ship: it wears the browser's black box, not this world. A hint is the only box that names a control.
 - **Don't** let opening or closing the rail or the panel shift the reading column by a single pixel.
 - **Don't** duplicate a control the panel already owns; while the panel is open, the shell shows no second control naming the same thing.
-- **Don't** add a radius outside the 3/6/10px ramp. Uppercase stays inside the one 0.6875rem label.
+- **Don't** round a corner. The ramp is held at `0px`; a thing that needs to read as separate takes a luminance step or a hairline. Uppercase stays inside the one 0.6875rem label.
 - **Don't** hardcode a colour at a call site, or define one in only one ground.
 - **Don't** let the accent change meaning between the two grounds — it is darkened for paper, not repurposed.
 - **Don't** carry the theme in React state; the class on `<html>` is the state, and a mounted flag is a hydration seam waiting to show.
