@@ -10,6 +10,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Hint } from "@/components/workspace/hint";
 import { readTheme, serverTheme, setTheme, subscribeTheme, type ThemeChoice } from "@/lib/theme";
 
 const THEMES = ["light", "dark", "system"] as const;
@@ -29,30 +30,31 @@ export function ThemeToggle() {
         if (!next || details.reason !== "trigger-press") setOpen(next);
       }}
     >
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="icon"
-            className="h-8 w-8 p-2"
-            aria-label="Switch theme. Right-click for theme options"
-            title="Switch theme · Right-click for options"
-            onClick={toggleTheme}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              setOpen(true);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+      <Hint label="Switch theme · Right-click for options">
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="icon"
+              className="h-8 w-8 p-2"
+              aria-label="Switch theme. Right-click for theme options"
+              onClick={toggleTheme}
+              onContextMenu={(event) => {
                 event.preventDefault();
                 setOpen(true);
-              }
-            }}
-          >
-            <Sun className="h-4 w-4 dark:hidden" strokeWidth={1.75} />
-            <Moon className="hidden h-4 w-4 dark:block" strokeWidth={1.75} />
-          </Button>
-        }
-      />
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                  event.preventDefault();
+                  setOpen(true);
+                }
+              }}
+            >
+              <Sun className="h-4 w-4 dark:hidden" strokeWidth={1.75} />
+              <Moon className="hidden h-4 w-4 dark:block" strokeWidth={1.75} />
+            </Button>
+          }
+        />
+      </Hint>
       <DropdownMenuContent align="end" className="min-w-32 py-1">
         <DropdownMenuRadioGroup
           value={theme}

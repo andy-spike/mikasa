@@ -106,12 +106,12 @@ export default async function CoursesPage() {
         )}
       </div>
 
+      {/* The New Course button slides its own label out on hover, so no hint. */}
       {owned.length > 0 && (
         <Button
           variant="hero"
           render={<Link href="/courses/new" />}
           aria-label="New Course"
-          title="New Course"
           className="new-course-button fixed right-5 bottom-5 z-20 h-11 gap-0 px-3 sm:right-8 sm:bottom-8"
         >
           <Plus className="h-4 w-4" strokeWidth={1.75} />

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const geistSans = Geist({
@@ -48,7 +49,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="grain h-full">{children}</body>
+      <body className="grain h-full">
+        {/* One delay for every hint in the product. The provider groups them,
+            so walking a rail opens the next one instantly, and a pointer that
+            merely crosses a control never flashes a box. */}
+        <TooltipProvider delay={400}>{children}</TooltipProvider>
+      </body>
     </html>
   );
 }

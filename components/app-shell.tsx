@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Settings } from "lucide-react";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./workspace/theme-toggle";
+import { Hint } from "./workspace/hint";
 import { SignOutButton } from "./sign-out-button";
 
 export function AppShell({
@@ -35,14 +36,11 @@ export function AppShell({
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {actions}
           <ThemeToggle />
-          <Button
-            variant="icon"
-            render={<Link href="/settings" />}
-            aria-label="Settings"
-            title="Settings"
-          >
-            <Settings className="h-4 w-4" strokeWidth={1.75} />
-          </Button>
+          <Hint label="Settings">
+            <Button variant="icon" render={<Link href="/settings" />} aria-label="Settings">
+              <Settings className="h-4 w-4" strokeWidth={1.75} />
+            </Button>
+          </Hint>
           <SignOutButton />
         </div>
       </header>
