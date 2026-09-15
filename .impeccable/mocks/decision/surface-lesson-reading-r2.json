@@ -1,0 +1,80 @@
+{
+  "title": "The lesson reading screen, round 2",
+  "question": "The Tutor belongs to the reading. The roll dealt The Two-Voice Lesson — lock it, or take The Second Pass or The Margin.",
+  "options": [
+    {
+      "id": "two-voice-lesson",
+      "label": "The Two-Voice Lesson",
+      "kicker": "THE ROLL",
+      "lineage": "the annotated edition: a second voice answering from beneath the text",
+      "thesis": "The Tutor joins the Lesson as a second voice: ask beside a block and the answer sets beneath it, hairline-ruled and quieter than the Lesson, so the page reads as a dialogue you can re-read.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["answers set under the block they answer, in the Tutor's voice", "hairline rules and a narrower answer measure", "the Course rail marks Lessons with threads"],
+      "viewport": "The Lesson reads at the 36rem measure. A hairline 'Ask about this' sits beside the block you are on; the answer streams beneath that block in a quieter voice at a narrower measure and stays when you scroll on. The rail carries the Course and marks every Lesson with a thread; the Exercise and the next handoff close the page.",
+      "risk": "Answers become part of the Lesson, so the authored text is no longer fixed: a long thread bloats the page and makes re-reading harder, and the reading column reflows every time the Tutor speaks.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "rail · the Course · Lessons with threads marked", "x": 0, "y": 0, "w": 3, "h": 10 },
+          { "label": "chrome · theme · Tutor", "x": 3, "y": 0, "w": 9, "h": 1 },
+          { "label": "the Lesson, first voice, at the 36rem measure", "x": 4, "y": 1, "w": 5, "h": 3 },
+          { "label": "ask line · Ask about this block", "x": 4, "y": 4, "w": 5, "h": 1 },
+          { "label": "the Tutor's answer, second voice, under the block", "x": 5, "y": 5, "w": 4, "h": 2, "accent": true },
+          { "label": "the Lesson continues", "x": 4, "y": 7, "w": 5, "h": 1 },
+          { "label": "Exercise close · mark done", "x": 4, "y": 8, "w": 5, "h": 1 },
+          { "label": "next Lesson", "x": 4, "y": 9, "w": 5, "h": 1 }
+        ]
+      }
+    },
+    {
+      "id": "second-pass",
+      "label": "The Second Pass",
+      "kicker": null,
+      "lineage": "the marked copy: a first read and the read you return to",
+      "thesis": "Read first, ask second. The Lesson stays untouched as the first pass; flagging a passage collects it into a Second Pass where each passage carries your question and the Tutor's answer.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["flagging from selection, no panel, no interruption", "the Pass as a switched view of the Lesson's own column", "the rail marks Lessons that have a Pass"],
+      "viewport": "The Lesson reads at the measure, untouched. Selecting a passage raises a quiet flag; the close of the Lesson carries the switch — 'Second pass · 4 passages' — and switching shows the Pass in the same column: each flagged passage quoted, your question, the Tutor's answer, hairline-separated. The rail carries the Course and marks which Lessons have a Pass.",
+      "risk": "Separating asking from the moment of confusion is the point and the price: the learner must flag now and ask later, so a question that was clear in the moment can be stale by the time the Pass opens.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "rail · Lessons marked with their passes", "x": 0, "y": 0, "w": 3, "h": 10 },
+          { "label": "chrome · theme · Tutor", "x": 3, "y": 0, "w": 9, "h": 1 },
+          { "label": "the Lesson · first pass · untouched", "x": 4, "y": 1, "w": 5, "h": 4 },
+          { "label": "flag · mark the passage you will ask about", "x": 4, "y": 5, "w": 5, "h": 1 },
+          { "label": "switch · Lesson ↔ Second pass · 4 passages", "x": 4, "y": 6, "w": 5, "h": 1 },
+          { "label": "the Second Pass · passage quoted · your question · the Tutor's answer", "x": 4, "y": 7, "w": 5, "h": 3, "accent": true }
+        ]
+      }
+    },
+    {
+      "id": "margin",
+      "label": "The Margin",
+      "kicker": null,
+      "lineage": "the scholar's margin: the text at the measure, the answer beside it",
+      "thesis": "The Tutor's home is the margin. Select a passage, ask, and the answer stays beside it for the Lesson; the measure never moves, and the margin exists only when the Lesson has something to answer.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["anchored answers beside the passage they answer", "the margin reserved from the wide viewport's dead space; a sheet below lg", "the rail marks Lessons with margins"],
+      "viewport": "At wide widths the Lesson keeps the 36rem measure and the margin takes the space between it and the panel edge; selecting a passage raises a hairline bracket and the answer sets beside it, anchored, with the ask line at the margin's foot. Below lg the margin becomes a sheet, and the Lesson behaves the same. The rail carries the Course and marks Lessons that have margins.",
+      "risk": "The margin only exists on wide screens; below lg asking falls back to a sheet, and long answers crowd the space beside the passage they answer.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "rail · Lessons with margins marked", "x": 0, "y": 0, "w": 3, "h": 10 },
+          { "label": "chrome · theme · Tutor", "x": 3, "y": 0, "w": 9, "h": 1 },
+          { "label": "the Lesson at the 36rem measure, never moved", "x": 3, "y": 1, "w": 5, "h": 8 },
+          { "label": "the margin · the answer, anchored to the passage", "x": 8, "y": 1, "w": 4, "h": 4, "accent": true },
+          { "label": "ask line at the margin's foot", "x": 8, "y": 5, "w": 4, "h": 1 },
+          { "label": "Exercise close · mark done", "x": 3, "y": 9, "w": 5, "h": 1 }
+        ]
+      }
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": { "value": "code" }
+}

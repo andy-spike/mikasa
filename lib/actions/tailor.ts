@@ -8,6 +8,7 @@ import { requireLearner, requireOwnedCourse } from "@/lib/session";
 import { generationRuns } from "@/lib/db/schema";
 import {
   applyPlanToOutline,
+  acceptProposedOperations,
   discardStagedRevision,
   findProposedPlan,
   findStagedPlan,
@@ -111,6 +112,16 @@ export async function reviewTailorOperationAction(
     parsed.data.operationId,
     parsed.data.status,
   );
+}
+
+/** Applying accepts the whole plan bar the rows the Learner struck out. */
+export async function acceptProposedOperationsAction(
+  planId: string,
+): Promise<OperationReviewResult> {
+  const { user } = await requireLearner();
+  const parsed = z.string().uuid().safeParse(planId);
+  if (!parsed.success) return { ok: false, message: "That plan does not fit the Course." };
+  return acceptProposedOperations(db, user.id, parsed.data);
 }
 
 export type ApplyPlanResult =

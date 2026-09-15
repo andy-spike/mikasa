@@ -1,0 +1,76 @@
+{
+  "title": "The Outline review screen",
+  "question": "The roll dealt The Ledger. Lock it, or take The Revision Sheet or The Change Docket.",
+  "options": [
+    {
+      "id": "the-ledger",
+      "label": "The Ledger",
+      "kicker": "THE ROLL",
+      "lineage": "the ruled register a clerk totals at the foot",
+      "thesis": "The review is a count: the whole Course on one ruled register, every Lesson a row with its time, and the totals beside the commit.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["full-width register", "module bands with subtotals", "tabular minutes", "totals footbar"],
+      "viewport": "Topic and Goal over a full-width register: each Module a band with its Lesson count and subtotal, each Lesson a row with its minutes and hover actions at its right, the evidence under it, and a footbar carrying 6 Modules · 13 Lessons · about 4h 40m beside Generate the Lessons. The Tailor keeps the right column.",
+      "risk": "A register can read as a spreadsheet, and at Mastery depth it runs long; the summary column and the module bands have to keep it a Course, not a grid.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "topic · goal", "x": 0, "y": 1, "w": 9, "h": 1 },
+          { "label": "register · module bands, lesson rows with minutes", "x": 0, "y": 2, "w": 9, "h": 5 },
+          { "label": "why this shape · sources", "x": 0, "y": 7, "w": 9, "h": 2 },
+          { "label": "totals · generate the lessons · back", "x": 0, "y": 9, "w": 9, "h": 1, "accent": true },
+          { "label": "tailor column", "x": 9, "y": 1, "w": 3, "h": 9 }
+        ]
+      }
+    },
+    {
+      "id": "the-revision-sheet",
+      "label": "The Revision Sheet",
+      "lineage": "the marked-up typescript a proofreader returns",
+      "thesis": "The Tailor's changes land on the Outline itself: each affected row shows what it is and what it would become, accepted or discarded in place.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["annotated rows", "struck current text", "inserted proposed text", "conversation kept in the right column"],
+      "viewport": "The Outline as a two-column sheet; a proposed change turns its row into a mark-up: the current title struck and dimmed, the proposed title in full ink with Accept and Discard at the row's edge. The Tailor column keeps only the conversation, and the foot carries the change count beside Generate the Lessons.",
+      "risk": "In-place marks crowd a row, and moves, splits and removals need an honest representation that never hides what the Outline would become.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "topic · goal", "x": 0, "y": 1, "w": 9, "h": 1 },
+          { "label": "outline sheet · two columns of modules", "x": 0, "y": 2, "w": 9, "h": 6 },
+          { "label": "the proposed change, on its own row", "x": 0, "y": 4, "w": 9, "h": 1, "accent": true },
+          { "label": "tailor conversation", "x": 9, "y": 1, "w": 3, "h": 8 },
+          { "label": "changes saved · generate the lessons", "x": 0, "y": 8, "w": 9, "h": 1 }
+        ]
+      }
+    },
+    {
+      "id": "the-change-docket",
+      "label": "The Change Docket",
+      "lineage": "the docket a clerk reads out, one motion at a time",
+      "thesis": "When there is something to decide, the changes lead: a numbered docket of every proposed motion, each accepted or discarded, with the Outline below showing the accepted state.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["numbered motions", "verb · target · change · reason", "accept and discard cells", "the outline behind"],
+      "viewport": "Topic and Goal, then the docket: each proposed change a row naming its verb, target, change and reason, with Accept or Discard at its right and Apply the accepted changes closing it; the Outline follows as the object it edits, with the Tailor conversation beside it.",
+      "risk": "With no proposals the docket is empty chrome, so the page must collapse to a plain review; and a long docket can bury the Outline it exists to serve.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "topic · goal", "x": 0, "y": 1, "w": 12, "h": 1 },
+          { "label": "docket · named motions with accept or discard", "x": 0, "y": 2, "w": 12, "h": 3, "accent": true },
+          { "label": "outline · the object being changed", "x": 0, "y": 5, "w": 9, "h": 4 },
+          { "label": "tailor conversation", "x": 9, "y": 5, "w": 3, "h": 4 },
+          { "label": "totals · generate the lessons", "x": 0, "y": 9, "w": 9, "h": 1 }
+        ]
+      }
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": { "value": "code" }
+}

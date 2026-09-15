@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { DoneCheck, LiveMark, UnsetMark } from "./marks";
+import { Hint } from "./hint";
 
 export type ModuleView = {
   numeral: string;
@@ -108,12 +109,11 @@ export function Outline({
         >
           <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
         </Button>
-        <span
-          className="tnum mt-1 text-[0.75rem] text-fg-dim"
-          title={`${doneCount} of ${total} Lessons complete`}
-        >
-          {doneCount}/{total}
-        </span>
+        <Hint label={`${doneCount} of ${total} Lessons complete`}>
+          <span className="tnum mt-1 text-[0.75rem] text-fg-dim">
+            {doneCount}/{total}
+          </span>
+        </Hint>
       </div>
 
       <SidebarHeader className="gap-0 px-4 pt-2 pb-3 group-data-[collapsible=icon]:hidden">
@@ -161,49 +161,52 @@ export function Outline({
 
                   return (
                     <SidebarMenuItem key={l.id}>
-                      <SidebarMenuButton
-                        ref={isOpen ? openLessonRef : undefined}
-                        isActive={isOpen}
-                        render={ghost ? <div /> : undefined}
-                        aria-disabled={ghost || undefined}
-                        aria-current={isOpen ? "page" : undefined}
-                        aria-label={`${l.n}. ${l.title}${stamp ? ", complete" : isLive ? ", current Lesson" : ""}`}
-                        title={l.title}
-                        onClick={ghost ? undefined : () => onOpen(l.id)}
-                        className={cn(
-                          "row grid h-auto grid-cols-[0.75rem_1.25rem_1fr] items-center gap-x-2 overflow-visible px-2 text-left aria-disabled:opacity-100",
-                          isMobile ? "min-h-11 py-2.5" : "min-h-7 py-1",
-                          ghost && "hover:bg-transparent",
-                        )}
-                      >
-                        <span className="flex h-4 w-3 items-center justify-center">
-                          <LessonMark
-                            live={isLive}
-                            stamp={stamp}
-                            ghost={ghost}
-                            handing={handing}
-                            striking={justDoneId === l.id}
-                          />
-                        </span>
-
-                        <span
+                      <Hint label={l.title} side="right">
+                        <SidebarMenuButton
+                          ref={isOpen ? openLessonRef : undefined}
+                          isActive={isOpen}
+                          render={ghost ? <div /> : undefined}
+                          aria-disabled={ghost || undefined}
+                          aria-current={isOpen ? "page" : undefined}
+                          aria-label={`${l.n}. ${l.title}${stamp ? ", complete" : isLive ? ", current Lesson" : ""}`}
+                          onClick={ghost ? undefined : () => onOpen(l.id)}
                           className={cn(
-                            "tnum text-[0.75rem] tabular-nums",
-                            ghost ? "text-fg-dim" : isOpen ? "text-fg-2" : "text-fg-3",
+                            "row grid h-auto grid-cols-[0.75rem_1.25rem_1fr] items-center gap-x-2 overflow-visible px-2 text-left aria-disabled:opacity-100",
+                            isMobile ? "min-h-11 py-2.5" : "min-h-7 py-1",
+                            ghost && "hover:bg-transparent",
                           )}
                         >
-                          {l.n}
-                        </span>
+                          {/* The sidebar primitive sizes a descendant svg to
+                              16px; the rail's mark is drawn at 10px. */}
+                          <span className="flex h-4 w-3 items-center justify-center [&_svg]:size-2.5!">
+                            <LessonMark
+                              live={isLive}
+                              stamp={stamp}
+                              ghost={ghost}
+                              handing={handing}
+                              striking={justDoneId === l.id}
+                            />
+                          </span>
 
-                        <span
-                          className={cn(
-                            "truncate text-[0.8125rem] leading-5",
-                            ghost ? "text-fg-3" : isOpen ? "font-medium text-fg" : "text-fg-2",
-                          )}
-                        >
-                          {l.title}
-                        </span>
-                      </SidebarMenuButton>
+                          <span
+                            className={cn(
+                              "tnum text-[0.75rem] tabular-nums",
+                              ghost ? "text-fg-dim" : isOpen ? "text-fg-2" : "text-fg-3",
+                            )}
+                          >
+                            {l.n}
+                          </span>
+
+                          <span
+                            className={cn(
+                              "truncate text-[0.8125rem] leading-5",
+                              ghost ? "text-fg-3" : isOpen ? "font-medium text-fg" : "text-fg-2",
+                            )}
+                          >
+                            {l.title}
+                          </span>
+                        </SidebarMenuButton>
+                      </Hint>
                     </SidebarMenuItem>
                   );
                 })}

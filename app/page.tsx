@@ -134,7 +134,10 @@ export default function Landing() {
         </div>
       </header>
 
-      <main id="main" className="relative z-[1] mx-auto max-w-[77rem] px-5 pt-[3.5rem] sm:px-8 lg:px-10">
+      <main
+        id="main"
+        className="relative z-[1] mx-auto max-w-[77rem] px-5 pt-[3.5rem] sm:px-8 lg:px-10"
+      >
         <section
           className="grid min-h-[calc(100dvh-3.5rem)] place-content-center pt-[4.5rem] pb-24 text-center max-sm:pt-12 max-sm:pb-[4.5rem]"
           aria-labelledby="intro"

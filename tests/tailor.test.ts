@@ -57,6 +57,7 @@ const { setRequestCookie } = await import("./helpers/request-context");
 const { makeOutline, makeSpec } = await import("./helpers/fixtures");
 const { OWNER, seedPublishedCourse } = await import("./helpers/published-course");
 const { streamingModel } = await import("./helpers/fake-model");
+const { readUIMessageStream } = await import("./helpers/ui-stream");
 const { POST } = await import("@/app/api/courses/[courseId]/tailor/route");
 
 const ORIGIN = "http://localhost:3000";
@@ -85,7 +86,7 @@ async function turn(
   cookie: string,
   courseId: string,
   message: string,
-): Promise<{ status: number; text: string }> {
+): Promise<{ status: number; text: string; errors: string[] }> {
   setRequestCookie(cookie || null);
   const response = await POST(
     new Request(`${ORIGIN}/api/courses/${courseId}/tailor`, {
@@ -95,8 +96,10 @@ async function turn(
     }),
     { params: Promise.resolve({ courseId }) },
   );
-  const text = response.body ? await response.text() : "";
-  return { status: response.status, text };
+  const stream = response.body
+    ? await readUIMessageStream(response)
+    : { text: "", errors: [] };
+  return { status: response.status, ...stream };
 }
 
 function planThenText(ops: unknown, text: string) {
@@ -175,6 +178,7 @@ describe("the conversation", () => {
     tailorModelState.current = streamingModel([{ error: true }]);
     const failed = await turn(ownerCookie, courseId, "Reshape everything.");
     expect(failed.text).toBe("");
+    expect(failed.errors.join(" ")).toContain("could not");
     expect((await db.select().from(tailorMessages)).length).toBe(0);
     expect((await db.select().from(tailorConversations)).length).toBe(0);
   });

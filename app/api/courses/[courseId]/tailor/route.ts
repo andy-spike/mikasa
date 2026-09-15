@@ -15,7 +15,7 @@ import {
 import { changePlanSchema, opDetail, opEntry, opVerb } from "@/lib/course/change-plan";
 import { designModel, designProviderOptions } from "@/lib/model";
 import { latestOutline } from "@/lib/db/design";
-import { collectStreamText, jsonError, textStreamResponse } from "@/lib/api/stream";
+import { collectStreamText, jsonError, uiMessageStreamResponse } from "@/lib/api/stream";
 import { historyMessages } from "@/lib/course/tutor";
 
 const turnSchema = z.object({
@@ -119,5 +119,5 @@ export async function POST(
     },
   });
 
-  return textStreamResponse(result.textStream);
+  return uiMessageStreamResponse(result.stream, "The Tailor could not finish that plan.");
 }

@@ -12,6 +12,7 @@ export type TutorTurnRow = {
   seq: number;
   role: "learner" | "tutor";
   content: string;
+  anchor: string | null;
   createdAt: Date;
 };
 
@@ -20,6 +21,7 @@ function toTutorTurnRow(r: {
   seq: number;
   role: string;
   content: string;
+  anchor: string | null;
   createdAt: Date;
 }): TutorTurnRow {
   return {
@@ -27,6 +29,7 @@ function toTutorTurnRow(r: {
     seq: r.seq,
     role: r.role as TutorTurnRow["role"],
     content: r.content,
+    anchor: r.anchor,
     createdAt: r.createdAt,
   };
 }
@@ -132,7 +135,7 @@ export async function appendTutorTurn(
   ownerId: string,
   courseId: string,
   lessonRef: string,
-  turn: { learner: string; tutor: string },
+  turn: { learner: string; tutor: string; anchor?: string | null },
 ): Promise<{ learner: TutorTurnRow; tutor: TutorTurnRow }> {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -165,6 +168,7 @@ export async function appendTutorTurn(
               seq: base + 1,
               role: "learner",
               content: turn.learner,
+              anchor: turn.anchor ?? null,
             },
             { conversationId: conversation.id, seq: base + 2, role: "tutor", content: turn.tutor },
           ])

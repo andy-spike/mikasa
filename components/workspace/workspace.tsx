@@ -13,6 +13,7 @@ import {
   listPublishedPlansAction,
   findStagedPlanAction,
   reviewTailorOperationAction,
+  acceptProposedOperationsAction,
   retryPlanRevisionAction,
   discardStagedRevisionAction,
   stagePlanRevisionAction,
@@ -28,14 +29,15 @@ import { Panel, type PanelMode } from "./panel";
 import { Resizer } from "./resizer";
 import { CommandPalette, type Command } from "./palette";
 import { ThemeToggle } from "./theme-toggle";
-import type { ReasoningEffort } from "@/lib/model";
-import { postStream } from "@/lib/api/post";
+import { Hint } from "./hint";
 import { useSyncedState } from "@/hooks/use-synced-state";
 
 const OUTLINE_MIN = 16;
 const OUTLINE_MAX = 24;
+const OUTLINE_DEFAULT = 18;
 const PANEL_MIN = 18;
 const PANEL_MAX = 26;
+const PANEL_DEFAULT = 21;
 const COMPACT_PANEL_MAX = 21;
 
 const STAGE_MESSAGES: Record<string, string> = {
@@ -218,10 +220,14 @@ export function Workspace({
   const [railChoice, setRailChoice] = useState<boolean | null>(null);
   const [panel, setPanel] = useState<PanelMode | null>(null);
   const [lastMode, setLastMode] = useState<PanelMode>("tutor");
-  const [outlineWidth, setOutlineWidth] = useState(18);
-  const [panelWidth, setPanelWidth] = useState(21);
+  const [outlineWidth, setOutlineWidth] = useState(OUTLINE_DEFAULT);
+  const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [justDone, setJustDone] = useState<string | null>(null);
+  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+  const [reveal, setReveal] = useState<{ quote: string; token: number } | null>(null);
+  const [focusToken, setFocusToken] = useState(0);
+  const [applying, setApplying] = useState(false);
   const [, startTransition] = useTransition();
 
   const router = useRouter();
@@ -310,7 +316,19 @@ export function Workspace({
   function openLesson(id: string) {
     setOpenId(id);
     setJustDone(null);
+    setPendingAnchor(null);
     if (compact) setRailChoice(false);
+  }
+
+  /* A selection in the Lesson becomes the Tutor's next question. */
+  function askAbout(text: string) {
+    setPendingAnchor(text);
+    setFocusToken((token) => token + 1);
+    showPanel("tutor");
+  }
+
+  function revealQuote(quote: string) {
+    setReveal({ quote, token: Date.now() });
   }
 
   function markDone() {
@@ -342,41 +360,22 @@ export function Workspace({
     });
   }
 
-  async function askTutor(
-    lessonId: string,
-    text: string,
-    effort: ReasoningEffort,
-    onDelta: (chunk: string) => void,
-  ): Promise<boolean> {
-    return postStream(
-      `/api/courses/${course.id}/tutor`,
-      { lessonId, message: text, effort },
-      onDelta,
-    );
-  }
-
   const tutorTurnsFor = useMemo<Turn[]>(
     () => tutorHistory?.[open.id] ?? [],
     [tutorHistory, open.id],
   );
 
-  async function askTailor(
-    text: string,
-    effort: ReasoningEffort,
-    onDelta: (chunk: string) => void,
-  ): Promise<boolean> {
-    const done = await postStream(
-      `/api/courses/${course.id}/tailor`,
-      { message: text, effort },
-      onDelta,
-    );
-    if (!done) return false;
-    const fresh = await onRefreshPlan();
-    setPlan(fresh);
-    return true;
+  /* Neon holds the conversation; a finished turn refreshes the server view so
+     switching Lessons restores it. */
+  function tutorFinished() {
+    router.refresh();
   }
 
   const [plan, setPlan] = useSyncedState(tailorPlan);
+
+  async function tailorFinished() {
+    setPlan(await onRefreshPlan());
+  }
 
   const [staged, setStaged] = useState(false);
   const [stagedRevision, setStagedRevision] = useSyncedState(stagedPlan);
@@ -474,25 +473,31 @@ export function Workspace({
     });
   }
 
-  async function reviewOperation(
-    operationId: string,
-    status: "accepted" | "discarded" | "proposed",
-  ) {
+  /* Applying accepts every row still standing, then stages the revision. */
+  async function applyPlan() {
+    if (!plan || applying) return;
+    const planId = plan.id;
+    setApplying(true);
+    const accepted = await acceptProposedOperationsAction(planId);
+    if (!accepted.ok) {
+      setPlan(await onRefreshPlan());
+      setApplying(false);
+      return;
+    }
+    beginRevision(planId);
+    setApplying(false);
+  }
+
+  async function reviewOperation(operationId: string, status: "discarded" | "proposed") {
     if (!plan) return;
     const result = await reviewTailorOperationAction(plan.id, operationId, status);
     if (result.ok) {
-      const reviewed = {
+      setPlan({
         ...plan,
         operations: plan.operations.map((operation) =>
           operation.id === operationId ? { ...operation, status } : operation,
         ),
-      };
-      const ready =
-        status !== "proposed" &&
-        reviewed.operations.every((operation) => operation.status !== "proposed") &&
-        reviewed.operations.some((operation) => operation.status === "accepted");
-      if (ready) beginRevision(plan.id);
-      else setPlan(reviewed);
+      });
     } else {
       setPlan(await onRefreshPlan());
     }
@@ -611,6 +616,10 @@ export function Workspace({
     // oxlint-disable-next-line react/exhaustive-deps
   }, [flat, open.id, open.exercise, doneAt, railOpen, router]);
 
+  const panelLabel = panel
+    ? `Close the ${panel === "tutor" ? "Tutor" : "Tailor"}`
+    : `Open the ${lastMode === "tutor" ? "Tutor" : "Tailor"}`;
+
   return (
     <SidebarProvider
       open={railOpen}
@@ -644,6 +653,7 @@ export function Workspace({
             width={outlineWidth}
             min={OUTLINE_MIN}
             max={outlineMax}
+            defaultWidth={OUTLINE_DEFAULT}
             onResize={setOutlineWidth}
           />
         }
@@ -681,11 +691,11 @@ export function Workspace({
                 aria-haspopup="dialog"
                 aria-expanded={paletteOpen}
                 onClick={() => setPaletteOpen(true)}
-                className="flex h-8 w-full min-w-0 items-center rounded-md bg-panel pr-10 pl-8 text-left text-[0.8125rem] text-fg-3 transition-colors hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-live"
+                className="flex h-8 w-full min-w-0 items-center bg-panel pr-10 pl-8 text-left text-[0.8125rem] text-fg-3 transition-colors hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-live"
               >
                 Go to a Lesson
               </button>
-              <kbd className="tnum pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 rounded-sm bg-raised px-1.5 py-0.5 font-mono text-[0.6875rem] text-fg-dim sm:block">
+              <kbd className="tnum pointer-events-none absolute top-1/2 right-2.5 hidden -translate-y-1/2 bg-raised px-1.5 py-0.5 font-mono text-[0.6875rem] text-fg-dim sm:block">
                 ⌘ K
               </kbd>
             </div>
@@ -697,28 +707,21 @@ export function Workspace({
               }
             >
               <ThemeToggle />
-              <Button
-                variant="icon"
-                onClick={() => (panel ? closePanel() : showPanel(lastMode))}
-                aria-expanded={panel !== null}
-                aria-label={
-                  panel
-                    ? `Close the ${panel === "tutor" ? "Tutor" : "Tailor"}`
-                    : `Open the ${lastMode === "tutor" ? "Tutor" : "Tailor"}`
-                }
-                title={
-                  panel
-                    ? `Close the ${panel === "tutor" ? "Tutor" : "Tailor"}`
-                    : `Open the ${lastMode === "tutor" ? "Tutor" : "Tailor"}`
-                }
-                className="h-8 w-8 p-2"
-              >
-                {panel ? (
-                  <PanelRightClose className="h-4 w-4" strokeWidth={1.75} />
-                ) : (
-                  <PanelRight className="h-4 w-4" strokeWidth={1.75} />
-                )}
-              </Button>
+              <Hint label={panelLabel}>
+                <Button
+                  variant="icon"
+                  onClick={() => (panel ? closePanel() : showPanel(lastMode))}
+                  aria-expanded={panel !== null}
+                  aria-label={panelLabel}
+                  className="h-8 w-8 p-2"
+                >
+                  {panel ? (
+                    <PanelRightClose className="h-4 w-4" strokeWidth={1.75} />
+                  ) : (
+                    <PanelRight className="h-4 w-4" strokeWidth={1.75} />
+                  )}
+                </Button>
+              </Hint>
             </div>
           </nav>
 
@@ -732,6 +735,8 @@ export function Workspace({
               previous={previous ? { id: previous.id, n: previous.n, title: previous.title } : null}
               next={next ? { id: next.id, n: next.n, title: next.title } : null}
               sourceFor={sources ? (ref) => sources.get(ref) : undefined}
+              reveal={reveal}
+              onAskAbout={askAbout}
               onMark={markDone}
               onUnmark={unmark}
               onOpen={openLesson}
@@ -741,18 +746,25 @@ export function Workspace({
 
         <Panel
           mode={panel ?? lastMode}
+          courseId={course.id}
+          lessonId={open.id}
           lessonTitle={open.title}
           tutorTurns={tutorTurnsFor}
-          onAsk={(text, effort, onDelta) => askTutor(open.id, text, effort, onDelta)}
+          onTutorFinished={tutorFinished}
+          pendingAnchor={pendingAnchor}
+          onClearAnchor={() => setPendingAnchor(null)}
+          onRevealAnchor={revealQuote}
+          focusToken={focusToken}
           tailorTurns={tailorTurnsStable}
-          onTailorAsk={askTailor}
+          onTailorFinished={tailorFinished}
           tailorPlan={plan ?? undefined}
           onMode={(m) => {
             setLastMode(m);
             setPanel(m);
           }}
           onClose={closePanel}
-          onAccept={(id) => reviewOperation(id, "accepted")}
+          onApply={() => void applyPlan()}
+          applying={applying}
           onDiscard={(id) => reviewOperation(id, "discarded")}
           onRestore={(id) => reviewOperation(id, "proposed")}
           tutorNotice={
@@ -784,6 +796,7 @@ export function Workspace({
               width={panelWidth}
               min={PANEL_MIN}
               max={panelMax}
+              defaultWidth={PANEL_DEFAULT}
               onResize={setPanelWidth}
             />
           }

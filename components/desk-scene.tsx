@@ -7,12 +7,7 @@ import { cn } from "@/lib/utils";
    loop, the page's only loop. The parent Reveal owns the settle. */
 export function DeskScene({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 420 340"
-      fill="none"
-      aria-hidden="true"
-      className={cn("w-full", className)}
-    >
+    <svg viewBox="0 0 420 340" fill="none" aria-hidden="true" className={cn("w-full", className)}>
       {/* soft light from the upper right */}
       <defs>
         <radialGradient id="deskLight" cx="0.72" cy="0.12" r="0.9">
@@ -36,7 +31,12 @@ export function DeskScene({ className }: { className?: string }) {
       <rect x="0" y="0" width="420" height="340" fill="url(#deskLight)" />
 
       {/* light falling across the desk */}
-      <path className="desk-ray" d="M330 -20 420 -20 372 360 282 360Z" fill="url(#rayWide)" opacity="0.45" />
+      <path
+        className="desk-ray"
+        d="M330 -20 420 -20 372 360 282 360Z"
+        fill="url(#rayWide)"
+        opacity="0.45"
+      />
       <path d="M372 -20 406 -20 372 360 338 360Z" fill="url(#rayEdge)" opacity="0.5" />
 
       {/* the desk edge */}
@@ -64,31 +64,64 @@ export function DeskScene({ className }: { className?: string }) {
           opacity="0.5"
         />
         {/* the line being written: the accent claiming its place */}
-        <path
-          d="M116 270h48"
-          stroke="var(--live)"
-          strokeWidth="2"
-          strokeLinecap="square"
-        />
+        <path d="M116 270h48" stroke="var(--live)" strokeWidth="2" strokeLinecap="square" />
         {/* the live mark, at home in the outline */}
         <path d="M103 106.5 109.5 111 103 115.5Z" fill="var(--live)" opacity="0.9" />
       </g>
 
       {/* the pencil, laid down where the writing stopped */}
       <g transform="translate(162 266) rotate(11)" opacity="0.95">
-        <path d="M0 0 22-11V11Z" fill="var(--over)" stroke="var(--fg-dim)" strokeWidth="1.25" strokeLinejoin="round" />
+        <path
+          d="M0 0 22-11V11Z"
+          fill="var(--over)"
+          stroke="var(--fg-dim)"
+          strokeWidth="1.25"
+          strokeLinejoin="round"
+        />
         <path d="M0 0 7-2.6V2.6Z" fill="var(--fg-2)" />
-        <rect x="22" y="-11" width="128" height="22" rx="3" fill="var(--panel)" stroke="var(--fg-dim)" strokeWidth="1.25" />
+        <rect
+          x="22"
+          y="-11"
+          width="128"
+          height="22"
+          rx="3"
+          fill="var(--panel)"
+          stroke="var(--fg-dim)"
+          strokeWidth="1.25"
+        />
         {/* one olive band: this is the mark the page is about */}
         <path d="M40-11V11" stroke="var(--live)" strokeWidth="5" />
-        <rect x="150" y="-11" width="14" height="22" fill="var(--raised)" stroke="var(--fg-dim)" strokeWidth="1.25" />
-        <path d="M164-11h9a11 11 0 0 1 0 22h-9Z" fill="var(--over)" stroke="var(--fg-dim)" strokeWidth="1.25" strokeLinejoin="round" />
+        <rect
+          x="150"
+          y="-11"
+          width="14"
+          height="22"
+          fill="var(--raised)"
+          stroke="var(--fg-dim)"
+          strokeWidth="1.25"
+        />
+        <path
+          d="M164-11h9a11 11 0 0 1 0 22h-9Z"
+          fill="var(--over)"
+          stroke="var(--fg-dim)"
+          strokeWidth="1.25"
+          strokeLinejoin="round"
+        />
       </g>
 
       {/* the cup, steam rising */}
       <g transform="translate(-12 0)">
-        <path d="M52 216h74v30c0 22-13 38-37 38s-37-16-37-38v-30Z" fill="var(--panel)" stroke="var(--fg-dim)" strokeWidth="1.5" />
-        <path d="M126 226h16c9 0 14 7 14 16s-5 16-14 16h-16" stroke="var(--fg-dim)" strokeWidth="1.5" />
+        <path
+          d="M52 216h74v30c0 22-13 38-37 38s-37-16-37-38v-30Z"
+          fill="var(--panel)"
+          stroke="var(--fg-dim)"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M126 226h16c9 0 14 7 14 16s-5 16-14 16h-16"
+          stroke="var(--fg-dim)"
+          strokeWidth="1.5"
+        />
         <path d="M52 216h74" stroke="var(--rule)" strokeWidth="1.5" />
         <path
           className="mk-steam"

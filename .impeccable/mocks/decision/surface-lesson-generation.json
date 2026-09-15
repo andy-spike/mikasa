@@ -1,0 +1,75 @@
+{
+  "title": "The lesson generation screen",
+  "question": "The roll dealt The Writer's Column. Lock it, or take The Quiet Handoff or The Run Sheet. All three cover the whole run: writing the Lessons one at a time, the check, the corrections, then the Course opening.",
+  "options": [
+    {
+      "id": "writers-column",
+      "label": "The Writer's Column",
+      "kicker": "THE ROLL",
+      "lineage": "the writer's desk: one page in hand, the stack of finished pages squared beside it",
+      "thesis": "The run is one Lesson at a time at reading size: the page being written holds the measure, the margin keeps the queue, and the check turns the margin into the reviewer's notes.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["the Lesson at the 36rem measure", "a margin queue with Done · Doing · Queued", "the sections landing in order"],
+      "viewport": "A 14rem margin: elapsed, the queue with the Lesson being written lit, the leave note, Cancel. The rest is the page in hand — Lesson number and title over its explanation, worked example, recall prompt, self-explanation, Exercise and bridge, filling section by section at the measure, the pages already written squared off at the right edge. The check swaps the margin's queue for what the review found; corrections rewrite the named pages in place; publish closes with the Course ready to open.",
+      "risk": "One page at a time hides the Course's shape, and watching prose arrive can read as theater when the pace stalls; the margin has to carry the whole run or the learner loses the count.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "margin: elapsed · queue · leave note · cancel", "x": 0, "y": 1, "w": 3, "h": 9 },
+          { "label": "Lesson number · title · state", "x": 3, "y": 1, "w": 9, "h": 1 },
+          { "label": "the page being written: explanation → example → recall → exercise", "x": 3, "y": 2, "w": 5, "h": 7, "accent": true },
+          { "label": "pages already written, squared at the edge", "x": 8, "y": 2, "w": 4, "h": 7 },
+          { "label": "the check's findings · corrections · publish line", "x": 3, "y": 9, "w": 9, "h": 1 }
+        ]
+      }
+    },
+    {
+      "id": "quiet-handoff",
+      "label": "The Quiet Handoff",
+      "lineage": "the receipt left on the counter: everything that happened, in small type, for when you get back",
+      "thesis": "The run is a receipt, not a show: one short column says what is happening, what is already written, and that the Course opens when it is done.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["one measure-wide column", "the four run states as ruled rows", "the Course shape, checked as it fills"],
+      "viewport": "A single column at the measure under the Topic and Goal: one sentence for what is happening now with elapsed beneath it, the four run states as ruled rows (writing · check · corrections · publish), then the Course's shape as 13 ruled rows, each checked the moment its Lesson lands, the leave note and Cancel closing the page. Nothing fills the width; the page is a promise, not a progress bar.",
+      "risk": "Refusing the show can read as refusing the work: a learner who wants to see the Lessons has nothing to watch, and the shape is the incumbent's narrow column done honestly rather than a new composition.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "topic · goal", "x": 4, "y": 1, "w": 5, "h": 1 },
+          { "label": "what is happening now · elapsed", "x": 4, "y": 2, "w": 5, "h": 1 },
+          { "label": "the run's four states as ruled rows", "x": 4, "y": 3, "w": 5, "h": 3 },
+          { "label": "the Course shape, ruled, checked as Lessons land", "x": 4, "y": 6, "w": 5, "h": 3 },
+          { "label": "leave note · cancel", "x": 4, "y": 9, "w": 5, "h": 1 }
+        ]
+      }
+    },
+    {
+      "id": "run-sheet",
+      "label": "The Run Sheet",
+      "lineage": "the run sheet a shop fills in as each job passes a station",
+      "thesis": "The whole Course is a sheet with one row per Lesson and one column per pass — written, checked, corrected — filled in as the run moves; the machine is legible instead of narrated.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["a row per Lesson, a column per pass", "measured times in mono as cells fill", "one lit frontier row"],
+      "viewport": "A run head carries the phase, elapsed and Cancel. The sheet runs the full width beneath it: Module bands hold their Lessons as rows; the written, checked and corrected columns fill with each pass's measured time; only the frontier row carries a live mark. The check phase is the checked column coming alive, corrections land in the last column, and publish closes the sheet with the Course ready.",
+      "risk": "A process table can turn the Course into a dashboard of itself; the learner must still see what is being made, and the review's findings need a home that is not a status cell.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "run head: phase · elapsed · cancel", "x": 0, "y": 1, "w": 12, "h": 1 },
+          { "label": "the sheet: Lesson rows × written · checked · corrected", "x": 0, "y": 2, "w": 12, "h": 6 },
+          { "label": "the frontier row: the only live mark", "x": 0, "y": 8, "w": 12, "h": 1, "accent": true },
+          { "label": "publish line · Course ready", "x": 0, "y": 9, "w": 12, "h": 1 }
+        ]
+      }
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": { "value": "code" }
+}

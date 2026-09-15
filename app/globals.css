@@ -213,11 +213,11 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Small soft corners for the paper desk. Call sites still name which kind
-     of thing they are, so one edit here would bring back the square world. */
-  --radius-sm: 3px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
+  /* This world is square. Call sites still name which kind of thing they are,
+     so one edit here would soften every corner at once. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
 }
 
 @layer base {
@@ -255,6 +255,18 @@
     outline-style: solid;
     outline-offset: 2px;
     border-radius: 0;
+  }
+
+  /* A rail under the pointer is direct manipulation, not motion: while the
+     Resizer has `data-resizing` on <html>, nothing on the page transitions
+     and the whole page holds the resize cursor, so the dragged edge and
+     everything that follows it track the cursor exactly. */
+  html[data-resizing] * {
+    transition: none !important;
+  }
+  html[data-resizing],
+  html[data-resizing] * {
+    cursor: col-resize !important;
   }
 
   textarea,
@@ -308,6 +320,20 @@
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+  /* The vendored Sidebar hides the bar its content would wear (`no-scrollbar`);
+     a port that wants one back asks for `scroll-thin`. The same bar the rest
+     of the shell wears, handed back so it can ride the scroll. */
+  .scroll-thin {
+    scrollbar-width: thin;
+  }
+  @supports selector(::-webkit-scrollbar) {
+    .scroll-thin {
+      scrollbar-width: auto;
+    }
+  }
+  .scroll-thin::-webkit-scrollbar {
+    display: block;
   }
   /* Lea Verou's scroll shadows: the cover layers scroll with the content
      (local), the shadows do not, so each edge fades in only while there is
@@ -513,7 +539,8 @@
   }
 
   /* Syntax roles. Only inside code blocks on the reading ground, where each
-     role clears 4.5:1 on the canvas in both themes. */  .tok-key {
+     role clears 4.5:1 on the canvas in both themes. */
+  .tok-key {
     color: var(--code-green);
     font-weight: 600;
   }

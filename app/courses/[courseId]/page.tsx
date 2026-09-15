@@ -10,7 +10,9 @@ import { loadTailorHistory } from "@/lib/db/tailor";
 import { markLessonDoneAction, markLessonUndoneAction } from "@/lib/actions/completion";
 import { findProposedPlanAction, findStagedPlanAction } from "@/lib/actions/tailor";
 import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
+import { highlightReading } from "@/lib/course/highlight";
 import { turnViews } from "@/lib/course/tutor";
+import type { Turn } from "@/components/workspace/panel";
 import { requireLearner } from "@/lib/session";
 
 export default async function CoursePage({ params }: { params: Promise<{ courseId: string }> }) {
@@ -23,16 +25,13 @@ export default async function CoursePage({ params }: { params: Promise<{ courseI
   if (!published) redirect(`/courses/${courseId}/outline`);
 
   const completions = await listCompletions(db, courseId);
-  const reading = toReadingCourse(
-    published.course,
-    published.outline.data,
-    published.lessonRows,
-    completions,
+  const reading = await highlightReading(
+    toReadingCourse(published.course, published.outline.data, published.lessonRows, completions),
   );
   const sources = toSourceLinks(published.sourceRows);
 
   const stored = await loadTutorHistory(db, user.id, courseId);
-  const tutorHistory: Record<string, { from: "learner" | "tutor"; text: string }[]> = {};
+  const tutorHistory: Record<string, Turn[]> = {};
   for (const [lessonRef, turns] of stored) {
     tutorHistory[lessonRef] = turnViews(turns);
   }

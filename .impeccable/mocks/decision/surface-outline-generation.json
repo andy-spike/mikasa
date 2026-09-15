@@ -1,0 +1,82 @@
+{
+  "title": "The outline generation screen",
+  "question": "The roll dealt The Now Column. Lock it, or take The Galley Proof or The Drawing Board.",
+  "options": [
+    {
+      "id": "now-column",
+      "label": "The Now Column",
+      "kicker": "THE ROLL",
+      "lineage": "the notebook open beside its ruled log sheet on the same desk",
+      "thesis": "The generation narrates itself from one sticky column while the Outline takes the rest of the width in two proof columns.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["running log in mono", "hairline-divided steps", "two-column proof"],
+      "viewport": "Left 22rem: the four steps as a spine with the live one marked, a ticking elapsed, one large now line, then the message log and Cancel. Right: Topic and Goal over two columns of Modules, the frontier Lesson writing in under skeleton rules; Sources close the page.",
+      "risk": "The status column can steal the Outline's thunder, and sticky status panes are familiar chrome; the now line must stay a caption, not a second headline.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "now · steps · elapsed · log · cancel", "x": 0, "y": 1, "w": 4, "h": 9 },
+          { "label": "topic · goal", "x": 4, "y": 1, "w": 8, "h": 1 },
+          { "label": "modules", "x": 4, "y": 2, "w": 4, "h": 6 },
+          { "label": "modules", "x": 8, "y": 2, "w": 4, "h": 6 },
+          { "label": "frontier lesson writing in", "x": 4, "y": 4, "w": 4, "h": 1, "accent": true },
+          { "label": "sources · why this shape", "x": 4, "y": 8, "w": 8, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "galley-proof",
+      "label": "The Galley Proof",
+      "lineage": "the galley a typesetter reads before the page is run",
+      "thesis": "The Outline is a galley being set: a running head counts the Lessons in as the page fills column by column, one line visibly being set at the frontier.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["running head in mono", "two-column galley", "margin notes for Sources"],
+      "viewport": "A narrow run spine holds the four steps, elapsed and Cancel. The galley spans the rest: running head with the live count, Modules set in two paper columns, the frontier line shimmering under the next Lesson; Sources and Why this shape close as margin notes.",
+      "risk": "A two-column galley tempts a newspaper pastiche; the columns must stay a reading order, not a costume, and long Lesson summaries can break the set.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "steps · elapsed · cancel", "x": 0, "y": 1, "w": 2, "h": 9 },
+          { "label": "running head · lessons set", "x": 2, "y": 1, "w": 10, "h": 1 },
+          { "label": "modules set", "x": 2, "y": 2, "w": 5, "h": 6 },
+          { "label": "modules set", "x": 7, "y": 2, "w": 5, "h": 6 },
+          { "label": "line being set", "x": 2, "y": 4, "w": 5, "h": 1, "accent": true },
+          { "label": "sources · why this shape", "x": 2, "y": 8, "w": 10, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "drawing-board",
+      "label": "The Drawing Board",
+      "lineage": "the drafting board where the Course is laid out before a word is written",
+      "thesis": "The Course is drafted in space: Modules stand as columns across the board, the writing front travels left to right, and Connections draws the lines between them.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["Columns inked on canvas", "dashed rules for unwritten Modules", "connection strokes at mark ink"],
+      "viewport": "A slim running head carries the four steps and the elapsed; beneath it the whole board: each Module a column, written ones solid, the current one filling in, later ones dashed at mark; Connections draws its strokes along the floor; Sources sit in a tray at the foot.",
+      "risk": "At mastery depth the board can reach ten Modules and must pan with edge fades rather than shrink into ten unreadable slivers; connection strokes must not become decoration.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "steps · elapsed · message", "x": 0, "y": 1, "w": 12, "h": 1 },
+          { "label": "module I", "x": 0, "y": 2, "w": 2, "h": 6 },
+          { "label": "module II", "x": 2, "y": 2, "w": 2, "h": 6 },
+          { "label": "module III writing", "x": 4, "y": 2, "w": 2, "h": 6, "accent": true },
+          { "label": "module IV queued", "x": 6, "y": 2, "w": 2, "h": 6 },
+          { "label": "module V queued", "x": 8, "y": 2, "w": 2, "h": 6 },
+          { "label": "module VI queued", "x": 10, "y": 2, "w": 2, "h": 6 },
+          { "label": "connections drawn between modules", "x": 0, "y": 8, "w": 12, "h": 1 },
+          { "label": "sources tray", "x": 0, "y": 9, "w": 12, "h": 1 }
+        ]
+      }
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": { "value": "code" }
+}

@@ -1,0 +1,75 @@
+{
+  "title": "The lesson reading screen",
+  "question": "The roll dealt The Focus Reader. Lock it, or take The Thread or The Course Line — three compositions for moving through a Course while keeping your place.",
+  "options": [
+    {
+      "id": "focus-reader",
+      "label": "The Focus Reader",
+      "kicker": "THE ROLL",
+      "lineage": "the cleared desk: one page under the lamp, everything else put away",
+      "thesis": "Reading is the screen. The map is summoned, never parked: one quiet line carries where you are and what is next, the rail rests as a stub, and the Course opens where you left it.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["a single position line: Lesson n of N · Module · done", "the rail as a 2.75rem stub, summoned by intent or ⌘B", "the 36rem measure untouched, the chrome quieter"],
+      "viewport": "A 2.75rem rail stub at the left. One quiet line under the top edge carries the Lesson number, its Module, done of total, and the live mark. The Lesson reads at the 36rem measure, centered in everything that is left, opening on the last Lesson read; the Exercise close and the next Lesson's title sit at the foot. The Outline is one gesture away — edge hover or ⌘B — and ⌘K still jumps anywhere.",
+      "risk": "Hiding the map asks the learner to trust a single line; someone who navigates by scanning the rail loses their map until they summon it, and a summoned map is slower than a parked one.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "rail stub · reopen · done count", "x": 0, "y": 0, "w": 1, "h": 10 },
+          { "label": "position line: Lesson 6 of 20 · Module III · 7/20 done", "x": 1, "y": 0, "w": 11, "h": 1, "accent": true },
+          { "label": "reading column at the 36rem measure, opened where you left", "x": 4, "y": 1, "w": 5, "h": 7 },
+          { "label": "Exercise close · mark done", "x": 4, "y": 8, "w": 5, "h": 1 },
+          { "label": "next Lesson's title at the foot", "x": 4, "y": 9, "w": 5, "h": 1 }
+        ]
+      }
+    },
+    {
+      "id": "thread",
+      "label": "The Thread",
+      "kicker": null,
+      "lineage": "the reading log: the trail of where you have been and where you stopped",
+      "thesis": "The Course opens where you left it. The chrome's first element is Continue — the last Lesson read — and the rail keeps the trail: stamped, last-read, live, unread.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["Continue in the chrome, carrying the last-read Lesson", "rail states: stamped · last read · live · unread", "the reading column opening on the last-read Lesson"],
+      "viewport": "The rail runs the Course with the trail visible: done rows carry their dates, the last-read row a thin rule, the live row the olive mark, unread rows nothing. The chrome's primary element is Continue Lesson 6, where you stopped; the Lesson opens there and reads at the measure, its Exercise and the next handoff at the foot. ⌘K still jumps anywhere.",
+      "risk": "A trail is only honest when it is cheap to keep: resuming mid-Lesson needs a reading position the product actually stores, or Continue overpromises and the thread breaks the first time the learner scrolls away.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "rail: stamped rows with dates · last-read rule · live mark", "x": 0, "y": 0, "w": 4, "h": 10 },
+          { "label": "chrome: Continue Lesson 6 — The shape of a conversation", "x": 4, "y": 0, "w": 8, "h": 1, "accent": true },
+          { "label": "reading column, opened at the last-read Lesson", "x": 4, "y": 1, "w": 6, "h": 7 },
+          { "label": "Exercise · mark done", "x": 4, "y": 8, "w": 6, "h": 1 },
+          { "label": "the next Lesson's title, at the foot", "x": 4, "y": 9, "w": 6, "h": 1 }
+        ]
+      }
+    },
+    {
+      "id": "course-line",
+      "label": "The Course Line",
+      "kicker": null,
+      "lineage": "the route line on a map: one line, the stops ticked as you pass",
+      "thesis": "The Course is a line at the head of the page: Module bands, one tick per Lesson — done filled, the live tick olive, the open tick extended. The rail drops the list and keeps the log: stamps and dates.",
+      "palette": ["#1b1a18", "#262522", "#fffcf0", "#8a867d", "#9cb52d"],
+      "materials": ["the Course Line: Module bands · Lesson ticks · done fill", "the rail as the stamped log, dates in mono", "the reading column beneath the line"],
+      "viewport": "A full-width line under the chrome: Module names as labelled bands, one tick per Lesson — filled as done, the live tick olive, the open tick extended with its number. The rail no longer lists the Course; it keeps the log, each done Lesson with its date. The Lesson reads at the measure beneath the line; a click on a tick jumps there, and ⌘K still searches.",
+      "risk": "Forty-five ticks turn the line into confetti on a narrow screen; the line earns its place only if every tick stays a target and the rail's log stays worth its width.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "chrome · theme · panel", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "the Course Line: Module bands · Lesson ticks · done fill · live tick · open tick extended", "x": 0, "y": 1, "w": 12, "h": 1, "accent": true },
+          { "label": "rail: the stamped log — done Lessons with their dates", "x": 0, "y": 2, "w": 3, "h": 8 },
+          { "label": "reading column at the measure", "x": 4, "y": 2, "w": 5, "h": 7 },
+          { "label": "Exercise close · mark done · next Lesson", "x": 4, "y": 9, "w": 5, "h": 1 }
+        ]
+      }
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": { "value": "code" }
+}

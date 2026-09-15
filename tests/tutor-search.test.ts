@@ -42,6 +42,7 @@ vi.mock("@/lib/web/firecrawl", () => ({
 }));
 
 import { streamingModel } from "./helpers/fake-model";
+import { readUIMessageStream } from "./helpers/ui-stream";
 
 /**
  * A deterministic, offline embedder: 1536 dimensions, one hot dimension
@@ -112,7 +113,7 @@ async function turn(
   courseId: string,
   lessonId: string,
   message: string,
-): Promise<{ status: number; text: string }> {
+): Promise<{ status: number; text: string; errors: string[] }> {
   setRequestCookie(cookie || null);
   const response = await POST(
     new Request(`${ORIGIN}/api/courses/${courseId}/tutor`, {
@@ -122,7 +123,8 @@ async function turn(
     }),
     { params: Promise.resolve({ courseId }) },
   );
-  return { status: response.status, text: response.body ? await response.text() : "" };
+  const stream = response.body ? await readUIMessageStream(response) : { text: "", errors: [] };
+  return { status: response.status, ...stream };
 }
 
 let ownerCookie = "";

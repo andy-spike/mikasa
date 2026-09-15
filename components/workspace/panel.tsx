@@ -5,7 +5,6 @@ import { X } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarHeader, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { ReasoningEffort } from "@/lib/model";
 import {
   Conversation,
   TailorConversation,
@@ -27,24 +26,24 @@ function EmptyCopy({ title, body }: { title: string; body: string }) {
 
 type Props = {
   mode: PanelMode;
+  courseId: string;
+  lessonId: string;
   lessonTitle: string;
   tutorTurns?: Turn[];
-  onAsk?: (
-    text: string,
-    effort: ReasoningEffort,
-    onDelta: (chunk: string) => void,
-  ) => Promise<boolean>;
+  onTutorFinished?: () => void | Promise<void>;
+  /** The passage a selection grew the next Tutor question from. */
+  pendingAnchor?: string | null;
+  onClearAnchor?: () => void;
+  onRevealAnchor?: (anchor: string) => void;
+  /** Bump to focus the Tutor's composer. */
+  focusToken?: number;
   tailorTurns?: Turn[];
-  onTailorAsk?: (
-    text: string,
-    effort: ReasoningEffort,
-    onDelta: (chunk: string) => void,
-  ) => Promise<boolean>;
+  onTailorFinished?: () => void | Promise<void>;
   tailorPlan?: PlanView;
-  onAccept: (operationId: string) => void;
+  onApply: () => void;
+  applying?: boolean;
   onDiscard: (operationId: string) => void;
   onRestore: (operationId: string) => void;
-  tailorApply?: ReactNode;
   revisionSlot?: ReactNode;
   tutorNotice?: ReactNode;
   publishedSlot?: ReactNode;
@@ -55,16 +54,22 @@ type Props = {
 
 export function Panel({
   mode,
+  courseId,
+  lessonId,
   lessonTitle,
   tutorTurns,
-  onAsk,
+  onTutorFinished,
+  pendingAnchor,
+  onClearAnchor,
+  onRevealAnchor,
+  focusToken,
   tailorTurns,
-  onTailorAsk,
+  onTailorFinished,
   tailorPlan,
-  onAccept,
+  onApply,
+  applying,
   onDiscard,
   onRestore,
-  tailorApply,
   revisionSlot,
   tutorNotice,
   publishedSlot,
@@ -74,7 +79,9 @@ export function Panel({
 }: Props) {
   const { isMobile } = useSidebar();
   const subtitle =
-    mode === "tutor" ? `This Lesson · ${lessonTitle}` : "Course · Changes require your approval.";
+    mode === "tutor"
+      ? "Answers about this Lesson and the Course. Changes nothing."
+      : "Proposes changes to the Course. Nothing is written until you apply.";
 
   return (
     <Sidebar
@@ -113,19 +120,33 @@ export function Panel({
           )}
         </div>
         <p className="mt-2.5 truncate text-[0.75rem] leading-[1.5] text-fg-3">{subtitle}</p>
+        {mode === "tutor" && (
+          <p className="mt-1 truncate text-[0.75rem] leading-[1.5] text-fg-dim">
+            This Lesson · {lessonTitle}
+          </p>
+        )}
       </SidebarHeader>
 
       <SidebarContent className="gap-0 overflow-hidden">
         <div className={mode === "tutor" ? "contents" : "hidden"} inert={mode !== "tutor"}>
           {tutorNotice}
           <Conversation
+            chatId={lessonId}
+            endpoint={`/api/courses/${courseId}/tutor`}
+            body={{ lessonId }}
             turns={tutorTurns ?? []}
-            onAsk={onAsk}
+            onFinish={onTutorFinished}
+            pendingAnchor={pendingAnchor}
+            onClearAnchor={onClearAnchor}
+            onRevealAnchor={onRevealAnchor}
+            focusToken={focusToken}
             placeholder="Ask about this Lesson"
             composerLabel="Ask the Tutor about this Lesson"
             sendLabel="Ask the Tutor"
+            stopLabel="Stop the Tutor"
+            retryLabel="Retry"
             pendingText="Working on an answer…"
-            failedText="The Tutor could not answer just now — ask again."
+            failedText="The Tutor could not answer just now."
             empty={
               <EmptyCopy
                 title="Ask about this Lesson"
@@ -136,10 +157,13 @@ export function Panel({
         </div>
         <div className={mode === "tailor" ? "contents" : "hidden"} inert={mode !== "tailor"}>
           <TailorConversation
+            chatId={courseId}
+            endpoint={`/api/courses/${courseId}/tailor`}
             turns={tailorTurns ?? []}
-            onAsk={onTailorAsk}
+            onFinish={onTailorFinished}
             plan={tailorPlan}
-            onAccept={onAccept}
+            onApply={onApply}
+            applying={applying}
             onDiscard={onDiscard}
             onRestore={onRestore}
             empty={
@@ -148,7 +172,6 @@ export function Panel({
                 body="Ask for a change. The Tailor prepares a Change plan for you to review."
               />
             }
-            applySlot={tailorApply}
             revisionSlot={revisionSlot}
             publishedSlot={publishedSlot}
           />

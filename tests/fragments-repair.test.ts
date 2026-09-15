@@ -69,8 +69,8 @@ const { stagePlanRevision, planContentAdjustments, planHasStructuralChanges } =
 const { specNeedsReconciliation } = await import("@/lib/course/reconcile");
 const { undoPlanRevisionAction } = await import("@/lib/actions/tailor");
 const { rebuildFragmentsAction } = await import("@/lib/actions/courses");
-const { repairFragmentsBody, repairFragmentsWorkflow } =
-  await import("@/workflows/repair-fragments");
+const { repairFragmentsBody } = await import("@/workflows/repair-fragments-body");
+const { repairFragmentsWorkflow } = await import("@/workflows/repair-fragments");
 const { stageRevisionWorkflow } = await import("@/workflows/course-revision");
 const { signInWithGoogle } = await import("./helpers/auth");
 const { setRequestCookie } = await import("./helpers/request-context");

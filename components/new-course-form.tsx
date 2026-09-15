@@ -24,6 +24,7 @@ import {
   DEPTH_CHOICES,
   GOAL_MAX_LENGTH,
   TOPIC_MAX_LENGTH,
+  courseLanguageLabel,
   depthTargetShape,
   validateCourseInput,
   type CourseInput,
@@ -242,7 +243,7 @@ export function NewCourseForm() {
               aria-label="Course Language"
               className="mt-3 w-fit min-w-40"
             >
-              <SelectValue />
+              <SelectValue>{(value) => courseLanguageLabel(value as string)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {COURSE_LANGUAGES.map((l) => (
