@@ -36,16 +36,29 @@ Two Neon Postgres branches back the repository: dev for daily work and productio
 
 Both databases must be current after a schema change. Apply to dev first, verify, then apply to production. Do not finish a task with migrations that production has not seen.
 
+## Worktrees
+
+Worktrunk owns every worktree in this repository. Use `wt` for worktree creation, discovery, navigation, integration, and removal in every agent harness. Do not use `git worktree` or change the branch inside an existing worktree.
+
+- Keep the primary worktree at `/home/andy-spike/code/mikasa` on `main`.
+- Inspect current worktrees with `wt list`. Use `wt list --format=json` when a tool needs a worktree path.
+- Create a task worktree with `wt switch --create <branch>`. Add `--base <branch>` only when the task must start somewhere other than the default branch.
+- If the harness does not preserve directory changes, use `wt switch --create --no-cd <branch>`, read the new path from `wt list --format=json`, and set that path as the working directory for later commands.
+- Let the configured `pre-start` hooks finish. They install dependencies and copy `.env.local` from the primary worktree.
+- Return to an existing worktree with `wt switch <branch>`. Use `wt switch ^` for the default branch worktree.
+- Remove completed or abandoned worktrees with `wt remove <branch>`. Worktrunk refuses dirty worktrees and unmerged branches by default. Treat that refusal as a safety check. Use force flags only when the user explicitly asks to discard the affected work.
+- Use `wt merge --no-commit --no-rebase` for a prepared, committed branch when the user asks to integrate it locally. This preserves the branch commits, requires a fast-forward, and removes the task worktree after the merge.
+
+Run `wt <command> --help` before using an unfamiliar option. The repository configuration is in `.config/wt.toml`.
+
 ## Shipping to main
 
-Pushing `main` deploys to production. There is no CI and no PR process, so the agent merges locally whenever the user says to ship a branch onto main.
-
-Worktree layout: a single worktree at `/home/andy-spike/code/mikasa` holds the work branches and `main`. Work on a branch, and check out `main` only to merge and push. Never commit work directly to `main`.
+Pushing `main` deploys to production. There is no CI and no PR process, so the agent integrates locally whenever the user says to ship a branch onto main. Work in a Worktrunk task worktree. Never commit work directly to `main`.
 
 1. On the work branch: everything committed and pushed, with `pnpm test`, `pnpm typecheck`, and `pnpm lint` green. Leave local-only churn uncommitted, never ship it: `.impeccable/hook.cache.json` and dependency install drift in `pnpm-lock.yaml` / `package.json`.
 2. If the branch changes `lib/db/schema.ts`: apply the new migrations to both databases before the push, `pnpm db:migrate` for dev and then `pnpm db:migrate:main` for production.
-3. `git switch main`, stash any local drift, `git fetch origin`, then `git merge --ff-only <branch>`. Main must be strictly behind the work branch. If it is not a fast-forward, stop and ask instead of forcing anything.
-4. `git push origin main`. That push is the deploy. Confirm main matches origin/main afterwards.
-5. `git switch <branch>` to come back to the work branch.
+3. Fetch `origin`. Confirm the primary worktree is clean and its `main` has not diverged from `origin/main`.
+4. From the task worktree, run `wt merge --no-commit --no-rebase`. If Worktrunk cannot fast-forward `main`, stop and ask instead of rewriting or forcing anything.
+5. In the primary worktree, run `git push origin main`. That push is the deploy. Confirm `main` matches `origin/main` afterwards.
 
-Never `push --force` to main. Stash entries are repository-wide, so pop by name (`git stash pop stash@{n}`), never a bare `pop`.
+Never push-force to `main`. Stash entries are repository-wide, so pop by name (`git stash pop stash@{n}`), never a bare `pop`.
