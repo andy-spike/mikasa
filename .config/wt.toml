@@ -14,3 +14,14 @@ install = "pnpm install"
 # where the untracked `.env.local` lives). Warn rather than fail when it is
 # missing so a teammate without env setup can still create a worktree.
 env = "if [ -f {{ primary_worktree_path }}/.env.local ]; then cp {{ primary_worktree_path }}/.env.local {{ worktree_path }}/.env.local; else echo 'worktrunk: no .env.local in the primary worktree — add one to this worktree before running the dev server' >&2; fi"
+
+# Start one development server per new worktree. Worktrunk tears down the full
+# process tree when it removes the worktree. The launcher reserves one of the
+# Google OAuth callback ports shared by all worktrees.
+[post-start]
+server = "wt step tether -- node scripts/worktree-dev.mjs"
+
+# Show each running worktree's URL. The launcher stores devport before Next.js
+# starts. Main uses port 3000; task worktrees use ports 3001 through 3010.
+[list]
+url = "{% if vars.devport %}http://localhost:{{ vars.devport }}{% endif %}"

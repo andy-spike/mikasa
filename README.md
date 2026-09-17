@@ -21,16 +21,22 @@ Open http://localhost:3000.
 
 ### Worktree development
 
-Better Auth accepts `localhost` on any port during development. Start each worktree on a
-different port:
+Create task worktrees with Worktrunk:
 
 ```bash
-pnpm dev --port 3001
+wt -y switch --create feature/my-change
 ```
 
-Add each port to the Google OAuth client's authorized redirect URIs. For the example above,
-add `http://localhost:3001/api/auth/callback/google`. Google requires one exact redirect URI
-per port.
+The creation hooks copy `.env.local`, install dependencies, and start a tethered Next.js
+development server. Task worktrees reserve ports 3001 through 3010. The primary worktree uses
+port 3000. These ports match the Google OAuth client's authorized redirect URIs.
+
+Use `wt list` to see every running worktree and its URL. If a server stops unexpectedly, rerun
+its background hook with `wt hook post-start -y project:server`. Worktrunk's tether stops the
+server when `wt remove <branch>` removes the worktree.
+
+The port limit allows ten task worktrees to run at once. If all ports are reserved, remove an
+unused worktree before creating another server.
 
 ## Runtime note
 

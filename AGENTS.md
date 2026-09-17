@@ -42,9 +42,11 @@ Worktrunk owns every worktree in this repository. Use `wt` for worktree creation
 
 - Keep the primary worktree at `/home/andy-spike/code/mikasa` on `main`.
 - Inspect current worktrees with `wt list`. Use `wt list --format=json` when a tool needs a worktree path.
-- Create a task worktree with `wt switch --create <branch>`. Add `--base <branch>` only when the task must start somewhere other than the default branch.
+- Create a task worktree with `wt -y switch --create <branch>`. `-y` authorizes the repository's setup hooks in non-interactive agent shells. Add `--base <branch>` only when the task must start somewhere other than the default branch.
 - If the harness does not preserve directory changes, use `wt switch --create --no-cd <branch>`, read the new path from `wt list --format=json`, and set that path as the working directory for later commands.
 - Let the configured `pre-start` hooks finish. They install dependencies and copy `.env.local` from the primary worktree.
+- The configured `post-start` hook starts a tethered Next.js development server. Use `wt list` to find its URL. Task worktrees use ports 3001 through 3010, which are registered as Google OAuth callback URLs.
+- Use `wt list` to find the worktree's URL. If its server stopped, run `wt hook post-start -y project:server` inside that worktree. Do not choose a port by hand.
 - Return to an existing worktree with `wt switch <branch>`. Use `wt switch ^` for the default branch worktree.
 - Remove completed or abandoned worktrees with `wt remove <branch>`. Worktrunk refuses dirty worktrees and unmerged branches by default. Treat that refusal as a safety check. Use force flags only when the user explicitly asks to discard the affected work.
 - Use `wt merge --no-commit --no-rebase` for a prepared, committed branch when the user asks to integrate it locally. This preserves the branch commits, requires a fast-forward, and removes the task worktree after the merge.
