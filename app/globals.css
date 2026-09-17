@@ -630,6 +630,18 @@
   }
 }
 
+/* The Courses pane turning to another Course. A layer arriving rises and
+   scales (mk-open); a page already on the desk only returns to full ink, so
+   this one is opacity alone, at the system's own --dur. */
+@keyframes mk-turn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .mk-check {
   stroke-dasharray: 22;
   animation: mk-check 340ms var(--ease) both;
@@ -643,6 +655,10 @@
   animation: mk-open var(--dur-slow) var(--ease) both;
 }
 
+.mk-turn {
+  animation: mk-turn var(--dur) var(--ease) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -650,6 +666,7 @@
   .mk-check,
   .mk-handoff,
   .mk-open,
+  .mk-turn,
   .mk-rise {
     animation: none;
   }

@@ -1,0 +1,66 @@
+{
+  "title": "The Courses page",
+  "question": "The roll dealt the Two-Pane Index. Lock it, or take the Practice Log or the Save Slots.",
+  "options": [
+    {
+      "id": "two-pane-index",
+      "label": "The Two-Pane Index",
+      "kicker": "THE ROLL",
+      "lineage": "the mail client: a ruled index on the left, the open thing on the right",
+      "thesis": "The library and the live Course sit side by side — the index to find and switch, the open pane to resume, with where you are and what comes next already in front of you.",
+      "viewport": "Left, a search field over a ruled index grouped into Needs you / In progress / Done, each row carrying Topic, last touched and the done fraction; right, the selected Course's own page — its module and Lesson position, the next Lesson title, Continue, and its state. On a phone the live Course leads and the index follows.",
+      "risk": "A split gives one Course a lot of room for one fact; when nothing is live the right pane has to earn its place or the page reads as an empty mailbox.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "search the library", "x": 0, "y": 1, "w": 5, "h": 1 },
+          { "label": "index · needs you / in progress / done, last touched", "x": 0, "y": 2, "w": 5, "h": 8 },
+          { "label": "open Course · where you are, next Lesson, continue", "x": 5, "y": 1, "w": 7, "h": 9, "accent": true }
+        ]
+      }
+    },
+    {
+      "id": "practice-log",
+      "label": "The Practice Log",
+      "kicker": "",
+      "lineage": "the dated practice journal a musician or a runner keeps",
+      "thesis": "The library reads as a dated log — the top of the page is always where you left off, the work waiting on you heads it, and everything else is grouped by when you last touched it.",
+      "viewport": "A band of what is waiting on you, then mono date headings — Today, This week, Earlier — over ruled entries carrying Topic, where you are, its state word and the last-touched date. Search sits at the foot with the archive's tail.",
+      "risk": "A log is honest about recency and blind to everything else; a Course you have not opened for a month sinks to the bottom, where a library-scale page still has to find it.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "what is waiting on you", "x": 0, "y": 1, "w": 12, "h": 1, "accent": true },
+          { "label": "log head · today", "x": 0, "y": 2, "w": 12, "h": 1 },
+          { "label": "dated entries · Course, where you are, state, last touched", "x": 0, "y": 3, "w": 12, "h": 6 },
+          { "label": "search · the archive's tail", "x": 0, "y": 9, "w": 12, "h": 1 }
+        ]
+      }
+    },
+    {
+      "id": "save-slots",
+      "label": "The Save Slots",
+      "kicker": "",
+      "lineage": "a game's continue screen: slots with where you are, progress and last played",
+      "thesis": "The page is a continue screen — the last-played Course gets the one unmistakable Continue, and every other Course is a slot carrying where you are, how far in, and when you last played.",
+      "viewport": "The live Course as a single wide continue block: Topic, module and Lesson position, the next Lesson, and Continue; below it a ruled table of slots — Course, where you are, progress, last played — with a Course that needs a decision flagged in its state column.",
+      "risk": "The games register can read playful for a calm desk, and slots imply a small fixed count while the library runs past thirty.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "app header", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "continue · the last-played Course, next Lesson", "x": 0, "y": 1, "w": 12, "h": 3, "accent": true },
+          { "label": "slots · Course, where you are, progress, last played", "x": 0, "y": 4, "w": 12, "h": 6 }
+        ]
+      }
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": { "value": "code" }
+}

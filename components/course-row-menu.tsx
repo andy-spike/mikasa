@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Hint } from "@/components/workspace/hint";
 import {
   Dialog,
   DialogContent,
@@ -31,18 +32,20 @@ export function CourseRowMenu({ courseId, topic }: { courseId: string; topic: st
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              variant="icon"
-              size="icon"
-              aria-label={`Course options: ${topic}`}
-              disabled={pending}
-            >
-              <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
-            </Button>
-          }
-        />
+        <Hint label="Course options">
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="icon"
+                size="icon"
+                aria-label={`Course options: ${topic}`}
+                disabled={pending}
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
+              </Button>
+            }
+          />
+        </Hint>
         <DropdownMenuContent align="end" sideOffset={2}>
           <DropdownMenuItem variant="destructive" onClick={() => setConfirming(true)}>
             <Trash2 strokeWidth={1.75} />

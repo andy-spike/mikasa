@@ -1,59 +1,25 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { CourseRowMenu } from "@/components/course-row-menu";
-import { DoneCheck, LiveMark, UnsetMark } from "@/components/workspace/marks";
+import { CourseLibrary } from "@/components/course-library";
 import { Button } from "@/components/ui/button";
-import { listOwnedCoursesWithCompletion } from "@/lib/db/courses";
+import { buildCourseLibrary } from "@/lib/course/library";
 import { db } from "@/lib/db";
+import { listOwnedCoursesForIndex } from "@/lib/db/courses";
 import { requireLearner } from "@/lib/session";
-
-const OUTLINE_LABELS: Record<string, string> = {
-  "awaiting-outline-approval": "Outline",
-  designing: "Designing",
-  failed: "Failed",
-  reviewing: "Reviewing",
-};
-
-function rowFor(course: { id: string; status: string; published: boolean }): {
-  href: string;
-  label: string;
-  reading: boolean;
-} {
-  if (course.published || course.status === "ready") {
-    return { href: `/courses/${course.id}`, label: "", reading: true };
-  }
-  return {
-    href: `/courses/${course.id}/outline`,
-    label: OUTLINE_LABELS[course.status] ?? "Generating",
-    reading: false,
-  };
-}
-
-function RowMark({ reading, complete }: { reading: boolean; complete: boolean }) {
-  if (!reading) return <UnsetMark />;
-  if (complete) {
-    return (
-      <span className="text-fg-3">
-        <DoneCheck />
-      </span>
-    );
-  }
-  return <LiveMark />;
-}
 
 export default async function CoursesPage() {
   const { user } = await requireLearner();
-  const owned = await listOwnedCoursesWithCompletion(db, user.id);
+  const items = buildCourseLibrary(await listOwnedCoursesForIndex(db, user.id));
 
   return (
     <AppShell section="Courses">
-      <div className="mx-auto w-full max-w-[52rem] px-5 pt-10 pb-24 sm:px-8">
-        <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
-          Courses
-        </h1>
+      {items.length === 0 ? (
+        <div className="mx-auto w-full max-w-[52rem] px-5 pt-10 pb-24 sm:px-8">
+          <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
+            Courses
+          </h1>
 
-        {owned.length === 0 ? (
           <div className="mt-8 border-t border-hair pt-10">
             <p className="text-[0.9375rem] leading-[1.66] text-fg-2">No Courses yet.</p>
             <p className="mt-2 max-w-(--measure) text-[0.8125rem] leading-[1.55] text-fg-3">
@@ -64,59 +30,23 @@ export default async function CoursesPage() {
               Start a Course
             </Button>
           </div>
-        ) : (
-          <ul className="mt-8 border-t border-hair">
-            {owned.map((c) => {
-              const { href, label, reading } = rowFor(c);
-              const complete =
-                reading && c.completion ? c.completion.done >= c.completion.total : false;
-              return (
-                <li key={c.id} className="group relative border-b border-hair hover:bg-panel">
-                  <Link
-                    href={href}
-                    className="row grid grid-cols-[0.75rem_1fr_auto] items-start gap-x-4 px-2 py-5"
-                  >
-                    <span className="flex h-5 w-3 items-center justify-center">
-                      <RowMark reading={reading} complete={complete} />
-                    </span>
+        </div>
+      ) : (
+        <>
+          <CourseLibrary items={items} />
 
-                    <span className="min-w-0">
-                      <span className="block truncate text-[0.9375rem] leading-snug font-semibold tracking-[-0.011em] text-fg">
-                        {c.topic}
-                      </span>
-                      <span className="mt-1.5 block truncate text-[0.8125rem] leading-[1.5] text-fg-3">
-                        {c.goal}
-                      </span>
-                    </span>
-
-                    <span className="tnum shrink-0 pr-10 text-[0.8125rem] text-fg-3">
-                      {reading && c.completion
-                        ? `${c.completion.done} / ${c.completion.total}`
-                        : label}
-                    </span>
-                  </Link>
-
-                  <div className="absolute top-4 right-2">
-                    <CourseRowMenu courseId={c.id} topic={c.topic} />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      {/* The New Course button slides its own label out on hover, so no hint. */}
-      {owned.length > 0 && (
-        <Button
-          variant="hero"
-          render={<Link href="/courses/new" />}
-          aria-label="New Course"
-          className="new-course-button fixed right-5 bottom-5 z-20 h-11 gap-0 px-3 sm:right-8 sm:bottom-8"
-        >
-          <Plus className="h-4 w-4" strokeWidth={1.75} />
-          <span className="new-course-label">New Course</span>
-        </Button>
+          {/* The New Course button slides its own label out on hover, so no hint.
+              From lg up the index head carries the control instead. */}
+          <Button
+            variant="hero"
+            render={<Link href="/courses/new" />}
+            aria-label="New Course"
+            className="new-course-button fixed right-5 bottom-5 z-20 h-11 gap-0 px-3 sm:right-8 sm:bottom-8 lg:hidden"
+          >
+            <Plus className="h-4 w-4" strokeWidth={1.75} />
+            <span className="new-course-label">New Course</span>
+          </Button>
+        </>
       )}
     </AppShell>
   );
