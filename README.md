@@ -19,6 +19,19 @@ pnpm dev
 
 Open http://localhost:3000.
 
+### Worktree development
+
+Better Auth accepts `localhost` on any port during development. Start each worktree on a
+different port:
+
+```bash
+pnpm dev --port 3001
+```
+
+Add each port to the Google OAuth client's authorized redirect URIs. For the example above,
+add `http://localhost:3001/api/auth/callback/google`. Google requires one exact redirect URI
+per port.
+
 ## Runtime note
 
 The Next.js scripts invoke `node` directly. Bun's fetch ignores Workflow's Undici dispatcher and times out local queue requests after five minutes, which course generation can exceed.

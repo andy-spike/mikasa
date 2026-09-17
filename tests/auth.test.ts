@@ -17,10 +17,14 @@ function testAuth(db: AuthDb): Auth {
 }
 
 async function startGoogleSignIn(auth: Auth, callbackURL = "/courses") {
+  return startGoogleSignInAtOrigin(auth, ORIGIN, callbackURL);
+}
+
+async function startGoogleSignInAtOrigin(auth: Auth, origin: string, callbackURL = "/courses") {
   const response = await auth.handler(
-    new Request(`${ORIGIN}/api/auth/sign-in/social`, {
+    new Request(`${origin}/api/auth/sign-in/social`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", origin },
       body: JSON.stringify({ provider: "google", callbackURL }),
     }),
   );
@@ -34,7 +38,7 @@ async function startGoogleSignIn(auth: Auth, callbackURL = "/courses") {
     "https://accounts.google.com/o/oauth2/v2/auth",
   );
   expect(authorize.searchParams.get("client_id")).toBe("test-google-client-id");
-  expect(authorize.searchParams.get("redirect_uri")).toBe(`${ORIGIN}/api/auth/callback/google`);
+  expect(authorize.searchParams.get("redirect_uri")).toBe(`${origin}/api/auth/callback/google`);
   const state = authorize.searchParams.get("state");
   expect(state).toBeTruthy();
   return { response, authorize, state: state as string };
@@ -98,6 +102,22 @@ describe("first sign-in", () => {
     expect(googleAccounts[0].providerId).toBe("google");
     expect(googleAccounts[0].accountId).toBe("google-sub-1");
     expect(googleAccounts[0].userId).toBe(learners[0].id);
+  });
+});
+
+describe("development worktrees", () => {
+  it("uses the request port for the Google callback", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const developmentAuth = createAuth(db, {
+      secret: "test-secret-not-used-anywhere-real",
+      google: { clientId: "test-google-client-id", clientSecret: "test-google-client-secret" },
+    });
+
+    const { authorize } = await startGoogleSignInAtOrigin(developmentAuth, "http://localhost:3001");
+
+    expect(authorize.searchParams.get("redirect_uri")).toBe(
+      "http://localhost:3001/api/auth/callback/google",
+    );
   });
 });
 
