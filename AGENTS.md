@@ -19,9 +19,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Worktree workflow
 
-Worktrunk owns worktree lifecycle. Use `wt` for worktree creation, discovery, navigation, integration, and removal. Leave an existing worktree on its current branch. Keep the primary worktree at `/home/andy-spike/code/mikasa` on `main`.
+Worktrunk owns worktree lifecycle for application functionality. Use `wt` for worktree creation, discovery, navigation, integration, and removal. Leave an existing worktree on its current branch. Keep the primary worktree at `/home/andy-spike/code/mikasa` on `main`.
 
-Before implementing a change, run `wt list --format=json` and find the current worktree.
+Documentation and agent-instruction changes that do not affect application functionality may be made directly in `main`.
+
+Before implementing an application functionality change, run `wt list --format=json` and find the current worktree.
 
 - When the current branch is `main`, create a task worktree with `wt -y switch --create <branch>`. Add `--base <branch>` only when the task starts from another branch. If the harness does not preserve directory changes, add `--no-cd`, then use the created worktree path from `wt list --format=json`.
 - When the current branch is not `main`, it is the assigned task worktree. Implement the change there. This includes a worktree the user created before the agent started.
