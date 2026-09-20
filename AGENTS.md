@@ -28,7 +28,7 @@ Before implementing an application functionality change, run `wt list --format=j
 - When the current branch is `main`, create a task worktree with `wt -y switch --create <branch>`. Add `--base <branch>` only when the task starts from another branch. If the harness does not preserve directory changes, add `--no-cd`, then use the created worktree path from `wt list --format=json`.
 - When the current branch is not `main`, it is the assigned task worktree. Implement the change there. This includes a worktree the user created before the agent started.
 
-Let the creation hooks finish. They install dependencies, copy `.env.local`, and start a tethered development server. Use `wt list` for its URL. Task worktrees use the Google OAuth ports 3001 through 3010. If that server stops, run `wt hook post-start -y project:server` from its worktree.
+Let the creation hooks finish. They install dependencies and copy `.env.local`. Start the development server yourself when you need it.
 
 Use `wt remove <branch>` for completed or abandoned worktrees. It preserves dirty or unmerged worktrees by default. Run `wt <command> --help` before using an unfamiliar Worktrunk option.
 

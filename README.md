@@ -27,16 +27,8 @@ Create task worktrees with Worktrunk:
 wt -y switch --create feature/my-change
 ```
 
-The creation hooks copy `.env.local`, install dependencies, and start a tethered Next.js
-development server. Task worktrees reserve ports 3001 through 3010. The primary worktree uses
-port 3000. These ports match the Google OAuth client's authorized redirect URIs.
-
-Use `wt list` to see every running worktree and its URL. If a server stops unexpectedly, rerun
-its background hook with `wt hook post-start -y project:server`. Worktrunk's tether stops the
-server when `wt remove <branch>` removes the worktree.
-
-The port limit allows ten task worktrees to run at once. If all ports are reserved, remove an
-unused worktree before creating another server.
+The creation hooks copy `.env.local` and install dependencies. They do not start the Next.js
+development server. Start it yourself with `pnpm dev` when you need it.
 
 ## Runtime note
 
