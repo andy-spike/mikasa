@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { generationRuns } from "@/lib/db/schema";
 import { requireLearner } from "@/lib/session";
 import { reconcileSpecification } from "@/lib/course/reconcile";
-import { validateSpecification } from "@/lib/course/spec-validate";
+import { validateSpecification } from "@/lib/course/specification";
 import { designModel } from "@/lib/model";
 import { listCourseSources } from "@/lib/db/design";
 import {

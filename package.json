@@ -29,6 +29,7 @@
     "cmdk": "^1.1.1",
     "cn": "^0.2.6",
     "drizzle-orm": "^0.45.2",
+    "effect": "^3.22.2",
     "firecrawl": "^4.38.0",
     "lucide-react": "^1.35.0",
     "motion": "^13.2.0",

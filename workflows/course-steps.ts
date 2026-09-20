@@ -32,6 +32,7 @@ const loadDbReview = once(() => import("@/lib/db/review"));
 const loadDbSchema = once(() => import("@/lib/db/schema"));
 const loadDrizzle = once(() => import("drizzle-orm"));
 const loadGenerate = once(() => import("@/lib/course/generate"));
+const loadSpecification = once(() => import("@/lib/course/specification"));
 const loadDesign = once(() => import("@/lib/course/design"));
 const loadReview = once(() => import("@/lib/course/review"));
 const loadFragments = once(() => import("@/lib/course/fragments"));
@@ -73,7 +74,7 @@ export async function stepGenerationCancelled(runId: string): Promise<boolean> {
 
 export async function stepOrder(context: GenerationContext): Promise<OutlineLesson[]> {
   "use step";
-  const { generationOrder } = await loadGenerate();
+  const { generationOrder } = await loadSpecification();
   return generationOrder(context.spec, context.outline.data);
 }
 
@@ -86,7 +87,7 @@ export async function stepValidateSpec(
   "use step";
   const { loadGenerationContext } = await loadDbLessons();
   const { db } = await loadDb();
-  const { validateSpecification } = await import("@/lib/course/spec-validate");
+  const { validateSpecification } = await loadSpecification();
   const context = await loadGenerationContext(db, courseId, outlineVersion);
   if (!context) return { ok: false, errors: ["The Course to generate no longer exists."] };
   try {

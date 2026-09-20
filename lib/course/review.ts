@@ -1,8 +1,6 @@
-import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
 import { z } from "zod";
 import { designProviderOptions, generationProviderOptions } from "@/lib/model";
-import { GenerationError } from "./generate";
 import { lessonContentSchema, parseLessonContent, type LessonContent } from "./content";
 import {
   contractCorrectBlock,
@@ -11,7 +9,8 @@ import {
   languageName,
   sourceLine,
 } from "./prompt-blocks";
-import { introducedAtMap, outlinePosition } from "./spec-graph";
+import { GenerationError, laterPrerequisiteViolations } from "./specification";
+import { generateStructuredStage } from "./structured-generation";
 import type { CourseSpecification, OutlineData } from "./types";
 
 export {
@@ -68,7 +67,7 @@ export type StructuralInput = {
 
 export function structuralFindings(input: StructuralInput): Finding[] {
   const findings: Finding[] = [];
-  const { lessons: planned, position } = outlinePosition(input.outline);
+  const planned = input.outline.modules.flatMap((module) => module.lessons);
   const byId = new Map(input.lessons.map((l) => [l.lessonId, l]));
   // Stored Sources are the authority; the specification's original evidence
   // entries alone are not enough. A stored Source absent from evidence passes.
@@ -152,22 +151,15 @@ export function structuralFindings(input: StructuralInput): Finding[] {
     }
   }
 
-  const introducedAt = introducedAtMap(input.spec.learningGraph, position);
-  for (const alignment of input.spec.alignment) {
-    const at = position.get(alignment.lessonId);
-    if (at === undefined) continue;
-    for (const nodeId of alignment.prerequisiteNodes) {
-      const introduced = introducedAt.get(nodeId);
-      if (introduced !== undefined && introduced > at) {
-        const lesson = planned[at];
-        findings.push({
-          kind: "structural",
-          lessonRef: lesson.id,
-          detail: `Lesson "${lesson.title}" assumes skill "${nodeId}", which is only introduced in a later Lesson.`,
-          correction: `Move the assumption or add what it needs earlier.`,
-        });
-      }
-    }
+  const lessonById = new Map(planned.map((lesson) => [lesson.id, lesson]));
+  for (const violation of laterPrerequisiteViolations(input.spec, input.outline)) {
+    const lesson = lessonById.get(violation.lessonId)!;
+    findings.push({
+      kind: "structural",
+      lessonRef: lesson.id,
+      detail: `Lesson "${lesson.title}" assumes skill "${violation.nodeId}", which is only introduced in a later Lesson.`,
+      correction: `Move the assumption or add what it needs earlier.`,
+    });
   }
 
   return findings;
@@ -189,10 +181,11 @@ export async function combinedFindings(
   const knownIds = new Set(outline.modules.flatMap((m) => m.lessons.map((l) => l.id)));
   const contentById = new Map(lessons.map((l) => [l.lessonId, l]));
 
-  const { output } = await generateText({
+  const { output } = await generateStructuredStage({
+    stage: "course-review",
     model,
     providerOptions: designProviderOptions(),
-    output: Output.object({ schema: combinedFindingsSchema }),
+    schema: combinedFindingsSchema,
     prompt: [
       "You review a complete course candidate before it publishes. One job:",
       "report critical factual errors only: wrong facts, outdated versions,",
@@ -331,10 +324,11 @@ export async function correctLesson(
 ): Promise<LessonContent> {
   const alignment = spec.alignment.find((a) => a.lessonId === lesson.lessonId);
 
-  const { output } = await generateText({
+  const { output } = await generateStructuredStage({
+    stage: "lesson-correction",
     model,
     providerOptions: generationProviderOptions(),
-    output: Output.object({ schema: lessonContentSchema }),
+    schema: lessonContentSchema,
     prompt: [
       "You correct one Lesson of a Mikasa course after review. One job: fix the",
       "named quotes and nothing else. Fix each quoted passage plus the same exact",

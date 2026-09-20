@@ -1,12 +1,15 @@
-import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { designProviderOptions, groundingProviderOptions } from "@/lib/model";
 import { depthBounds, depthTargetShape, type CourseInput, type DepthId } from "./limits";
 import { languageName as courseLanguageName } from "./prompt-blocks";
-import { outlineLessonsWithModule } from "./spec-graph";
-import { validateSpecification } from "./spec-validate";
+import {
+  outlineLessonsWithModule,
+  specificationDesignSchema,
+  validateSpecification,
+} from "./specification";
+import { generateStructuredStage } from "./structured-generation";
 import type { CourseSpecification, GatheredSource, OutlineData, OutlineModule } from "./types";
 
 export class DesignError extends Error {
@@ -106,10 +109,11 @@ export async function selectExcerpts(
 
   let chosen: Map<string, string | undefined>;
   try {
-    const { output } = await generateText({
+    const { output } = await generateStructuredStage({
+      stage: "source-excerpts",
       model,
       providerOptions: groundingProviderOptions(),
-      output: Output.object({ schema: excerptsSchema }),
+      schema: excerptsSchema,
       prompt: [
         "A learner is building a course.",
         `Topic: ${course.topic}`,
@@ -236,10 +240,11 @@ export async function draftOutline(
         ].join("\n")
       : "The learner chose no Grounding: rely on your built-in knowledge and keep claims timeless.";
 
-  const { output } = await generateText({
+  const { output } = await generateStructuredStage({
+    stage: "outline-draft",
     model,
     providerOptions: designProviderOptions(),
-    output: Output.object({ schema: outlineSchema }),
+    schema: outlineSchema,
     prompt: [
       "You design course outlines for Mikasa. A course takes a learner from their background to a concrete goal.",
       "",
@@ -318,39 +323,6 @@ export function buildOutline(
   return { modules };
 }
 
-const specificationSchema = z.object({
-  learningGraph: z.array(
-    z.object({
-      id: z.string().regex(/^g\d+$/),
-      skill: z.string().min(1),
-      requires: z.array(z.string()),
-      lessonId: z.string(),
-    }),
-  ),
-  alignment: z.array(
-    z.object({
-      lessonId: z.string(),
-      performance: z.string().min(1),
-      prerequisiteNodes: z.array(z.string()),
-      moduleMilestone: z.string().min(1),
-      exerciseContribution: z.string().min(1),
-      exampleStart: z.string(),
-      exampleEnd: z.string(),
-      sourceRefs: z.array(z.string()),
-    }),
-  ),
-  finalExercise: z.object({
-    task: z.string().min(1),
-    acceptanceChecks: z.array(z.string()).min(1),
-  }),
-  evidence: z.array(
-    z.object({
-      sourceRef: z.string(),
-      supports: z.string().min(1),
-    }),
-  ),
-});
-
 export async function designSpecification(
   model: LanguageModel,
   course: DesignCourse,
@@ -360,10 +332,11 @@ export async function designSpecification(
 ): Promise<CourseSpecification> {
   const lessons = outlineLessonsWithModule(outline);
 
-  const { output } = await generateText({
+  const { output } = await generateStructuredStage({
+    stage: "course-specification",
     model,
     providerOptions: designProviderOptions(),
-    output: Output.object({ schema: specificationSchema }),
+    schema: specificationDesignSchema,
     prompt: [
       "You materialize Mikasa's private Course specification. The learner approved nothing yet;",
       "this document is the hidden context every Lesson will be written from.",

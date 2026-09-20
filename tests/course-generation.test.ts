@@ -27,11 +27,13 @@ vi.mock("workflow/api", () => ({
 }));
 
 import { json, scriptedModel } from "./helpers/fake-model";
+import { InvalidStructuredOutput } from "@/lib/course/structured-generation";
 import { makeTestDb } from "./helpers/test-db";
 import { makeOutline } from "./helpers/fixtures";
 
-const { candidateIsComplete, generateLesson, generationOrder, GenerationError } =
+const { candidateIsComplete, generateLesson, GenerationError } =
   await import("@/lib/course/generate");
+const { generationOrder } = await import("@/lib/course/specification");
 const { users, courses, outlines, courseSpecs, sources, generationRuns, lessons } =
   await import("@/lib/db/schema");
 const {
@@ -219,7 +221,7 @@ describe("generateLesson", () => {
         priorLessons: [],
         sources: [],
       }),
-    ).rejects.toMatchObject({ name: "AI_NoObjectGeneratedError" });
+    ).rejects.toBeInstanceOf(InvalidStructuredOutput);
   });
 
   it("carries the learner's accepted demands into the Lesson's prompt", async () => {

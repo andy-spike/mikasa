@@ -113,7 +113,7 @@ No other voice or asset commitments are binding yet.
 ## Evidence on hand
 
 - Domain vocabulary: `CONTEXT.md`.
-- Architecture decisions: `docs/adr/0001` through `docs/adr/0008`.
+- Architecture decisions: `docs/adr/0001` through `docs/adr/0007`, plus `docs/adr/0009`.
 - Course-generation research: `docs/research/cohesive-course-generation.md`.
 - Interface direction: `DESIGN.md` and the current frontend mockup.
 - There are no real Learner stories, benchmarks, testimonials, or usage claims. Future work must not invent them.

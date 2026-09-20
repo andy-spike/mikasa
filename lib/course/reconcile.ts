@@ -1,33 +1,9 @@
-import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
-import { z } from "zod";
 import { designProviderOptions } from "@/lib/model";
 import { DesignError } from "./design";
-import { outlineLessonsWithModule } from "./spec-graph";
+import { outlineLessonsWithModule, specificationReconciliationSchema } from "./specification";
+import { generateStructuredStage } from "./structured-generation";
 import type { CourseSpecification, LessonAdjustment, OutlineData } from "./types";
-
-const reconcileSchema = z.object({
-  learningGraph: z.array(
-    z.object({
-      id: z.string().regex(/^g\d+$/),
-      skill: z.string().min(1),
-      requires: z.array(z.string()),
-      lessonId: z.string(),
-    }),
-  ),
-  alignment: z.array(
-    z.object({
-      lessonId: z.string(),
-      performance: z.string().min(1),
-      prerequisiteNodes: z.array(z.string()),
-      moduleMilestone: z.string().min(1),
-      exerciseContribution: z.string().min(1),
-      exampleStart: z.string(),
-      exampleEnd: z.string(),
-      sourceRefs: z.array(z.string()),
-    }),
-  ),
-});
 
 // A spec that does not join to the Outline would poison generation.
 export async function reconcileSpecification(
@@ -42,10 +18,11 @@ export async function reconcileSpecification(
   const lessonIds = new Set(lessons.map((l) => l.id));
   const live = adjustments.filter((a) => lessonIds.has(a.lessonId));
 
-  const { output } = await generateText({
+  const { output } = await generateStructuredStage({
+    stage: "course-specification-reconciliation",
     model,
     providerOptions: designProviderOptions(),
-    output: Output.object({ schema: reconcileSchema }),
+    schema: specificationReconciliationSchema,
     prompt: [
       "A learner reshaped a course outline after it was designed. Reconcile the",
       "private specification to the new shape. The learner never sees this document.",

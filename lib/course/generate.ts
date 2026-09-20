@@ -1,4 +1,3 @@
-import { generateText, Output } from "ai";
 import type { LanguageModel } from "ai";
 import { nanoid } from "nanoid";
 import { generationProviderOptions } from "@/lib/model";
@@ -8,9 +7,12 @@ import {
   type ContentBlock,
   type LessonContent,
 } from "./content";
-import type { CourseSpecification, OutlineData, OutlineLesson } from "./types";
-import { findCyclePath, introducedAtMap, outlinePosition } from "./spec-graph";
+import type { CourseSpecification, OutlineData } from "./types";
 import { contractWriteBlock, finalExerciseLines, languageName, sourceLine } from "./prompt-blocks";
+import { GenerationError } from "./specification";
+import { generateStructuredStage } from "./structured-generation";
+
+export { GenerationError } from "./specification";
 
 export type PromptSource = {
   ref: string;
@@ -23,106 +25,6 @@ export type LessonSourceSearcher = (
   query: string,
   limit: number,
 ) => Promise<{ title: string; url: string; content: string }[]>;
-
-export class GenerationError extends Error {
-  name = "GenerationError";
-}
-
-// Reading order is the Outline order. The specification must already be
-// consistent with it; this function validates and returns that order.
-// It never reorders the approved Outline.
-export function generationOrder(spec: CourseSpecification, outline: OutlineData): OutlineLesson[] {
-  const { lessons, position } = outlinePosition(outline);
-
-  const seenAlignment = new Set<string>();
-  for (const a of spec.alignment) {
-    if (seenAlignment.has(a.lessonId)) {
-      throw new GenerationError(
-        `The specification has two alignment entries for Lesson "${a.lessonId}". Keep one.`,
-      );
-    }
-    seenAlignment.add(a.lessonId);
-    if (!position.has(a.lessonId)) {
-      throw new GenerationError(
-        `The specification aligns Lesson "${a.lessonId}", which the Outline does not have.`,
-      );
-    }
-  }
-  const missingAlignment = lessons.filter((l) => !seenAlignment.has(l.id));
-  if (missingAlignment.length > 0) {
-    throw new GenerationError(
-      `The specification skipped ${missingAlignment.length} Lesson(s): ${missingAlignment.map((l) => l.title).join(", ")}.`,
-    );
-  }
-
-  const nodeIds = new Set<string>();
-  for (const node of spec.learningGraph) {
-    if (nodeIds.has(node.id)) {
-      throw new GenerationError(
-        `The specification introduces skill "${node.id}" twice. Give every graph node a unique id.`,
-      );
-    }
-    nodeIds.add(node.id);
-    if (!position.has(node.lessonId)) {
-      throw new GenerationError(
-        `The specification's node "${node.id}" points at Lesson "${node.lessonId}", which the Outline does not have.`,
-      );
-    }
-  }
-  for (const node of spec.learningGraph) {
-    for (const required of node.requires) {
-      if (!nodeIds.has(required)) {
-        throw new GenerationError(
-          `Node "${node.id}" requires "${required}", which no node introduces.`,
-        );
-      }
-    }
-  }
-  for (const a of spec.alignment) {
-    for (const p of a.prerequisiteNodes) {
-      if (!nodeIds.has(p)) {
-        throw new GenerationError(
-          `Lesson "${a.lessonId}" assumes skill "${p}", which no graph node introduces.`,
-        );
-      }
-    }
-  }
-
-  // Cycle check over graph nodes.
-  const cycle = findCyclePath(spec.learningGraph);
-  if (cycle) {
-    throw new GenerationError(
-      "The specification's dependency graph has a cycle; no Lesson order satisfies it.",
-    );
-  }
-
-  // Reading-order consistency: a prerequisite cannot be introduced later.
-  // Same-Lesson edges are allowed.
-  const introducedAt = introducedAtMap(spec.learningGraph, position);
-  for (const n of spec.learningGraph) {
-    const at = position.get(n.lessonId)!;
-    for (const r of n.requires) {
-      if (introducedAt.get(r)! > at) {
-        throw new GenerationError(
-          `Node "${n.id}" in Lesson "${n.lessonId}" requires "${r}", which is only introduced in a later Lesson.`,
-        );
-      }
-    }
-  }
-  for (const a of spec.alignment) {
-    const at = position.get(a.lessonId)!;
-    for (const p of a.prerequisiteNodes) {
-      const providerAt = introducedAt.get(p);
-      if (providerAt !== undefined && providerAt > at) {
-        throw new GenerationError(
-          `Lesson "${a.lessonId}" assumes skill "${p}", which is only introduced in a later Lesson.`,
-        );
-      }
-    }
-  }
-
-  return lessons;
-}
 
 export const LESSON_SOURCE_LIMIT = 2;
 
@@ -167,10 +69,11 @@ export async function generateLesson(
       ? input.sources.filter((s) => alignment.sourceRefs.includes(s.ref))
       : input.sources;
 
-  const { output } = await generateText({
+  const { output } = await generateStructuredStage({
+    stage: "lesson-generation",
     model,
     providerOptions: generationProviderOptions(),
-    output: Output.object({ schema: lessonContentSchema }),
+    schema: lessonContentSchema,
     prompt: [
       "You write one Lesson of a Mikasa course. One job: write THIS lesson as",
       "part of one coherent course, not a standalone explainer.",

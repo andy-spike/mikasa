@@ -35,8 +35,8 @@ import { makeOutline, makeSpec } from "./helpers/fixtures";
 
 const { users, courses, outlines, courseSpecs, generationRuns, lessons, revisions } =
   await import("@/lib/db/schema");
-const { generationOrder, generateLesson } = await import("@/lib/course/generate");
-const { validateSpecification } = await import("@/lib/course/spec-validate");
+const { generateLesson } = await import("@/lib/course/generate");
+const { generationOrder, validateSpecification } = await import("@/lib/course/specification");
 const {
   structuralFindings,
   combinedFindings,
