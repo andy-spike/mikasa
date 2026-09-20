@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CourseLibrary } from "@/components/course-library";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,7 @@ export default async function CoursesPage() {
   return (
     <AppShell section="Courses">
       {items.length === 0 ? (
-        <div className="mx-auto w-full max-w-[52rem] px-5 pt-10 pb-24 sm:px-8">
+        <div className="mx-auto w-full max-w-[40rem] px-5 pt-10 pb-24 sm:px-8">
           <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
             Courses
           </h1>
@@ -32,21 +31,7 @@ export default async function CoursesPage() {
           </div>
         </div>
       ) : (
-        <>
-          <CourseLibrary items={items} />
-
-          {/* The New Course button slides its own label out on hover, so no hint.
-              From lg up the index head carries the control instead. */}
-          <Button
-            variant="hero"
-            render={<Link href="/courses/new" />}
-            aria-label="New Course"
-            className="new-course-button fixed right-5 bottom-5 z-20 h-11 gap-0 px-3 sm:right-8 sm:bottom-8 lg:hidden"
-          >
-            <Plus className="h-4 w-4" strokeWidth={1.75} />
-            <span className="new-course-label">New Course</span>
-          </Button>
-        </>
+        <CourseLibrary items={items} />
       )}
     </AppShell>
   );

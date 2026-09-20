@@ -44,6 +44,11 @@ export type CourseLibraryItem = {
   actionLabel: string;
   href: string;
   lastTouched: string;
+  /** Milliseconds since the epoch behind `lastTouched`, for sorting. */
+  touchedAt: number;
+  /** Published Lessons marked done, and published Lessons in total. */
+  doneCount: number;
+  totalCount: number;
   nextLessonTitle: string | null;
   nextLessonMinutes: number | null;
   position: CourseLibraryPosition | null;
@@ -138,6 +143,9 @@ function toItem(input: CourseLibraryInput, now: Date): CourseLibraryItem {
     topic: input.topic,
     goal: input.goal,
     lastTouched,
+    touchedAt: lastTouchedAt.getTime(),
+    doneCount,
+    totalCount: total,
     nextLessonTitle: next?.title ?? null,
     nextLessonMinutes: next?.minutes ?? null,
     position: next?.position ?? null,
@@ -303,7 +311,5 @@ export function buildCourseLibrary(
     ordered.find((entry) => entry.item.state === "complete") ??
     ordered[0];
 
-  return ordered.map((entry) =>
-    entry === live ? { ...entry.item, isLive: true } : entry.item,
-  );
+  return ordered.map((entry) => (entry === live ? { ...entry.item, isLive: true } : entry.item));
 }

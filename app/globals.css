@@ -367,24 +367,6 @@
 }
 
 @layer components {
-  .new-course-label {
-    max-width: 0;
-    margin-left: 0;
-    overflow: hidden;
-    opacity: 0;
-    transition:
-      max-width var(--dur) var(--ease),
-      margin-left var(--dur) var(--ease),
-      opacity var(--dur-fast) var(--ease);
-  }
-
-  .new-course-button:hover .new-course-label,
-  .new-course-button:focus-visible .new-course-label {
-    max-width: 6rem;
-    margin-left: 0.5rem;
-    opacity: 1;
-  }
-
   /* The one label style. Small, tracked, never Literata-sized. */
   .label {
     font-size: 0.6875rem;
@@ -630,18 +612,6 @@
   }
 }
 
-/* The Courses pane turning to another Course. A layer arriving rises and
-   scales (mk-open); a page already on the desk only returns to full ink, so
-   this one is opacity alone, at the system's own --dur. */
-@keyframes mk-turn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 .mk-check {
   stroke-dasharray: 22;
   animation: mk-check 340ms var(--ease) both;
@@ -655,10 +625,6 @@
   animation: mk-open var(--dur-slow) var(--ease) both;
 }
 
-.mk-turn {
-  animation: mk-turn var(--dur) var(--ease) both;
-}
-
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -666,7 +632,6 @@
   .mk-check,
   .mk-handoff,
   .mk-open,
-  .mk-turn,
   .mk-rise {
     animation: none;
   }
