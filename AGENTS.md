@@ -43,3 +43,10 @@ Only ship when the user asks to ship, deploy, or integrate a branch. Pushing `ma
 5. From the primary worktree, run `git push origin main`, then confirm `main` matches `origin/main`.
 
 Never force-push `main`. Stash entries are repository-wide, so name the entry when popping it.
+
+## Agent browser auth (Google OAuth)
+
+Auth is Google OAuth only (`lib/auth.ts`); `/courses` and `/settings` need a session (`lib/access.ts`). Google blocks fresh logins inside agent-managed Chromium ("This browser or app may not be secure"), so never retry that — seed instead.
+
+- Preferred: dedicated profile at `~/.profiles/mikasa` (outside the repo, never commit). Pass `--profile ~/.profiles/mikasa` (or `export AGENT_BROWSER_PROFILE=~/.profiles/mikasa`) on every `agent-browser` command, plus your own `--session` per the agent-browser skill. Verify with `open http://localhost:3000/courses`: it must stay on `/courses` and show `Sign out` / `Courses`, not redirect to `/`.
+- Re-seed when expired: ask the user to log in at `http://localhost:3000` in their personal Chromium (Sign in → Google → `/courses`). Then run `agent-browser --auto-connect state save /tmp/opencode/mikasa-seed.json` (each call triggers the "Allow remote debugging?" prompt — the user must click Allow), then `agent-browser --session <own-session> --profile ~/.profiles/mikasa state load /tmp/opencode/mikasa-seed.json`, re-verify `/courses`, and delete the temp file. Do not use `--auto-connect` for anything else.
