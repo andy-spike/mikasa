@@ -24,6 +24,7 @@ import {
   stepRecordExpandedTouched,
   type ReviewFindingPayload,
 } from "./course-steps";
+import { setModelStepRetryLimit, withModelFailurePolicy } from "./model-failure-policy";
 
 async function stepReconcileSpec(
   planId: string,
@@ -55,15 +56,14 @@ async function stepReconcileSpec(
     return context;
   }
 
-  const reconciled = await reconcileSpecification(
-    generationModel(),
-    context.outline.data,
-    context.spec,
-    adjustments,
+  const reconciled = await withModelFailurePolicy(() =>
+    reconcileSpecification(generationModel(), context.outline.data, context.spec, adjustments),
   );
   await saveReconciledSpec(db, context.course.id, reconciled, context.outline.version);
   return { ...context, spec: reconciled };
 }
+
+setModelStepRetryLimit(stepReconcileSpec);
 
 // Stale guard: a candidate must never replace a newer revision.
 async function stepCheckStillCurrent(

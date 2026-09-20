@@ -1,7 +1,7 @@
 import type { LanguageModel } from "ai";
 import { z } from "zod";
 import { designProviderOptions, generationProviderOptions } from "@/lib/model";
-import { lessonContentSchema, parseLessonContent, type LessonContent } from "./content";
+import { parseLessonContent, type LessonContent } from "./content";
 import {
   contractCorrectBlock,
   contractReviewBlock,
@@ -24,6 +24,7 @@ export type FindingKind = "structural" | "factual";
 export type Finding = {
   kind: FindingKind;
   lessonRef: string | null;
+  quote?: string;
   detail: string;
   correction: string;
   sourceQuery?: string;
@@ -226,17 +227,7 @@ export async function combinedFindings(
   });
 
   if (!output) throw new GenerationError("The combined review returned nothing.");
-  const textById = new Map(
-    lessons.map(
-      (l) =>
-        [
-          l.lessonId,
-          [...l.body.map(renderBlockForReview), ...l.workedExample.map(renderBlockForReview)].join(
-            "\n",
-          ),
-        ] as const,
-    ),
-  );
+  const lessonById = new Map(lessons.map((lesson) => [lesson.lessonId, lesson]));
   const expanded: Finding[] = [];
   for (const f of output.findings) {
     if (!f.lessonRefs || f.lessonRefs.length === 0) {
@@ -251,8 +242,10 @@ export async function combinedFindings(
           `The review targets Lesson "${ref}", which the candidate does not have: ${f.detail}.`,
         );
       }
-      const text = textById.get(ref) ?? "";
-      if (!quote || !text.includes(quote)) {
+      const target = lessonById.get(ref);
+      const hasExactQuote =
+        target && lessonTextSlots(target, true).some((slot) => slot.get().includes(quote));
+      if (!quote || !hasExactQuote) {
         throw new GenerationError(
           `The review quotes text that Lesson "${ref}" does not contain: ${f.quote}. Quote the Lesson exactly.`,
         );
@@ -262,7 +255,8 @@ export async function combinedFindings(
       expanded.push({
         kind: "factual" as const,
         lessonRef: ref,
-        detail: `"${quote}" — ${f.detail}`,
+        quote,
+        detail: f.detail,
         correction: f.correction,
         ...(f.sourceQuery?.trim() ? { sourceQuery: f.sourceQuery.trim() } : {}),
       });
@@ -304,10 +298,132 @@ function renderBlockForReview(block: unknown): string {
     case "note":
       return `[note: ${b.title}] ${b.text ?? ""}`;
     case "table":
-      return "[table]";
+      return [b.title, b.text].filter(Boolean).join("\n") || JSON.stringify(block);
     default:
       return "";
   }
+}
+
+const correctionsSchema = z.object({
+  replacements: z
+    .array(
+      z.object({
+        quote: z.string().min(1),
+        replacement: z.string().min(1),
+        replaceAll: z.boolean().default(false),
+      }),
+    )
+    .min(1)
+    .max(3),
+});
+
+type TextSlot = { get: () => string; set: (value: string) => void };
+
+function lessonTextSlots(lesson: LessonContent, includeExercise: boolean): TextSlot[] {
+  const slots: TextSlot[] = [];
+  const add = (owner: Record<string, unknown>, key: string) => {
+    if (typeof owner[key] !== "string") return;
+    slots.push({
+      get: () => owner[key] as string,
+      set: (value) => {
+        owner[key] = value;
+      },
+    });
+  };
+  for (const block of [...lesson.body, ...lesson.workedExample]) {
+    const owner = block as unknown as Record<string, unknown>;
+    switch (block.kind) {
+      case "p":
+        add(owner, "text");
+        break;
+      case "code":
+        add(owner, "code");
+        add(owner, "caption");
+        break;
+      case "note":
+        add(owner, "title");
+        add(owner, "text");
+        break;
+      case "table":
+        for (let i = 0; i < block.head.length; i++) {
+          slots.push({
+            get: () => block.head[i],
+            set: (value) => {
+              block.head[i] = value;
+            },
+          });
+        }
+        for (const row of block.rows) {
+          for (let i = 0; i < row.length; i++) {
+            slots.push({
+              get: () => row[i],
+              set: (value) => {
+                row[i] = value;
+              },
+            });
+          }
+        }
+        add(owner, "caption");
+        break;
+    }
+  }
+  add(lesson as unknown as Record<string, unknown>, "recallPrompt");
+  add(lesson as unknown as Record<string, unknown>, "selfExplanationPrompt");
+  add(lesson as unknown as Record<string, unknown>, "bridge");
+  if (includeExercise) {
+    add(lesson.exercise as unknown as Record<string, unknown>, "task");
+    add(lesson.exercise as unknown as Record<string, unknown>, "check");
+  }
+  return slots;
+}
+
+function occurrenceCount(value: string, quote: string): number {
+  return value.split(quote).length - 1;
+}
+
+export function applyLessonCorrections(
+  lesson: LessonContent,
+  findings: Finding[],
+  replacements: z.infer<typeof correctionsSchema>["replacements"],
+  preserveExercise = false,
+): LessonContent {
+  const expected = new Set(findings.map((finding) => finding.quote?.trim()).filter(Boolean));
+  if (findings.some((finding) => !finding.quote?.trim())) {
+    throw new GenerationError(`A correction for "${lesson.title}" has no exact quote to replace.`);
+  }
+  const proposed = new Set(replacements.map((replacement) => replacement.quote.trim()));
+  if (expected.size !== proposed.size || [...expected].some((quote) => !proposed.has(quote!))) {
+    throw new GenerationError(
+      `The correction for "${lesson.title}" did not address the reviewed quotes exactly.`,
+    );
+  }
+
+  const corrected = structuredClone(lesson);
+  const slots = lessonTextSlots(corrected, !preserveExercise);
+  for (const replacement of replacements) {
+    const quote = replacement.quote.trim();
+    const matches = slots.reduce((count, slot) => count + occurrenceCount(slot.get(), quote), 0);
+    if (matches === 0) {
+      throw new GenerationError(
+        `The correction quote is not present in "${lesson.title}": ${quote}`,
+      );
+    }
+    if (matches > 1 && !replacement.replaceAll) {
+      throw new GenerationError(`The correction quote is ambiguous in "${lesson.title}": ${quote}`);
+    }
+    for (const slot of slots) {
+      const current = slot.get();
+      if (!current.includes(quote)) continue;
+      slot.set(
+        replacement.replaceAll
+          ? current.split(quote).join(replacement.replacement)
+          : current.slice(0, current.indexOf(quote)) +
+              replacement.replacement +
+              current.slice(current.indexOf(quote) + quote.length),
+      );
+    }
+  }
+  return parseLessonContent(lesson.lessonId, lesson.title, corrected);
 }
 
 export async function correctLesson(
@@ -328,12 +444,12 @@ export async function correctLesson(
     stage: "lesson-correction",
     model,
     providerOptions: generationProviderOptions(),
-    schema: lessonContentSchema,
+    schema: correctionsSchema,
     prompt: [
       "You correct one Lesson of a Mikasa course after review. One job: fix the",
-      "named quotes and nothing else. Fix each quoted passage plus the same exact",
-      "string where it repeats inside THIS lesson only. Keep everything else as",
-      "it is, word for word. Never add new facts, new Sources, or new claims —",
+      "named quotes and nothing else. Return a replacement for every exact quote.",
+      "Application code applies your replacements, so you cannot rewrite any",
+      "unmentioned text, structure, citations, or Lesson identity. Never add new facts —",
       `fix from the named Sources only. Write in ${languageName(course.language)}.`,
       "",
       `Topic: ${course.topic}`,
@@ -372,10 +488,14 @@ export async function correctLesson(
       "The findings to fix. Each finding names the exact quote to replace;",
       "fix that quote plus the same exact string where it repeats in this",
       "Lesson only. Do not touch other Lessons, do not broaden the fix:",
-      ...findings.map((f) => `- [${f.kind}] ${f.detail} → ${f.correction}`),
+      ...findings.map(
+        (f) =>
+          `- [${f.kind}] QUOTE: ${f.quote ?? "(missing)"} | PROBLEM: ${f.detail} | FIX: ${f.correction}`,
+      ),
       "",
-      "Return the full corrected Lesson as JSON (body, workedExample,",
-      "recallPrompt, selfExplanationPrompt, exercise {task, check}, bridge).",
+      "Return JSON with replacements only. Each replacement has quote (copied exactly),",
+      "replacement (the corrected text), and replaceAll. Set replaceAll only when the",
+      "same reviewed quote intentionally needs the same fix everywhere in this Lesson.",
     ]
       .filter(Boolean)
       .join("\n"),
@@ -384,6 +504,10 @@ export async function correctLesson(
   if (!output) {
     throw new GenerationError(`The correction for "${lesson.title}" returned nothing.`);
   }
-  const corrected = parseLessonContent(lesson.lessonId, lesson.title, output);
-  return options?.preserveExercise ? { ...corrected, exercise: lesson.exercise } : corrected;
+  return applyLessonCorrections(
+    lesson,
+    findings,
+    output.replacements,
+    options?.preserveExercise ?? false,
+  );
 }

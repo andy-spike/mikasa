@@ -1,0 +1,46 @@
+[
+  {
+    "name": "complete generated Lesson",
+    "valid": true,
+    "value": {
+      "body": [
+        { "kind": "p", "text": "Explain the idea." },
+        { "kind": "p", "text": "Apply the idea." },
+        { "kind": "p", "text": "Check the result." }
+      ],
+      "workedExample": [{ "kind": "p", "text": "Work through one example." }],
+      "recallPrompt": "What is the key idea?",
+      "selfExplanationPrompt": "Why does it work?",
+      "exercise": { "task": "Try it.", "check": "The result is correct." },
+      "bridge": "Next, extend it."
+    }
+  },
+  {
+    "name": "undersized generated Lesson",
+    "valid": false,
+    "value": {
+      "body": [{ "kind": "p", "text": "Too short." }],
+      "workedExample": [{ "kind": "p", "text": "Example." }],
+      "recallPrompt": "Recall?",
+      "selfExplanationPrompt": "Why?",
+      "exercise": { "task": "Try it.", "check": "Done." },
+      "bridge": "Next."
+    }
+  },
+  {
+    "name": "malformed content block",
+    "valid": false,
+    "value": {
+      "body": [
+        { "kind": "p", "text": "First." },
+        { "kind": "p", "text": "Second." },
+        { "kind": "code", "language": "ts" }
+      ],
+      "workedExample": [{ "kind": "p", "text": "Example." }],
+      "recallPrompt": "Recall?",
+      "selfExplanationPrompt": "Why?",
+      "exercise": { "task": "Try it.", "check": "Done." },
+      "bridge": "Next."
+    }
+  }
+]

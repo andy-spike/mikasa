@@ -117,11 +117,46 @@ export function validateSpecification(
   validateAlignmentCoverage(specification, outlineIndex, true);
   validateUniquePerformances(specification, outlineIndex.lessons);
   validateAlignmentSources(specification, availableSourceRefs);
+  validateDistinctReferences(specification);
   const nodeIds = validateGraphNodeIds(specification);
   validateGraphLessonRefs(specification, outlineIndex.position);
   validateGraphReferences(specification, nodeIds, true);
   validateEvidenceSources(specification, availableSourceRefs);
   validateGraphOrder(specification, outlineIndex.position, true);
+}
+
+function duplicate(values: string[]): string | undefined {
+  const seen = new Set<string>();
+  return values.find((value) => {
+    if (seen.has(value)) return true;
+    seen.add(value);
+    return false;
+  });
+}
+
+function validateDistinctReferences(specification: CourseSpecification): void {
+  for (const node of specification.learningGraph) {
+    const repeated = duplicate(node.requires);
+    if (repeated) {
+      throw new GenerationError(
+        `Node "${node.id}" requires "${repeated}" more than once. Keep one edge.`,
+      );
+    }
+  }
+  for (const alignment of specification.alignment) {
+    const repeatedPrerequisite = duplicate(alignment.prerequisiteNodes);
+    if (repeatedPrerequisite) {
+      throw new GenerationError(
+        `Lesson "${alignment.lessonId}" repeats prerequisite "${repeatedPrerequisite}". Keep one reference.`,
+      );
+    }
+    const repeatedSource = duplicate(alignment.sourceRefs);
+    if (repeatedSource) {
+      throw new GenerationError(
+        `Lesson "${alignment.lessonId}" repeats Source "${repeatedSource}". Keep one reference.`,
+      );
+    }
+  }
 }
 
 function validateAlignmentCoverage(

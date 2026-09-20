@@ -7,10 +7,12 @@ import type { FindingKind } from "@/lib/course/review";
 import { CORRECTION_SOURCE_QUERY_CAP } from "@/lib/course/review-policy";
 import type { GenerationContext } from "@/lib/db/lessons";
 import type { OutlineLesson } from "@/lib/course/types";
+import { setModelStepRetryLimit, withModelFailurePolicy } from "./model-failure-policy";
 
 export type ReviewFindingPayload = {
   kind: FindingKind;
   lessonRef: string | null;
+  quote?: string;
   detail: string;
   correction: string;
   sourceQuery?: string;
@@ -121,12 +123,14 @@ export async function stepRepairSpec(
   const { loadGenerationContext } = await loadDbLessons();
   const { saveReconciledSpec } = await loadDbOutline();
   const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
-  const reconciled = await reconcileSpecification(
-    generationModel(),
-    context.outline.data,
-    context.spec,
-    adjustments as never,
-    errors,
+  const reconciled = await withModelFailurePolicy(() =>
+    reconcileSpecification(
+      generationModel(),
+      context.outline.data,
+      context.spec,
+      adjustments as never,
+      errors,
+    ),
   );
   await saveReconciledSpec(db, courseId, reconciled, outlineVersion);
 }
@@ -201,14 +205,16 @@ export async function stepGenerateLesson(
     .slice(0, current)
     .map((l) => ({ title: l.title, summary: l.summary, excerpt: excerptOf.get(l.id) }));
 
-  const content = await generateLesson(generationModel(), {
-    course: context.course,
-    spec: context.spec,
-    lesson,
-    nextLesson,
-    priorLessons,
-    sources,
-  });
+  const content = await withModelFailurePolicy(() =>
+    generateLesson(generationModel(), {
+      course: context.course,
+      spec: context.spec,
+      lesson,
+      nextLesson,
+      priorLessons,
+      sources,
+    }),
+  );
   await saveLessonContent(db, context.course.id, context.outline.version, runId, content);
 }
 
@@ -269,17 +275,19 @@ export async function stepCombinedReview(
 
   const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
   const lessonContents = await getLessonContentsForVersion(db, courseId, outlineVersion);
-  return combinedFindings(
-    generationModel(),
-    {
-      topic: context.course.topic,
-      goal: context.course.goal,
-      language: context.course.language,
-    },
-    context.spec,
-    context.outline.data,
-    context.sources,
-    lessonContents,
+  return withModelFailurePolicy(() =>
+    combinedFindings(
+      generationModel(),
+      {
+        topic: context.course.topic,
+        goal: context.course.goal,
+        language: context.course.language,
+      },
+      context.spec,
+      context.outline.data,
+      context.sources,
+      lessonContents,
+    ),
   );
 }
 
@@ -376,18 +384,20 @@ export async function stepCorrectLesson(
       };
     });
 
-  const corrected = await correctLesson(
-    generationModel(),
-    {
-      topic: context.course.topic,
-      goal: context.course.goal,
-      language: context.course.language,
-    },
-    context.spec,
-    current,
-    findings as Parameters<typeof correctLesson>[4],
-    prior,
-    { preserveExercise: options?.preserveExercise, sources: context.sources },
+  const corrected = await withModelFailurePolicy(() =>
+    correctLesson(
+      generationModel(),
+      {
+        topic: context.course.topic,
+        goal: context.course.goal,
+        language: context.course.language,
+      },
+      context.spec,
+      current,
+      findings as Parameters<typeof correctLesson>[4],
+      prior,
+      { preserveExercise: options?.preserveExercise, sources: context.sources },
+    ),
   );
   // Explicit Learner Exercise requirements survive corrections: the
   // specification's adjustment is the authority, not the model's rewrite.
@@ -633,3 +643,8 @@ export async function ensureValidSpec(
   }
   return { ok: true, context: reloaded };
 }
+
+setModelStepRetryLimit(stepRepairSpec);
+setModelStepRetryLimit(stepGenerateLesson);
+setModelStepRetryLimit(stepCombinedReview);
+setModelStepRetryLimit(stepCorrectLesson);

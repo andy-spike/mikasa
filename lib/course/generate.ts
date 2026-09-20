@@ -2,7 +2,7 @@ import type { LanguageModel } from "ai";
 import { nanoid } from "nanoid";
 import { generationProviderOptions } from "@/lib/model";
 import {
-  lessonContentSchema,
+  generatedLessonContentSchema,
   parseLessonContent,
   type ContentBlock,
   type LessonContent,
@@ -73,7 +73,7 @@ export async function generateLesson(
     stage: "lesson-generation",
     model,
     providerOptions: generationProviderOptions(),
-    schema: lessonContentSchema,
+    schema: generatedLessonContentSchema,
     prompt: [
       "You write one Lesson of a Mikasa course. One job: write THIS lesson as",
       "part of one coherent course, not a standalone explainer.",
@@ -157,24 +157,23 @@ export async function generateLesson(
 
   if (!output) throw new GenerationError(`No content came back for "${input.lesson.title}".`);
 
-  const knownRefs = new Set(input.sources.map((s) => s.ref));
   const content = parseLessonContent(input.lesson.id, input.lesson.title, output);
-  return {
-    ...content,
-    body: content.body.map(stripUnknownRefs(knownRefs)),
-    workedExample: content.workedExample.map(stripUnknownRefs(knownRefs)),
-  };
+  assertKnownSourceRefs(content, new Set(input.sources.map((source) => source.ref)));
+  return content;
 }
 
 type BlockWithRefs = ContentBlock & { sourceRefs?: string[] };
 
-function stripUnknownRefs(known: Set<string>) {
-  return (block: ContentBlock): BlockWithRefs => {
+export function assertKnownSourceRefs(content: LessonContent, known: Set<string>): void {
+  for (const block of [...content.body, ...content.workedExample]) {
     const refs = (block as BlockWithRefs).sourceRefs;
-    return refs
-      ? { ...(block as BlockWithRefs), sourceRefs: refs.filter((r) => known.has(r)) }
-      : block;
-  };
+    const unknown = refs?.find((ref) => !known.has(ref));
+    if (unknown) {
+      throw new GenerationError(
+        `Lesson "${content.title}" cites Source "${unknown}", which the Course does not have.`,
+      );
+    }
+  }
 }
 
 export function candidateIsComplete(outline: OutlineData, writtenLessonIds: Set<string>): boolean {

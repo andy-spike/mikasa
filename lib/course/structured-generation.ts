@@ -23,7 +23,8 @@ export type StructuredGenerationStage =
   | "course-specification-reconciliation"
   | "lesson-generation"
   | "course-review"
-  | "lesson-correction";
+  | "lesson-correction"
+  | "capability-preflight";
 
 type StagePolicy = {
   timeoutMs: number;
@@ -38,6 +39,7 @@ const STAGE_POLICIES: Record<StructuredGenerationStage, StagePolicy> = {
   "lesson-generation": { timeoutMs: 180_000, maxRetries: 1 },
   "course-review": { timeoutMs: 180_000, maxRetries: 1 },
   "lesson-correction": { timeoutMs: 180_000, maxRetries: 1 },
+  "capability-preflight": { timeoutMs: 60_000, maxRetries: 0 },
 };
 
 export type StructuredGenerationMetadata = {
@@ -49,8 +51,26 @@ export type StructuredGenerationMetadata = {
   provider: string;
   modelId: string;
   responseId: string;
+  durationMs: number;
+  providerCalls: number;
   providerMetadata?: ProviderMetadata;
 };
+
+export type StructuredGenerationEvent = {
+  stage: StructuredGenerationStage;
+  outcome: "succeeded" | "failed";
+  durationMs: number;
+  providerCalls?: number;
+  finishReason?: FinishReason;
+  provider?: string;
+  modelId?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  failure?: StructuredGenerationFailure["_tag"];
+  retryable?: boolean;
+};
+
+export type StructuredGenerationObserver = (event: StructuredGenerationEvent) => void;
 
 type FailureFields = {
   stage: StructuredGenerationStage;
@@ -143,6 +163,8 @@ export type StructuredGenerationAdapter = <T>(
 const aiSdkAdapter: StructuredGenerationAdapter = async <T>(
   request: StructuredGenerationAdapterRequest<T>,
 ) => {
+  const startedAt = Date.now();
+  let providerCalls = 0;
   const result = await generateText({
     model: request.model,
     providerOptions: request.providerOptions,
@@ -150,6 +172,9 @@ const aiSdkAdapter: StructuredGenerationAdapter = async <T>(
     prompt: request.prompt,
     timeout: request.timeoutMs,
     maxRetries: request.maxRetries,
+    onLanguageModelCallStart: () => {
+      providerCalls += 1;
+    },
   });
   const metadata: AdapterResult<T>["metadata"] = {
     finishReason: result.finishReason,
@@ -159,6 +184,8 @@ const aiSdkAdapter: StructuredGenerationAdapter = async <T>(
     provider: result.finalStep.model.provider,
     modelId: result.finalStep.model.modelId,
     responseId: result.response.id,
+    durationMs: Date.now() - startedAt,
+    providerCalls,
     ...(result.providerMetadata ? { providerMetadata: result.providerMetadata } : {}),
   };
 
@@ -239,11 +266,21 @@ function classifyFailure(
   });
 }
 
-export function createStructuredGenerator(adapter: StructuredGenerationAdapter) {
+function defaultObserver(event: StructuredGenerationEvent): void {
+  if (process.env.NODE_ENV === "production") {
+    console.info("structured-generation", event);
+  }
+}
+
+export function createStructuredGenerator(
+  adapter: StructuredGenerationAdapter,
+  observe: StructuredGenerationObserver = defaultObserver,
+) {
   return async function generateStructuredStage<T>(
     request: StructuredGenerationRequest<T>,
   ): Promise<StructuredGenerationResult<T>> {
     const policy = STAGE_POLICIES[request.stage];
+    const startedAt = Date.now();
     const program = Effect.tryPromise({
       try: () => adapter({ ...request, ...policy }),
       catch: (error) => classifyFailure(error, request.stage, policy),
@@ -264,7 +301,37 @@ export function createStructuredGenerator(adapter: StructuredGenerationAdapter) 
     );
 
     const outcome = await Effect.runPromise(Effect.either(program));
-    if (Either.isLeft(outcome)) throw outcome.left;
+    if (Either.isLeft(outcome)) {
+      try {
+        observe({
+          stage: request.stage,
+          outcome: "failed",
+          durationMs: Date.now() - startedAt,
+          failure: outcome.left._tag,
+          ...(outcome.left._tag === "ProviderGenerationFailure"
+            ? { retryable: outcome.left.retryable }
+            : {}),
+        });
+      } catch {
+        // Diagnostics must never change generation behavior.
+      }
+      throw outcome.left;
+    }
+    try {
+      observe({
+        stage: request.stage,
+        outcome: "succeeded",
+        durationMs: outcome.right.metadata.durationMs,
+        providerCalls: outcome.right.metadata.providerCalls,
+        finishReason: outcome.right.metadata.finishReason,
+        provider: outcome.right.metadata.provider,
+        modelId: outcome.right.metadata.modelId,
+        inputTokens: outcome.right.metadata.usage.inputTokens,
+        outputTokens: outcome.right.metadata.usage.outputTokens,
+      });
+    } catch {
+      // Diagnostics must never change generation behavior.
+    }
     return outcome.right;
   };
 }

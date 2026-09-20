@@ -86,7 +86,11 @@ function spec4(outline: ReturnType<typeof makeOutline>) {
 
 function lessonJson(title: string): string {
   return json({
-    body: [{ kind: "p", text: `Body ${title}.` }],
+    body: [
+      { kind: "p", text: `Body ${title}.` },
+      { kind: "p", text: "Apply the idea." },
+      { kind: "p", text: "Check the result." },
+    ],
     workedExample: [{ kind: "p", text: "Worked." }],
     recallPrompt: `Recall ${title}?`,
     selfExplanationPrompt: "Why?",
@@ -159,12 +163,7 @@ describe("generation prompt carries shared context", () => {
     const lesson = parseLessonContent("l1", "Lesson one", JSON.parse(lessonJson("Lesson one")));
     const model = scriptedModel([
       json({
-        body: [{ kind: "p", text: "Fixed." }],
-        workedExample: [{ kind: "p", text: "Worked." }],
-        recallPrompt: "R?",
-        selfExplanationPrompt: "W?",
-        exercise: { task: "Do.", check: "Done." },
-        bridge: "Next.",
+        replacements: [{ quote: "Body Lesson one.", replacement: "Fixed.", replaceAll: false }],
       }),
     ]);
     await correctLesson(
@@ -172,7 +171,15 @@ describe("generation prompt carries shared context", () => {
       { topic: "t", goal: "g", language: "en" },
       spec,
       lesson,
-      [{ kind: "factual", lessonRef: "l1", detail: "Wrong.", correction: "Fix." }],
+      [
+        {
+          kind: "factual",
+          lessonRef: "l1",
+          quote: "Body Lesson one.",
+          detail: "Wrong.",
+          correction: "Fix.",
+        },
+      ],
       [],
     );
     expect(model.prompts[0]).toContain("Ship the app");
@@ -448,12 +455,7 @@ describe("staged corrections preserve Exercises", () => {
     const before = { ...lesson.exercise };
     const model = scriptedModel([
       json({
-        body: [{ kind: "p", text: "Rewritten prose." }],
-        workedExample: [{ kind: "p", text: "Reworked example." }],
-        recallPrompt: "New recall?",
-        selfExplanationPrompt: "New why?",
-        exercise: { task: "CHANGED", check: "CHANGED" },
-        bridge: "New bridge.",
+        replacements: [{ quote: "Body l2.", replacement: "Rewritten prose.", replaceAll: false }],
       }),
     ]);
     const corrected = await correctLesson(
@@ -465,6 +467,7 @@ describe("staged corrections preserve Exercises", () => {
         {
           kind: "factual",
           lessonRef: "l2",
+          quote: "Body l2.",
           detail: "Prose drifts.",
           correction: "Tighten.",
         },

@@ -96,32 +96,45 @@ describe("gatherSources", () => {
 });
 
 describe("selectExcerpts", () => {
-  it("uses the model's excerpt per url and slices it to the ceiling", async () => {
+  it("uses verbatim model excerpts and rejects an invented excerpt", async () => {
+    const verbatim = "The AI SDK has a generateText function. ".repeat(10).trim();
     const excerptModel = scriptedModel([
       json({
         excerpts: [
-          { url: "https://sdk.vercel.example/docs", excerpt: "x".repeat(700) },
-          { url: "https://sdk.vercel.example/streaming", excerpt: "streamText streams tokens." },
+          { url: "https://sdk.vercel.example/docs", excerpt: verbatim },
+          {
+            url: "https://sdk.vercel.example/streaming",
+            excerpt: "streamText streams tokens as they arrive.",
+          },
         ],
       }),
     ]);
     const found = await gatherSources(fakeFirecrawl(fetched).searcher, course);
     const excerpts = await selectExcerpts(excerptModel.model, course, found);
 
-    expect(excerpts.get("https://sdk.vercel.example/docs")).toHaveLength(600);
-    expect(excerpts.get("https://sdk.vercel.example/streaming")).toBe("streamText streams tokens.");
+    expect(excerpts.get("https://sdk.vercel.example/docs")).toBe(verbatim);
+    expect(excerpts.get("https://sdk.vercel.example/streaming")).toBe(
+      "streamText streams tokens as they arrive.",
+    );
   });
 
   it("falls back to the page's opening lines when the model skips a url", async () => {
     const excerptModel = scriptedModel([
       json({
-        excerpts: [{ url: "https://sdk.vercel.example/docs", excerpt: "The one that matters." }],
+        excerpts: [
+          {
+            url: "https://sdk.vercel.example/docs",
+            excerpt: "The AI SDK has a generateText function.",
+          },
+        ],
       }),
     ]);
     const found = await gatherSources(fakeFirecrawl(fetched).searcher, course);
     const excerpts = await selectExcerpts(excerptModel.model, course, found);
 
-    expect(excerpts.get("https://sdk.vercel.example/docs")).toBe("The one that matters.");
+    expect(excerpts.get("https://sdk.vercel.example/docs")).toBe(
+      "The AI SDK has a generateText function.",
+    );
     expect(excerpts.get("https://sdk.vercel.example/streaming")).toContain(
       "streamText streams tokens",
     );
@@ -145,8 +158,14 @@ describe("collectSources", () => {
     const excerptModel = scriptedModel([
       json({
         excerpts: [
-          { url: "https://sdk.vercel.example/docs", excerpt: "generateText builds courses." },
-          { url: "https://sdk.vercel.example/streaming", excerpt: "streamText streams." },
+          {
+            url: "https://sdk.vercel.example/docs",
+            excerpt: "The AI SDK has a generateText function.",
+          },
+          {
+            url: "https://sdk.vercel.example/streaming",
+            excerpt: "streamText streams tokens as they arrive.",
+          },
         ],
       }),
     ]);
@@ -157,7 +176,7 @@ describe("collectSources", () => {
     expect(sources[0]).toMatchObject({
       title: "AI SDK docs",
       url: "https://sdk.vercel.example/docs",
-      excerpt: "generateText builds courses.",
+      excerpt: "The AI SDK has a generateText function.",
     });
     for (const s of sources) {
       expect(s.ref).toMatch(/^src-/);
@@ -367,7 +386,9 @@ describe("design persistence", () => {
     const pages = runCourse.grounding ? fetched.slice(0, 2) : [];
     const firecrawl = fakeFirecrawl(pages);
     const excerptModel = scriptedModel([
-      json({ excerpts: pages.map((p) => ({ url: p.url, excerpt: `Excerpt for ${p.title}` })) }),
+      json({
+        excerpts: pages.map((p) => ({ url: p.url, excerpt: p.content.slice(0, 80).trim() })),
+      }),
     ]);
     const sources = await collectSources(firecrawl.searcher, excerptModel.model, runCourse);
 
@@ -430,7 +451,7 @@ describe("design persistence", () => {
     expect(first).toMatchObject({
       ref: outcome.sources[0].ref,
       title: "AI SDK docs",
-      excerpt: "Excerpt for AI SDK docs",
+      excerpt: outcome.sources[0].excerpt,
     });
     expect(first.fetchedAt).toBeInstanceOf(Date);
 

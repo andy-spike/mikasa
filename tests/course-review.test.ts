@@ -13,7 +13,7 @@ import { makeTestDb } from "./helpers/test-db";
 import { makeOutline, makeSpec } from "./helpers/fixtures";
 import type { LessonContent } from "@/lib/course/content";
 
-const { correctLesson, MAX_CORRECTION_ROUNDS, structuralFindings } =
+const { applyLessonCorrections, correctLesson, MAX_CORRECTION_ROUNDS, structuralFindings } =
   await import("@/lib/course/review");
 const { parseLessonContent } = await import("@/lib/course/content");
 const {
@@ -182,12 +182,13 @@ describe("correctLesson", () => {
   it("rewrites only the affected Lesson, in the same six-part shape", async () => {
     const model = scriptedModel([
       json({
-        body: [{ kind: "p", text: "Explanation, now with v7." }],
-        workedExample: [{ kind: "p", text: "Worked through the chat app." }],
-        recallPrompt: "What was first?",
-        selfExplanationPrompt: "Why this way?",
-        exercise: { task: "Do it.", check: "It ran." },
-        bridge: "Next comes more.",
+        replacements: [
+          {
+            quote: "Explanation.",
+            replacement: "Explanation, now with v7.",
+            replaceAll: false,
+          },
+        ],
       }),
     ]);
 
@@ -196,26 +197,29 @@ describe("correctLesson", () => {
       { topic: "t", goal: "g", language: "en" },
       SPEC,
       contentFor("l1"),
-      [{ kind: "factual", lessonRef: "l1", detail: "Wrong version.", correction: "Say v7." }],
+      [
+        {
+          kind: "factual",
+          lessonRef: "l1",
+          quote: "Explanation.",
+          detail: "Wrong version.",
+          correction: "Say v7.",
+        },
+      ],
       [],
     );
 
     expect(corrected.lessonId).toBe("l1");
     expect(corrected.body[0]).toMatchObject({ text: "Explanation, now with v7." });
     expect(model.prompts[0]).toContain("Wrong version.");
-    expect(JSON.stringify(model.responseFormats[0])).toContain('"kind"');
+    expect(JSON.stringify(model.responseFormats[0])).toContain('"replacements"');
   });
 
   it("holds the corrected Lesson to the example contract", async () => {
     const contract = "img.card-img; 300px and 500px breakpoints";
     const model = scriptedModel([
       json({
-        body: [{ kind: "p", text: "Fixed." }],
-        workedExample: [{ kind: "p", text: "Worked." }],
-        recallPrompt: "What?",
-        selfExplanationPrompt: "Why?",
-        exercise: { task: "Do it.", check: "It ran." },
-        bridge: "Next.",
+        replacements: [{ quote: "Explanation.", replacement: "Fixed.", replaceAll: false }],
       }),
     ]);
 
@@ -235,6 +239,7 @@ describe("correctLesson", () => {
         {
           kind: "factual",
           lessonRef: "l1",
+          quote: "Explanation.",
           detail: "Names drift.",
           correction: "Match the contract.",
         },
@@ -249,12 +254,7 @@ describe("correctLesson", () => {
   it("shows the corrected Lesson the other Lessons' current text", async () => {
     const model = scriptedModel([
       json({
-        body: [{ kind: "p", text: "Fixed." }],
-        workedExample: [{ kind: "p", text: "Worked." }],
-        recallPrompt: "What?",
-        selfExplanationPrompt: "Why?",
-        exercise: { task: "Do it.", check: "It ran." },
-        bridge: "Next.",
+        replacements: [{ quote: "Explanation.", replacement: "Fixed.", replaceAll: false }],
       }),
     ]);
 
@@ -267,6 +267,7 @@ describe("correctLesson", () => {
         {
           kind: "factual",
           lessonRef: "l2",
+          quote: "Explanation.",
           detail: "The recap contradicts Lesson 1.",
           correction: "Match what Lesson 1 ships.",
         },
@@ -282,6 +283,57 @@ describe("correctLesson", () => {
 
     expect(model.prompts[0]).toContain("currently stand");
     expect(model.prompts[0]).toContain("EXERCISE: Wrap one card | CHECK: class names match");
+  });
+
+  it("rejects ambiguous replacements unless the model explicitly replaces all matches", () => {
+    const lesson = contentFor("l1", {
+      body: [{ kind: "p", text: "Wrong. Wrong.", sourceRefs: ["src-1"] }],
+    });
+    const finding = {
+      kind: "factual" as const,
+      lessonRef: "l1",
+      quote: "Wrong.",
+      detail: "Wrong twice.",
+      correction: "Fix both.",
+    };
+    expect(() =>
+      applyLessonCorrections(
+        lesson,
+        [finding],
+        [{ quote: "Wrong.", replacement: "Right.", replaceAll: false }],
+      ),
+    ).toThrow(/ambiguous/);
+    expect(
+      applyLessonCorrections(
+        lesson,
+        [finding],
+        [{ quote: "Wrong.", replacement: "Right.", replaceAll: true }],
+      ).body[0],
+    ).toMatchObject({ text: "Right. Right." });
+  });
+
+  it("keeps every unmentioned field byte-for-byte and protects the Exercise", () => {
+    const lesson = contentFor("l1");
+    const before = structuredClone(lesson);
+    const corrected = applyLessonCorrections(
+      lesson,
+      [
+        {
+          kind: "factual",
+          lessonRef: "l1",
+          quote: "Explanation.",
+          detail: "Wrong.",
+          correction: "Fix.",
+        },
+      ],
+      [{ quote: "Explanation.", replacement: "Fixed.", replaceAll: false }],
+      true,
+    );
+    expect(corrected).toEqual({
+      ...before,
+      body: [{ ...before.body[0], text: "Fixed." }],
+    });
+    expect(corrected.exercise).toEqual(before.exercise);
   });
 });
 

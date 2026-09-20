@@ -1,0 +1,1 @@
+ALTER TABLE "review_findings" ADD COLUMN "quote" text;

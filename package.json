@@ -15,7 +15,8 @@
     "db:generate": "DATABASE_TARGET=dev drizzle-kit generate",
     "db:migrate": "DATABASE_TARGET=dev drizzle-kit migrate",
     "db:migrate:main": "DATABASE_TARGET=main drizzle-kit migrate",
-    "dev:reset": "node scripts/dev-reset.mts"
+    "dev:reset": "node scripts/dev-reset.mts",
+    "model:smoke": "node scripts/model-generation-smoke.mts"
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.103",

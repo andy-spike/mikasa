@@ -42,6 +42,11 @@ export const lessonContentSchema = z.object({
   bridge: z.string().min(1),
 });
 
+export const generatedLessonContentSchema = lessonContentSchema.extend({
+  body: z.array(blockSchema).min(3).max(7),
+  workedExample: z.array(blockSchema).min(1).max(4),
+});
+
 export type LessonContent = z.infer<typeof lessonContentSchema> & {
   lessonId: string;
   title: string;

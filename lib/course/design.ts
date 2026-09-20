@@ -142,7 +142,10 @@ export async function selectExcerpts(
   const result = new Map<string, string>();
   for (const page of pages) {
     const picked = (chosen.get(page.url) ?? "").trim().slice(0, EXCERPT_MAX_CHARS);
-    result.set(page.url, chosen.has(page.url) ? picked : fallback(page));
+    result.set(
+      page.url,
+      chosen.has(page.url) && (!picked || page.content.includes(picked)) ? picked : fallback(page),
+    );
   }
   return result;
 }
@@ -154,6 +157,7 @@ export async function collectSources(
   newRef: () => string = () => `src-${nanoid(10)}`,
 ): Promise<GatheredSource[]> {
   const pages = await gatherSources(searcher, course);
+  for (const page of pages) validateFetchedPage(page);
   const excerpts = await selectExcerpts(excerptModel, course, pages);
   return pages.map((page) => ({
     ref: newRef(),
@@ -162,6 +166,22 @@ export async function collectSources(
     fetchedAt: page.fetchedAt,
     excerpt: excerpts.get(page.url) ?? "",
   }));
+}
+
+function validateFetchedPage(page: FetchedPage): void {
+  let url: URL;
+  try {
+    url = new URL(page.url);
+  } catch {
+    throw new DesignError(`Source "${page.title}" has an invalid URL.`);
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new DesignError(`Source "${page.title}" must use an HTTP or HTTPS URL.`);
+  }
+  const fetchedAt = new Date(page.fetchedAt);
+  if (Number.isNaN(fetchedAt.getTime()) || fetchedAt.toISOString() !== page.fetchedAt) {
+    throw new DesignError(`Source "${page.title}" has an invalid fetched time.`);
+  }
 }
 
 export type OutlineDraft = {
@@ -181,13 +201,13 @@ export type OutlineDraft = {
 const outlineSchema = z.object({
   modules: z.array(
     z.object({
-      title: z.string().min(1),
+      title: z.string().trim().min(1),
       lessons: z.array(
         z.object({
-          title: z.string().min(1),
-          summary: z.string().min(1).max(200),
+          title: z.string().trim().min(1),
+          summary: z.string().trim().min(1).max(200),
           // Models sometimes return fractional minutes; rounding beats failing the outline.
-          minutes: z.number().positive(),
+          minutes: z.number().min(5).max(90),
         }),
       ),
     }),
@@ -261,7 +281,7 @@ export async function draftOutline(
       "Plan the course backwards from the goal:",
       "- terminalPerformances: 2-5 things the learner can demonstrably DO at the end, phrased as verbs.",
       "- modules: each covers one area; lessons are a small, named step that serves its module.",
-      "- summaries: exactly ONE sentence per lesson, under 200 characters, saying what the learner gets from it.",
+      "- summaries: one short sentence per lesson, under 200 characters, saying what the learner gets from it when practical.",
       "- minutes: a realistic study estimate per lesson (5-90).",
       "- throughline: one running problem, project or scenario every lesson extends, plus the shared vocabulary.",
       "- throughline.exampleContract: pin the running example once, now, in this fixed template and nothing else:",
@@ -298,6 +318,29 @@ export function buildOutline(
     throw new DesignError(
       `The drafted Outline misses the ${depth} bounds of ${describeBounds(depth)}.`,
     );
+  }
+
+  const normalizedModuleTitles = draft.modules.map((module) => module.title.trim().toLowerCase());
+  if (normalizedModuleTitles.some((title) => !title)) {
+    throw new DesignError("Every Module needs a title.");
+  }
+  if (new Set(normalizedModuleTitles).size !== normalizedModuleTitles.length) {
+    throw new DesignError("Every Module needs a distinct title.");
+  }
+
+  const lessons = draft.modules.flatMap((module) => module.lessons);
+  const normalizedLessonTitles = lessons.map((lesson) => lesson.title.trim().toLowerCase());
+  if (normalizedLessonTitles.some((title) => !title)) {
+    throw new DesignError("Every Lesson needs a title.");
+  }
+  if (new Set(normalizedLessonTitles).size !== normalizedLessonTitles.length) {
+    throw new DesignError("Every Lesson needs a distinct title.");
+  }
+  const invalidMinutes = lessons.find(
+    (lesson) => !Number.isFinite(lesson.minutes) || lesson.minutes < 5 || lesson.minutes > 90,
+  );
+  if (invalidMinutes) {
+    throw new DesignError(`Lesson "${invalidMinutes.title}" needs a 5 to 90 minute estimate.`);
   }
 
   let lessonOrdinal = 0;

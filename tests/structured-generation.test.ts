@@ -36,6 +36,8 @@ function metadata(finishReason: FinishReason = "stop") {
     provider: "test-provider",
     modelId: "test-model",
     responseId: "response-1",
+    durationMs: 25,
+    providerCalls: 1,
   };
 }
 
@@ -73,6 +75,35 @@ describe("structured Course generation", () => {
       responseId: "response-1",
     });
     expect(seen).toEqual([{ timeoutMs: 180_000, maxRetries: 1 }]);
+  });
+
+  it("emits prompt-free diagnostics and ignores observer failures", async () => {
+    const events: unknown[] = [];
+    const adapter: StructuredGenerationAdapter = async <T>() => ({
+      output: { value: "done" } as T,
+      metadata: metadata(),
+    });
+    const generate = createStructuredGenerator(adapter, (event) => events.push(event));
+    await generate(request());
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        stage: "lesson-generation",
+        outcome: "succeeded",
+        durationMs: 25,
+        providerCalls: 1,
+        inputTokens: 10,
+        outputTokens: 20,
+      }),
+    ]);
+    expect(JSON.stringify(events)).not.toContain("private Course prompt");
+
+    const generateWithBrokenObserver = createStructuredGenerator(adapter, () => {
+      throw new Error("diagnostics unavailable");
+    });
+    await expect(generateWithBrokenObserver(request())).resolves.toMatchObject({
+      output: { value: "done" },
+    });
   });
 
   it.each([

@@ -110,7 +110,11 @@ const SPEC = makeSpec(OUTLINE, {
 
 function lessonJson(title: string): string {
   return json({
-    body: [{ kind: "p", text: `Repainted: **${title}** works now.` }],
+    body: [
+      { kind: "p", text: `Repainted: **${title}** works now.` },
+      { kind: "p", text: "Apply the updated idea." },
+      { kind: "p", text: "Check the updated result." },
+    ],
     workedExample: [{ kind: "p", text: "The sky wash, again." }],
     recallPrompt: `What does ${title} do?`,
     selfExplanationPrompt: "Why this order?",

@@ -267,6 +267,7 @@ export const reviewFindings = pgTable(
     round: integer("round").notNull(),
     kind: text("kind").notNull(),
     lessonRef: text("lesson_ref"),
+    quote: text("quote"),
     detail: text("detail").notNull(),
     correction: text("correction").notNull(),
     status: text("status").notNull().default("open"),

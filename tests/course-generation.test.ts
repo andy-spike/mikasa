@@ -112,11 +112,12 @@ async function seedCourse(grounding = true): Promise<string> {
   return course.id;
 }
 
-function lessonJson(title: string): string {
+function lessonJson(title: string, sourceRefs: string[] = []): string {
   return json({
     body: [
       { kind: "p", text: `How **${title}** works.` },
-      { kind: "p", text: "Grounded in the docs.", sourceRefs: ["src-1", "src-9"] },
+      { kind: "p", text: "Grounded in the docs.", sourceRefs },
+      { kind: "p", text: "Apply it in the running example." },
     ],
     workedExample: [{ kind: "p", text: "Walk the chat app." }],
     recallPrompt: `What does ${title} do?`,
@@ -174,8 +175,8 @@ describe("generationOrder", () => {
 });
 
 describe("generateLesson", () => {
-  it("returns all six parts and drops Source refs the Course does not have", async () => {
-    const model = scriptedModel([lessonJson("Lesson one")]);
+  it("returns all six parts with known Source refs", async () => {
+    const model = scriptedModel([lessonJson("Lesson one", ["src-1"])]);
     const content = await generateLesson(model.model, {
       course: { topic: "t", goal: "g", background: "b", language: "en", depth: "reach" },
       spec: SPEC,
@@ -186,11 +187,28 @@ describe("generateLesson", () => {
     });
 
     expect(content.lessonId).toBe("l1");
-    expect(content.body).toHaveLength(2);
+    expect(content.body).toHaveLength(3);
     expect(content.recallPrompt).toContain("Lesson one");
     expect(content.exercise.task).toContain("Lesson one");
     expect(content.bridge).toBeTruthy();
     expect((content.body[1] as { sourceRefs?: string[] }).sourceRefs).toEqual(["src-1"]);
+  });
+
+  it("rejects a Lesson that cites a Source the Course does not have", async () => {
+    const lesson = JSON.parse(lessonJson("Lesson one", ["src-1"]));
+    lesson.body[1].sourceRefs.push("src-9");
+    const model = scriptedModel([json(lesson)]);
+
+    await expect(
+      generateLesson(model.model, {
+        course: { topic: "t", goal: "g", background: "b", language: "en", depth: "reach" },
+        spec: SPEC,
+        lesson: { id: "l1", title: "Lesson one", summary: "First." },
+        nextLesson: { title: "Lesson two" },
+        priorLessons: [],
+        sources: [{ ref: "src-1", title: "Docs", url: "https://example.com", excerpt: "e" }],
+      }),
+    ).rejects.toThrow(GenerationError);
   });
 
   it("fails a Lesson the specification cannot align", async () => {

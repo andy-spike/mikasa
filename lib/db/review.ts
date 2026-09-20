@@ -75,6 +75,7 @@ export async function saveFindings(
           round,
           kind: f.kind,
           lessonRef: f.lessonRef,
+          quote: f.quote,
           detail: f.detail,
           correction: f.correction,
         })),

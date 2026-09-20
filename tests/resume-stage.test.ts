@@ -99,7 +99,11 @@ function lessonBodyText(title: string): string {
 
 function lessonJson(title: string): string {
   return json({
-    body: [{ kind: "p", text: lessonBodyText(title) }],
+    body: [
+      { kind: "p", text: lessonBodyText(title) },
+      { kind: "p", text: "Apply the idea." },
+      { kind: "p", text: "Check the result." },
+    ],
     workedExample: [{ kind: "p", text: "The sky wash, again." }],
     recallPrompt: `What does ${title} do?`,
     selfExplanationPrompt: "Why this order?",
