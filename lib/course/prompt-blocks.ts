@@ -23,12 +23,14 @@ export function sourceLine(
   return `- ${source.ref}: ${source.title} (${source.url}) — ${source.excerpt.slice(0, 300)}`;
 }
 
-// Pinned before any Lesson was written; the writer copies it verbatim.
+// Pinned before any Lesson was written; the writer preserves its fixed parts.
 export function contractWriteBlock(contract: string): string {
   return contractBlock([
-    "The shared example's contract, pinned before any Lesson was written. Copy its tags,",
-    "class names, and values verbatim wherever the running example appears. Never rename,",
-    "revalue, or restate them differently:",
+    "The shared example's contract was pinned before any Lesson was written.",
+    "Keep its fixed names, artifacts, and boundaries consistent. A value applies only",
+    "within the scope stated in the contract. Make choices marked Decide later in",
+    "the relevant Lesson; do not apply one choice to every part of the example.",
+    "Carry each choice forward until a later Lesson explicitly changes it:",
     contract,
     "",
   ]);
@@ -37,8 +39,10 @@ export function contractWriteBlock(contract: string): string {
 // Authoritative for the Lesson under correction; the corrector keeps it exact.
 export function contractCorrectBlock(contract: string): string {
   return contractBlock([
-    "The example contract below is authoritative: keep its tags, class names, and values",
-    "exactly as written in the corrected Lesson; never invent alternatives.",
+    "The example contract below is authoritative for its fixed names, artifacts,",
+    "and boundaries. Keep values within their stated scope. Choices marked Decide",
+    "later may differ across parts of the example; follow the Lesson alignment",
+    "and preserve choices already established unless a correction changes them.",
     contract,
   ]);
 }
@@ -46,9 +50,11 @@ export function contractCorrectBlock(contract: string): string {
 // Authoritative for the reviewer, but only breaking mismatches count.
 export function contractReviewBlock(contract: string): string {
   return contractBlock([
-    "The example contract below is authoritative. Flag only mismatches",
-    "that break code: wrong tags, class names, or values the Lesson uses",
-    "differently. Ignore rewording that runs the same:",
+    "The example contract below is authoritative for its fixed names, artifacts,",
+    "and boundaries. Flag only mismatches that break code or violate a fixed",
+    "boundary. Choices marked Decide later may differ by resource and may",
+    "evolve across Lessons when explained. Flag unexplained changes that break",
+    "the example. Ignore rewording that has the same effect:",
     contract,
   ]);
 }

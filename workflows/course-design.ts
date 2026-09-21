@@ -1,10 +1,16 @@
 // Step args cross process boundaries as JSON, so providers resolve inside each step.
-import type { DesignCourse, OutlineDraft } from "@/lib/course/design";
+import type {
+  DesignCourse,
+  ModuleAlignment,
+  OutlineDraft,
+  SharedSpecification,
+} from "@/lib/course/design";
 import type {
   CourseSpecification,
   DesignOutcome,
   GatheredSource,
   OutlineData,
+  OutlineModule,
 } from "@/lib/course/types";
 
 export type DesignStep = "sources" | "outline" | "specification" | "persist";
@@ -205,20 +211,10 @@ async function stepDesignOutline(
   return { outline, draft, outlineVersion: saved.version };
 }
 
-async function stepDesignSpecification(
-  course: DesignCourse,
-  courseId: string,
-  runId: string,
-  outline: OutlineData,
-  draft: OutlineDraft,
-  sources: GatheredSource[],
-): Promise<CourseSpecification> {
+async function stepBeginSpecification(courseId: string, runId: string): Promise<void> {
   "use step";
-  const { designSpecification } = await import("@/lib/course/design");
-  const { designModel } = await import("@/lib/model");
   const { appendDesignEvent } = await import("@/lib/db/design");
   const { db } = await import("@/lib/db");
-
   await appendDesignEvent(
     db,
     courseId,
@@ -226,7 +222,37 @@ async function stepDesignSpecification(
     "specification-working",
     "Linking each Lesson to the Goal and the final exercise.",
   );
-  const specification = await designSpecification(designModel(), course, outline, draft, sources);
+}
+
+async function stepDesignSharedSpecification(
+  course: DesignCourse,
+  outline: OutlineData,
+  draft: OutlineDraft,
+  sources: GatheredSource[],
+): Promise<SharedSpecification> {
+  "use step";
+  const { designSharedSpecification } = await import("@/lib/course/design");
+  const { designModel } = await import("@/lib/model");
+  return designSharedSpecification(designModel(), course, outline, draft, sources);
+}
+
+async function stepDesignModuleAlignment(
+  course: DesignCourse,
+  outline: OutlineData,
+  module: OutlineModule,
+  shared: SharedSpecification,
+  sources: GatheredSource[],
+): Promise<ModuleAlignment> {
+  "use step";
+  const { designModuleAlignment } = await import("@/lib/course/design");
+  const { designModel } = await import("@/lib/model");
+  return designModuleAlignment(designModel(), course, outline, module, shared, sources);
+}
+
+async function stepFinishSpecification(courseId: string, runId: string): Promise<void> {
+  "use step";
+  const { appendDesignEvent } = await import("@/lib/db/design");
+  const { db } = await import("@/lib/db");
   await appendDesignEvent(
     db,
     courseId,
@@ -234,7 +260,19 @@ async function stepDesignSpecification(
     "specification-ready",
     "The Lesson connections are set. Saving the Outline for your review.",
   );
-  return specification;
+}
+
+async function stepAssembleSpecification(
+  course: DesignCourse,
+  outline: OutlineData,
+  draft: OutlineDraft,
+  sources: GatheredSource[],
+  shared: SharedSpecification,
+  modules: ModuleAlignment[],
+): Promise<CourseSpecification> {
+  "use step";
+  const { assembleSpecification } = await import("@/lib/course/design");
+  return assembleSpecification(course, outline, draft, sources, shared, modules);
 }
 
 async function stepPersist(
@@ -296,14 +334,35 @@ export async function designCourseWorkflow(
     if (await stepDesignCancelled(courseId)) return { ok: false as const, reason: "cancelled" };
 
     await stepMarkStep(runId, "specification");
-    const specification = await stepDesignSpecification(
+    await stepBeginSpecification(courseId, runId);
+    const shared = await stepDesignSharedSpecification(
       loaded.course,
-      courseId,
-      runId,
       built.outline,
       built.draft,
       sources,
     );
+    const moduleAlignments: ModuleAlignment[] = [];
+    for (let index = 0; index < built.outline.modules.length; index += 3) {
+      const batch = built.outline.modules.slice(index, index + 3);
+      const results = await Promise.allSettled(
+        batch.map((module) =>
+          stepDesignModuleAlignment(loaded.course, built.outline, module, shared, sources),
+        ),
+      );
+      for (const result of results) {
+        if (result.status === "rejected") throw result.reason;
+        moduleAlignments.push(result.value);
+      }
+    }
+    const specification = await stepAssembleSpecification(
+      loaded.course,
+      built.outline,
+      built.draft,
+      sources,
+      shared,
+      moduleAlignments,
+    );
+    await stepFinishSpecification(courseId, runId);
     if (await stepDesignCancelled(courseId)) return { ok: false as const, reason: "cancelled" };
 
     await stepMarkStep(runId, "persist");

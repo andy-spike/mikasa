@@ -6,7 +6,8 @@ import { depthBounds, depthTargetShape, type CourseInput, type DepthId } from ".
 import { languageName as courseLanguageName } from "./prompt-blocks";
 import {
   outlineLessonsWithModule,
-  specificationDesignSchema,
+  sharedSpecificationSchema,
+  moduleAlignmentSchema,
   validateSpecification,
 } from "./specification";
 import { generateStructuredStage } from "./structured-generation";
@@ -263,7 +264,7 @@ export async function draftOutline(
   const { output } = await generateStructuredStage({
     stage: "outline-draft",
     model,
-    providerOptions: designProviderOptions(),
+    providerOptions: designProviderOptions("low"),
     schema: outlineSchema,
     prompt: [
       "You design course outlines for Mikasa. A course takes a learner from their background to a concrete goal.",
@@ -284,10 +285,11 @@ export async function draftOutline(
       "- summaries: one short sentence per lesson, under 200 characters, saying what the learner gets from it when practical.",
       "- minutes: a realistic study estimate per lesson (5-90).",
       "- throughline: one running problem, project or scenario every lesson extends, plus the shared vocabulary.",
-      "- throughline.exampleContract: pin the running example once, now, in this fixed template and nothing else:",
-      "  Tags: <exact tags in order>; Classes: <exact class names>; Values: <exact shared values, breakpoints, sizes, units, file names>.",
-      "  Lessons copy this verbatim; anything not pinned here each Lesson may choose, but never contradict.",
-      "  Use an empty string only when the Topic has no cumulative example.",
+      "- throughline.exampleContract: describe what stays the same in the running example across Lessons.",
+      "  Use two labeled parts: Fixed: <concrete names, artifacts, roles, and boundaries>; Decide later: <choices the Lessons will make>.",
+      "  Pin a value only when it truly applies everywhere within its stated scope, such as an established design breakpoint.",
+      "  Do not preselect the answer to the Goal. If the Course designs a policy, leave its settings to the Lessons and state which resources may need different settings.",
+      "  Keep the contract concise. Use an empty string only when the Topic has no cumulative example.",
       "- exclusions: what this course deliberately leaves out.",
       "- learnerAssumptions: what you assume they already know, derived from the background.",
       "",
@@ -366,62 +368,189 @@ export function buildOutline(
   return { modules };
 }
 
-export async function designSpecification(
+export type SharedSpecification = z.infer<typeof sharedSpecificationSchema>;
+export type ModuleAlignment = z.infer<typeof moduleAlignmentSchema>["alignment"];
+
+export async function designSharedSpecification(
   model: LanguageModel,
   course: DesignCourse,
   outline: OutlineData,
   draft: OutlineDraft,
   sources: GatheredSource[],
-): Promise<CourseSpecification> {
+): Promise<SharedSpecification> {
   const lessons = outlineLessonsWithModule(outline);
-
   const { output } = await generateStructuredStage({
     stage: "course-specification",
     model,
     providerOptions: designProviderOptions(),
-    schema: specificationDesignSchema,
+    schema: sharedSpecificationSchema,
     prompt: [
-      "You materialize Mikasa's private Course specification. The learner approved nothing yet;",
-      "this document is the hidden context every Lesson will be written from.",
-      "",
+      "Design the shared decisions for Mikasa's private Course specification.",
       `Topic: ${course.topic}`,
       `Goal: ${course.goal}`,
       course.background ? `Background: ${course.background}` : "Background: none given.",
       `Depth: ${course.depth} (${depthIntent(course.depth)}).`,
       `Course language: write every phrase in ${courseLanguageName(course.language)}.`,
-      "",
-      "The Outline is frozen. Use exactly these lesson ids:",
-      ...lessons.map((l) => `- ${l.id} — Module "${l.module}", "${l.title}": ${l.summary}`),
-      "",
+      "The Outline is frozen. Use exactly these Module and Lesson ids:",
+      ...outline.modules.flatMap((module) => [
+        `Module ${module.id}: ${module.title}`,
+        ...module.lessons.map((lesson) => `- ${lesson.id}: ${lesson.title} — ${lesson.summary}`),
+      ]),
       "Terminal performances:",
-      ...draft.terminalPerformances.map((p) => `- ${p}`),
-      "Throughline:",
-      JSON.stringify(draft.throughline),
+      ...draft.terminalPerformances.map((performance) => `- ${performance}`),
+      `Throughline: ${JSON.stringify(draft.throughline)}`,
+      "The running example contract fixes shared identity and scope. Do not turn a choice marked Decide later into one value for every part of the example.",
       draft.exclusions.length ? `Exclusions: ${draft.exclusions.join("; ")}` : "",
       draft.learnerAssumptions.length
         ? `Learner assumptions: ${draft.learnerAssumptions.join("; ")}`
         : "",
-      "",
       sources.length
-        ? "Source refs you may cite (use exactly these): " +
-          sources.map((s) => `${s.ref} (${s.url})`).join(", ")
+        ? "Source refs you may cite: " +
+          sources.map((source) => `${source.ref} (${source.url})`).join(", ")
         : "Grounding was off: return an empty evidence array.",
-      "",
-      "Produce:",
-      "- learningGraph: one node per skill/concept (ids g1, g2, ... in order; every id unique, matching /^g\\d+$/), each introduced by exactly one lessonId from the list above, with requires listing node ids introduced at the same or an earlier Lesson. Never require a skill introduced later.",
-      "- alignment: for EVERY lesson id: the performance it teaches (distinct from every other Lesson's performance — duplicates fail validation; two Lessons with the same performance read as duplicate Lessons), the graph nodes it assumes (only nodes introduced at the same or an earlier Lesson), the module milestone it advances, how its Exercise contributes to the final one, exampleStart (how the shared running example looks before this Lesson; empty when the Topic has no cumulative example), exampleEnd (how it looks after; empty when none), and sourceRefs (stored Source refs this Lesson leans on; empty array is fine when it leans on none).",
-      "- finalExercise: the one task that evidences the goal, with concrete acceptance checks.",
-      "- evidence: for each source ref you actually rely on, the claim it supports.",
-      "",
-      "Write in the course language. Return JSON only.",
+      "Produce learningGraph with unique g1, g2, ... ids. Each node belongs to one listed Lesson and may require only nodes introduced at the same or an earlier Lesson.",
+      "Produce finalExercise: one task that evidences the Goal, with concrete acceptance checks.",
+      "Produce evidence for each Source ref you rely on.",
+      "Produce modules: exactly one entry per Module id in Outline order. Each entry fixes that Module's milestone and the shared running example at its start and end. The exampleEnd of one Module must exactly equal the exampleStart of the next. Use empty strings throughout when there is no cumulative example.",
+      "Do not produce Lesson alignment here. Write in the Course language. Return JSON only.",
     ]
       .filter(Boolean)
       .join("\n"),
   });
+  if (!output) throw new DesignError("The model returned no shared specification.");
+  if (
+    output.modules.length !== outline.modules.length ||
+    output.modules.some((module, index) => module.moduleId !== outline.modules[index].id)
+  ) {
+    throw new DesignError("The shared specification must include every Module in Outline order.");
+  }
+  for (let index = 1; index < output.modules.length; index++) {
+    if (output.modules[index].exampleStart !== output.modules[index - 1].exampleEnd) {
+      throw new DesignError(
+        `The running example changes between Modules ${index} and ${index + 1}.`,
+      );
+    }
+  }
+  const lessonIds = new Set(lessons.map((lesson) => lesson.id));
+  const positions = new Map(lessons.map((lesson, index) => [lesson.id, index]));
+  const graphIds = new Set<string>();
+  for (const node of output.learningGraph) {
+    if (graphIds.has(node.id) || !lessonIds.has(node.lessonId)) {
+      throw new DesignError(`The learning graph has an invalid node ${node.id}.`);
+    }
+    graphIds.add(node.id);
+  }
+  for (const node of output.learningGraph) {
+    if (
+      new Set(node.requires).size !== node.requires.length ||
+      node.requires.some((id) => {
+        const prerequisite = output.learningGraph.find((candidate) => candidate.id === id);
+        return (
+          !prerequisite ||
+          (positions.get(prerequisite.lessonId) ?? Infinity) > (positions.get(node.lessonId) ?? -1)
+        );
+      })
+    ) {
+      throw new DesignError(`The learning graph has invalid prerequisites for ${node.id}.`);
+    }
+  }
+  const sourceRefs = new Set(sources.map((source) => source.ref));
+  if (output.evidence.some((item) => !sourceRefs.has(item.sourceRef))) {
+    throw new DesignError("The shared specification cites a Source the Course does not have.");
+  }
+  return output;
+}
 
-  if (!output) throw new DesignError("The model returned no specification.");
+export async function designModuleAlignment(
+  model: LanguageModel,
+  course: DesignCourse,
+  outline: OutlineData,
+  module: OutlineModule,
+  shared: SharedSpecification,
+  sources: GatheredSource[],
+): Promise<ModuleAlignment> {
+  const boundary = shared.modules.find((item) => item.moduleId === module.id);
+  if (!boundary) throw new DesignError(`The shared specification skipped Module ${module.id}.`);
+  const { output } = await generateStructuredStage({
+    stage: "course-specification-module",
+    model,
+    providerOptions: designProviderOptions(),
+    schema: moduleAlignmentSchema,
+    prompt: [
+      "Write Lesson alignment for one Module of Mikasa's private Course specification.",
+      `Topic: ${course.topic}`,
+      `Goal: ${course.goal}`,
+      `Course language: write every phrase in ${courseLanguageName(course.language)}.`,
+      `Module ${module.id}: ${module.title}`,
+      "Use exactly these Lesson ids, in this order:",
+      ...module.lessons.map((lesson) => `- ${lesson.id}: ${lesson.title} — ${lesson.summary}`),
+      `Module milestone (copy exactly): ${boundary.milestone}`,
+      `Running example before this Module (copy exactly): ${boundary.exampleStart}`,
+      `Running example after this Module (copy exactly): ${boundary.exampleEnd}`,
+      `Final Exercise: ${JSON.stringify(shared.finalExercise)}`,
+      `Learning graph (reference only these ids): ${JSON.stringify(shared.learningGraph)}`,
+      sources.length
+        ? `Available Source refs: ${sources.map((source) => source.ref).join(", ")}`
+        : "There are no Sources. Use empty sourceRefs arrays.",
+      "For every Lesson produce one alignment entry: a distinct performance, prerequisiteNodes introduced by this or an earlier Lesson, how its Exercise contributes to the final Exercise, exampleStart, exampleEnd, and sourceRefs.",
+      "Copy the Module milestone into every moduleMilestone. The first exampleStart and last exampleEnd must match the fixed Module boundaries. Each Lesson's exampleEnd must exactly equal the next Lesson's exampleStart. Use empty strings if there is no cumulative example.",
+      "Return JSON only.",
+    ].join("\n"),
+  });
+  if (!output) throw new DesignError(`The model returned no alignment for Module ${module.title}.`);
+  const alignment = output.alignment;
+  if (
+    alignment.length !== module.lessons.length ||
+    alignment.some((entry, index) => entry.lessonId !== module.lessons[index].id)
+  ) {
+    throw new DesignError(`Module ${module.title} must align every Lesson in Outline order.`);
+  }
+  if (
+    alignment.some((entry) => entry.moduleMilestone !== boundary.milestone) ||
+    alignment[0].exampleStart !== boundary.exampleStart ||
+    alignment[alignment.length - 1].exampleEnd !== boundary.exampleEnd ||
+    alignment.some(
+      (entry, index) => index > 0 && entry.exampleStart !== alignment[index - 1].exampleEnd,
+    )
+  ) {
+    throw new DesignError(
+      `Module ${module.title} does not follow its fixed milestone or running example.`,
+    );
+  }
+  const graph = new Map(shared.learningGraph.map((node) => [node.id, node]));
+  const positions = new Map(
+    outline.modules.flatMap((item) => item.lessons).map((lesson, index) => [lesson.id, index]),
+  );
+  const sourceRefs = new Set(sources.map((source) => source.ref));
+  for (const entry of alignment) {
+    if (
+      new Set(entry.prerequisiteNodes).size !== entry.prerequisiteNodes.length ||
+      new Set(entry.sourceRefs).size !== entry.sourceRefs.length ||
+      entry.sourceRefs.some((ref) => !sourceRefs.has(ref)) ||
+      entry.prerequisiteNodes.some((id) => {
+        const node = graph.get(id);
+        return (
+          !node ||
+          (positions.get(node.lessonId) ?? Infinity) > (positions.get(entry.lessonId) ?? -1)
+        );
+      })
+    ) {
+      throw new DesignError(
+        `Lesson ${entry.lessonId} has invalid Source or learning graph references.`,
+      );
+    }
+  }
+  return alignment;
+}
 
-  const sourceRefSet = new Set(sources.map((s) => s.ref));
+export function assembleSpecification(
+  course: DesignCourse,
+  outline: OutlineData,
+  draft: OutlineDraft,
+  sources: GatheredSource[],
+  shared: SharedSpecification,
+  modules: ModuleAlignment[],
+): CourseSpecification {
   const candidate: CourseSpecification = {
     contract: {
       topic: course.topic,
@@ -434,17 +563,34 @@ export async function designSpecification(
       learnerAssumptions: draft.learnerAssumptions,
     },
     throughline: draft.throughline,
-    learningGraph: output.learningGraph,
-    alignment: output.alignment,
-    finalExercise: output.finalExercise,
-    evidence: output.evidence,
+    learningGraph: shared.learningGraph,
+    alignment: modules.flat(),
+    finalExercise: shared.finalExercise,
+    evidence: shared.evidence,
   };
   try {
-    validateSpecification(candidate, outline, sourceRefSet);
+    validateSpecification(candidate, outline, new Set(sources.map((source) => source.ref)));
   } catch (error) {
     throw new DesignError(
       error instanceof Error ? error.message : "The specification did not validate.",
     );
   }
   return candidate;
+}
+
+export async function designSpecification(
+  model: LanguageModel,
+  course: DesignCourse,
+  outline: OutlineData,
+  draft: OutlineDraft,
+  sources: GatheredSource[],
+): Promise<CourseSpecification> {
+  const shared = await designSharedSpecification(model, course, outline, draft, sources);
+  const modules: ModuleAlignment[] = [];
+  for (const outlineModule of outline.modules) {
+    modules.push(
+      await designModuleAlignment(model, course, outline, outlineModule, shared, sources),
+    );
+  }
+  return assembleSpecification(course, outline, draft, sources, shared, modules);
 }

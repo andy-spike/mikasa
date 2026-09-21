@@ -9,7 +9,7 @@ Course workflow's steps.
 | Concern                    | Installed version                   | Current use                                                                                                                                                                                 |
 | -------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AI SDK Core                | `ai` 7.0.100                        | `generateText` with `Output.object` for Course design, Course specification, Lesson generation, review, correction, and reconciliation; `streamText` with tools for Tutor and Tailor turns. |
-| OpenRouter AI SDK provider | `@openrouter/ai-sdk-provider` 3.0.0 | `createOpenRouter`; all models use `google/gemini-3.7-flash`, routed only to `google-ai-studio`, with `service_tier: "flex"`.                                                               |
+| OpenRouter AI SDK provider | `@openrouter/ai-sdk-provider` 3.0.0 | `createOpenRouter`; Course text uses `z-ai/glm-5.3-flash:nitro`, restricted to CoreWeave, Together, Fireworks, and Baseten with `require_parameters: true`. Embeddings use OpenAI.          |
 | Zod                        | 4.6.1                               | Schemas passed to `Output.object` and Tailor tools.                                                                                                                                         |
 | Vercel Workflow            | `workflow` 4.8.5                    | Durable Course design, Course generation, review, correction, and Course revision.                                                                                                          |
 | Firecrawl                  | `firecrawl` 4.38.0                  | Optional Grounding search and Markdown page retrieval before Course design.                                                                                                                 |
@@ -47,10 +47,10 @@ strict mode. The current model setup already has
 does not support the requested parameters. This is a useful reliability guard.
 
 The missing operational guard is a startup or deployment check that the chosen
-model _and_ `google-ai-studio` still advertise the required structured-output
-parameter. Do that outside a learner request. If the capability disappears,
-fail configuration clearly instead of discovering it midway through a Course
-build.
+model _and_ every provider in the route still advertise the required
+structured-output parameter. Do that outside a learner request. If a capability
+disappears, fail configuration clearly instead of discovering it midway through
+a Course build.
 
 - Sources: [OpenRouter structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs), [OpenRouter provider routing](https://openrouter.ai/docs/guides/routing/provider-selection), [OpenRouter's AI SDK integration](https://openrouter.ai/docs/community/frameworks).
 
@@ -100,28 +100,38 @@ finish event, rather than inferring success only from nonempty collected text.
 
 ### 5. Separate provider routing reliability from output consistency
 
-The configured OpenRouter route is deliberately strict:
-`order: ["google-ai-studio"]`, `allow_fallbacks: false`, and
-`require_parameters: true`. This makes a model/provider response more
-consistent, but it accepts a single-provider availability dependency.
+The configured OpenRouter route uses Nitro's throughput sorting with
+`only: ["coreweave", "together", "fireworks", "baseten"]`,
+`allow_fallbacks: false`, and `require_parameters: true`. It cannot route
+outside the selected providers.
 
 OpenRouter documents that provider fallback is normally enabled and that model
 fallbacks can activate for rate limits, downtime, moderation refusal, and
 context-length errors. It also documents that requests are billed and reported
-using the model actually used. Flex trades lower cost for higher latency and
-lower availability.
+using the model actually used. Service tiers such as Flex trade lower cost for
+higher latency and lower availability; the current route does not use one.
 
 Choose and document one of these policies for Course builds:
 
-| Policy                                      | Reliability effect                                | Required safeguard                                                                                                                                         |
-| ------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pin Google AI Studio, no fallback (current) | Stable provider behavior; lower availability      | Strong retry/timeout policy and a clear retryable run state.                                                                                               |
-| Permit provider fallback for the same model | Higher availability; provider behavior can differ | Record actual provider/model metadata and run the same schema and Course validators.                                                                       |
-| Specify compatible model fallbacks          | Highest availability                              | Treat a fallback model as a new output variant: capability preflight, strict schema validation, output metadata, and full Course audit before publication. |
+| Policy                                                       | Reliability effect                                          | Required safeguard                                                                                                                                         |
+| ------------------------------------------------------------ | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pin a vetted provider list, no fallback outside it (current) | Stable behavior inside the list; availability bounded by it | Strong retry/timeout policy, recorded provider metadata, and a capability preflight on every listed provider.                                              |
+| Permit provider fallback for the same model                  | Higher availability; provider behavior can differ           | Record actual provider/model metadata and run the same schema and Course validators.                                                                       |
+| Specify compatible model fallbacks                           | Highest availability                                        | Treat a fallback model as a new output variant: capability preflight, strict schema validation, output metadata, and full Course audit before publication. |
 
-Do not make this decision implicitly. Also budget generation time for Flex; a
-workflow may survive a slow task, but the individual model call still needs a
-timeout chosen for that tier.
+Do not make this decision implicitly. Also budget generation time for the
+chosen route; a workflow may survive a slow task, but the individual model call
+still needs a timeout chosen for that route.
+
+Historical DeepSeek measurements: an Outline draft took about three minutes
+at reach and mastery Depth (183s and 190s), with 5.6k–6.9k reasoning tokens
+out of 8.1k–8.8k output tokens. A later mastery call took 252.5s. With the
+same mastery prompt, GLM 5.3 Flash Nitro returned valid 9-Module, 45-Lesson
+Outlines in 27.8s, 26.7s, 16.3s, and 19.8s at low reasoning, and 28.3s,
+31.6s, 45.4s, and 55.0s at high reasoning. Three extra requests failed
+quickly during the comparison, and one later failure was confirmed as HTTP 429. These are small samples, not latency guarantees. The 600-second stage
+ceilings remain until more GLM measurements cover Course specification,
+Lesson writing, and review.
 
 - Sources: [OpenRouter provider routing](https://openrouter.ai/docs/guides/routing/provider-selection), [OpenRouter model fallbacks](https://openrouter.ai/docs/guides/routing/model-fallbacks), [OpenRouter service tiers](https://openrouter.ai/docs/guides/features/service-tiers).
 
@@ -175,9 +185,9 @@ verbatim or whether a source supports a claim.
 4. Classify typed failures at the Vercel Workflow boundary as fatal, retryable,
    or repairable. Cap repair rounds where the workflow already caps them.
 5. Add a capability preflight for the selected OpenRouter route: structured
-   output support, required parameters, reasoning option support, and service
-   tier. Run it at deploy/startup or as an explicit health check, not during a
-   Learner's Course build.
+   output support, required parameters, and reasoning option support across
+   every provider in the route. Run it at deploy/startup or as an explicit
+   health check, not during a Learner's Course build.
 6. Capture model, provider, finish reason, raw finish reason, warnings, usage,
    timeout/abort status, and attempt number in the Generation run. Use these to
    diagnose reliability without storing prompts or private Course content in

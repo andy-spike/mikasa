@@ -286,6 +286,29 @@ describe("generateLesson", () => {
     expect(model.prompts[0]).toContain("pinned before any Lesson was written");
     expect(model.prompts[0]).toContain(contract);
   });
+
+  it("leaves resource-specific choices to the Lesson", async () => {
+    const contract =
+      "Fixed: GET /products is public; GET /orders is account-specific. Decide later: Cache-Control per endpoint.";
+    const model = scriptedModel([lessonJson("Lesson one")]);
+    await generateLesson(model.model, {
+      course: {
+        topic: "HTTP caching",
+        goal: "Design a cache policy",
+        background: "",
+        language: "en",
+        depth: "reach",
+      },
+      spec: { ...SPEC, throughline: { ...SPEC.throughline, exampleContract: contract } },
+      lesson: { id: "l1", title: "Lesson one", summary: "First." },
+      nextLesson: null,
+      priorLessons: [],
+      sources: [],
+    });
+
+    expect(model.prompts[0]).toContain(contract);
+    expect(model.prompts[0]).toContain("do not apply one choice to every part of the example");
+  });
 });
 
 describe("a full candidate", () => {

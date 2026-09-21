@@ -40,8 +40,8 @@ export type CourseSpecification = {
     premise: string;
     runningExample: string;
     vocabulary: string[];
-    // The running example's concrete artifacts, pinned before any Lesson is
-    // written. Empty when the Topic has no cumulative example.
+    // The running example's fixed identity and scope, plus choices left for
+    // Lessons. Empty when the Topic has no cumulative example.
     exampleContract?: string;
   };
   learningGraph: {

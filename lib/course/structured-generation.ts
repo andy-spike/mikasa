@@ -20,6 +20,7 @@ export type StructuredGenerationStage =
   | "source-excerpts"
   | "outline-draft"
   | "course-specification"
+  | "course-specification-module"
   | "course-specification-reconciliation"
   | "lesson-generation"
   | "course-review"
@@ -31,14 +32,18 @@ type StagePolicy = {
   maxRetries: number;
 };
 
+// Keep a finite ceiling for long Course generations. The previous model needed
+// several minutes for large Outlines; retain these budgets until GLM 5.3 Flash
+// has representative measurements. Workflow steps can run within this ceiling.
 const STAGE_POLICIES: Record<StructuredGenerationStage, StagePolicy> = {
-  "source-excerpts": { timeoutMs: 60_000, maxRetries: 1 },
-  "outline-draft": { timeoutMs: 120_000, maxRetries: 1 },
-  "course-specification": { timeoutMs: 120_000, maxRetries: 1 },
-  "course-specification-reconciliation": { timeoutMs: 120_000, maxRetries: 1 },
-  "lesson-generation": { timeoutMs: 180_000, maxRetries: 1 },
-  "course-review": { timeoutMs: 180_000, maxRetries: 1 },
-  "lesson-correction": { timeoutMs: 180_000, maxRetries: 1 },
+  "source-excerpts": { timeoutMs: 120_000, maxRetries: 1 },
+  "outline-draft": { timeoutMs: 600_000, maxRetries: 1 },
+  "course-specification": { timeoutMs: 600_000, maxRetries: 1 },
+  "course-specification-module": { timeoutMs: 600_000, maxRetries: 1 },
+  "course-specification-reconciliation": { timeoutMs: 600_000, maxRetries: 1 },
+  "lesson-generation": { timeoutMs: 600_000, maxRetries: 1 },
+  "course-review": { timeoutMs: 600_000, maxRetries: 1 },
+  "lesson-correction": { timeoutMs: 600_000, maxRetries: 1 },
   "capability-preflight": { timeoutMs: 60_000, maxRetries: 0 },
 };
 
@@ -63,6 +68,7 @@ export type StructuredGenerationEvent = {
   providerCalls?: number;
   finishReason?: FinishReason;
   provider?: string;
+  upstreamProvider?: string;
   modelId?: string;
   inputTokens?: number;
   outputTokens?: number;
@@ -272,6 +278,14 @@ function defaultObserver(event: StructuredGenerationEvent): void {
   }
 }
 
+// OpenRouter names the upstream host in provider metadata; the AI SDK's
+// `provider` field is always "openrouter". The route can fail over between
+// vetted hosts, so diagnostics name the one that actually served.
+function upstreamProvider(metadata: StructuredGenerationMetadata): string | undefined {
+  const provider = metadata.providerMetadata?.openrouter?.provider;
+  return typeof provider === "string" ? provider : undefined;
+}
+
 export function createStructuredGenerator(
   adapter: StructuredGenerationAdapter,
   observe: StructuredGenerationObserver = defaultObserver,
@@ -303,11 +317,14 @@ export function createStructuredGenerator(
     const outcome = await Effect.runPromise(Effect.either(program));
     if (Either.isLeft(outcome)) {
       try {
+        const failureMetadata = "metadata" in outcome.left ? outcome.left.metadata : undefined;
+        const upstream = failureMetadata ? upstreamProvider(failureMetadata) : undefined;
         observe({
           stage: request.stage,
           outcome: "failed",
           durationMs: Date.now() - startedAt,
           failure: outcome.left._tag,
+          ...(upstream ? { upstreamProvider: upstream } : {}),
           ...(outcome.left._tag === "ProviderGenerationFailure"
             ? { retryable: outcome.left.retryable }
             : {}),
@@ -318,6 +335,7 @@ export function createStructuredGenerator(
       throw outcome.left;
     }
     try {
+      const upstream = upstreamProvider(outcome.right.metadata);
       observe({
         stage: request.stage,
         outcome: "succeeded",
@@ -325,6 +343,7 @@ export function createStructuredGenerator(
         providerCalls: outcome.right.metadata.providerCalls,
         finishReason: outcome.right.metadata.finishReason,
         provider: outcome.right.metadata.provider,
+        ...(upstream ? { upstreamProvider: upstream } : {}),
         modelId: outcome.right.metadata.modelId,
         inputTokens: outcome.right.metadata.usage.inputTokens,
         outputTokens: outcome.right.metadata.usage.outputTokens,

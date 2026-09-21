@@ -8,22 +8,21 @@ import type {
 export type ReasoningEffort = "low" | "medium" | "high";
 
 export const MODEL_PROFILES = {
-  // Gemini 3.7 Flash supports the three thinking levels exposed to the
-  // Learner and a 1M-token window for sequential Lesson generation.
+  // GLM 5.3 Flash has the long context needed for sequential Lesson generation.
   design: {
-    model: "google/gemini-3.7-flash",
+    model: "z-ai/glm-5.3-flash:nitro",
     reasoning: { effort: "medium" },
   },
   grounding: {
-    model: "google/gemini-3.7-flash",
+    model: "z-ai/glm-5.3-flash:nitro",
     reasoning: { effort: "low" },
   },
   generation: {
-    model: "google/gemini-3.7-flash",
+    model: "z-ai/glm-5.3-flash:nitro",
     reasoning: { effort: "high" },
   },
   tutor: {
-    model: "google/gemini-3.7-flash",
+    model: "z-ai/glm-5.3-flash:nitro",
     reasoning: { effort: "low" },
   },
   embedding: {
@@ -36,13 +35,14 @@ function openrouter() {
   return createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 }
 
-const GOOGLE_AI_STUDIO_FLEX: OpenRouterChatSettings = {
+// Nitro sorts the eligible endpoints by throughput. The allowlist keeps
+// routing within the four providers selected for Course generation.
+export const GLM_FLASH_ROUTE: OpenRouterChatSettings = {
   provider: {
-    order: ["google-ai-studio"],
+    only: ["coreweave", "together", "fireworks", "baseten"],
     allow_fallbacks: false,
     require_parameters: true,
   },
-  extraBody: { service_tier: "flex" },
 };
 
 export function reasoningOptions(effort: ReasoningEffort): {
@@ -68,7 +68,7 @@ export function generationProviderOptions(): { openrouter: OpenRouterProviderOpt
 type ModelProfile = "design" | "grounding" | "generation" | "tutor";
 
 function modelFor(profile: ModelProfile): LanguageModel {
-  return openrouter()(MODEL_PROFILES[profile].model, GOOGLE_AI_STUDIO_FLEX);
+  return openrouter()(MODEL_PROFILES[profile].model, GLM_FLASH_ROUTE);
 }
 
 export function designModel(): LanguageModel {

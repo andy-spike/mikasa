@@ -204,6 +204,12 @@ describe("draftOutline and buildOutline", () => {
     expect(prompt).toContain("exactly 4 Modules with exactly 3 Lessons each");
     expect(prompt).toContain("https://sdk.vercel.example/docs");
     expect(prompt).toContain("exampleContract");
+    expect(prompt).toContain("Do not preselect the answer to the Goal");
+    expect(prompt).toContain("Decide later:");
+    expect(prompt).not.toContain("Tags: <exact tags in order>");
+    expect(model.providerOptions[0]).toMatchObject({
+      openrouter: { reasoning: { effort: "low" } },
+    });
   });
 
   it("freezes the draft into an Outline inside the Depth bounds", () => {
@@ -278,8 +284,32 @@ describe("designSpecification", () => {
     };
   }
 
+  function splitResponses(response: ReturnType<typeof specResponse>) {
+    const shared = {
+      learningGraph: response.learningGraph,
+      finalExercise: response.finalExercise,
+      evidence: response.evidence,
+      modules: outline.modules.map((module) => ({
+        moduleId: module.id,
+        milestone: "The app runs",
+        exampleStart: "",
+        exampleEnd: "",
+      })),
+    };
+    return [
+      json(shared),
+      ...outline.modules.map((module) =>
+        json({
+          alignment: response.alignment.filter((entry) =>
+            module.lessons.some((lesson) => lesson.id === entry.lessonId),
+          ),
+        }),
+      ),
+    ];
+  }
+
   it("materializes the private specification against the real lesson ids", async () => {
-    const specModel = scriptedModel([json(specResponse())]);
+    const specModel = scriptedModel(splitResponses(specResponse()));
     const sources = [
       {
         ref: "src-a",
@@ -307,7 +337,7 @@ describe("designSpecification", () => {
   });
 
   it("fails on evidence that cites a Source the Course does not have", async () => {
-    const specModel = scriptedModel([json(specResponse())]);
+    const specModel = scriptedModel(splitResponses(specResponse()));
     const sources = [
       {
         ref: "src-a",
@@ -325,7 +355,7 @@ describe("designSpecification", () => {
       { sourceRef: "src-a", supports: "streamText streams tokens" },
       { sourceRef: "src-unknown", supports: "should fail, not drop" },
     ];
-    const badModel = scriptedModel([json(bad)]);
+    const badModel = scriptedModel(splitResponses(bad));
     await expect(
       designSpecification(badModel.model, course, outline, REACH_DRAFT, sources),
     ).rejects.toThrow(DesignError);
@@ -338,11 +368,31 @@ describe("designSpecification", () => {
   it("fails when the model ignores a Lesson", async () => {
     const response = specResponse();
     response.alignment = response.alignment.slice(0, 2);
-    const specModel = scriptedModel([json(response)]);
+    const specModel = scriptedModel(splitResponses(response));
 
     await expect(
       designSpecification(specModel.model, course, outline, REACH_DRAFT, []),
     ).rejects.toThrow(DesignError);
+  });
+
+  it("rejects a Module alignment that changes the shared running example", async () => {
+    const response = specResponse();
+    response.evidence = [];
+    const responses = splitResponses(response);
+    responses[1] = json({
+      alignment: specResponse()
+        .alignment.slice(0, 2)
+        .map((entry, index) => ({
+          ...entry,
+          exampleEnd: index === 1 ? "an unplanned change" : "",
+        })),
+    });
+    const specModel = scriptedModel(responses);
+
+    await expect(
+      designSpecification(specModel.model, course, outline, REACH_DRAFT, []),
+    ).rejects.toThrow(/fixed milestone or running example/);
+    expect(specModel.prompts).toHaveLength(2);
   });
 });
 
@@ -403,19 +453,32 @@ describe("design persistence", () => {
           { id: "g1", skill: "Start", requires: [], lessonId: lessonIds[0] },
           { id: "g2", skill: "Reply", requires: ["g1"], lessonId: lessonIds[1] },
         ],
-        alignment: lessonIds.map((id, i) => ({
-          lessonId: id,
-          performance: `Do step ${i + 1}`,
-          prerequisiteNodes: [],
-          moduleMilestone: "The app runs",
-          exerciseContribution: "Adds a page",
+        modules: outline.modules.map((module) => ({
+          moduleId: module.id,
+          milestone: "The app runs",
           exampleStart: "",
           exampleEnd: "",
-          sourceRefs: [],
         })),
         finalExercise: { task: "Ship it", acceptanceChecks: ["It runs"] },
-        evidence: sources.map((s) => ({ sourceRef: s.ref, supports: `${s.title} backs this` })),
+        evidence: sources.map((source) => ({
+          sourceRef: source.ref,
+          supports: `${source.title} backs this`,
+        })),
       }),
+      ...outline.modules.map((module) =>
+        json({
+          alignment: module.lessons.map((lesson) => ({
+            lessonId: lesson.id,
+            performance: `Do step ${lesson.ordinal}`,
+            prerequisiteNodes: [],
+            moduleMilestone: "The app runs",
+            exerciseContribution: "Adds a page",
+            exampleStart: "",
+            exampleEnd: "",
+            sourceRefs: [],
+          })),
+        }),
+      ),
     ]);
     const specification = await designSpecification(
       specModel.model,

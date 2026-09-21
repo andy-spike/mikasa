@@ -74,7 +74,7 @@ describe("structured Course generation", () => {
       modelId: "test-model",
       responseId: "response-1",
     });
-    expect(seen).toEqual([{ timeoutMs: 180_000, maxRetries: 1 }]);
+    expect(seen).toEqual([{ timeoutMs: 600_000, maxRetries: 1 }]);
   });
 
   it("emits prompt-free diagnostics and ignores observer failures", async () => {
@@ -106,6 +106,30 @@ describe("structured Course generation", () => {
     });
   });
 
+  it("names the upstream host from provider metadata", async () => {
+    const events: unknown[] = [];
+    const adapter: StructuredGenerationAdapter = async <T>() => ({
+      output: { value: "done" } as T,
+      metadata: {
+        ...metadata(),
+        providerMetadata: { openrouter: { provider: "DeepInfra" } },
+      },
+    });
+    const generate = createStructuredGenerator(adapter, (event) => events.push(event));
+
+    await generate(request());
+
+    expect(events).toEqual([expect.objectContaining({ upstreamProvider: "DeepInfra" })]);
+
+    const withoutMetadata = createStructuredGenerator(
+      async <T>() => ({ output: { value: "done" } as T, metadata: metadata() }),
+      (event) => events.push(event),
+    );
+    await withoutMetadata(request());
+
+    expect(events[1]).not.toHaveProperty("upstreamProvider");
+  });
+
   it.each([
     ["length" as const, StructuredOutputTruncated],
     ["content-filter" as const, StructuredOutputFiltered],
@@ -133,7 +157,7 @@ describe("structured Course generation", () => {
     const failure = await generate(request()).catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(GenerationTimedOut);
-    expect(failure).toMatchObject({ stage: "lesson-generation", timeoutMs: 180_000 });
+    expect(failure).toMatchObject({ stage: "lesson-generation", timeoutMs: 600_000 });
     expect(String(failure)).not.toContain("private Course content");
   });
 

@@ -31,7 +31,7 @@ export function EffortControl({
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <Hint label="Gemini 3.7 Flash reasoning effort">
+      <Hint label="GLM 5.3 Flash reasoning effort">
         <DropdownMenuTrigger
           render={
             <Button
@@ -60,7 +60,7 @@ export function EffortControl({
       >
         <div className="flex items-center gap-2 text-[0.8125rem] text-fg">
           <Zap className="h-3.5 w-3.5 text-fg-3" strokeWidth={1.75} />
-          <span className="font-medium">Gemini 3.7 Flash</span>
+          <span className="font-medium">GLM 5.3 Flash</span>
           <span className="ml-auto capitalize text-fg-3">{effort}</span>
         </div>
         <Slider.Root

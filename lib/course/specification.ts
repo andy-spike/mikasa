@@ -45,6 +45,21 @@ export const specificationDesignSchema = specificationReconciliationSchema.exten
   ),
 });
 
+export const sharedSpecificationSchema = specificationDesignSchema
+  .omit({ alignment: true })
+  .extend({
+    modules: z.array(
+      z.object({
+        moduleId: z.string(),
+        milestone: z.string().min(1),
+        exampleStart: z.string(),
+        exampleEnd: z.string(),
+      }),
+    ),
+  });
+
+export const moduleAlignmentSchema = z.object({ alignment: alignmentSchema });
+
 type OutlinePositions = {
   lessons: OutlineLesson[];
   position: Map<string, number>;
