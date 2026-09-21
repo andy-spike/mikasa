@@ -16,6 +16,14 @@ export type TutorTurnRow = {
   createdAt: Date;
 };
 
+/** One chat in a Lesson's margin. A Lesson may hold several; the newest is
+ *  the one the margin opens, and the rest wait behind Previous chats. */
+export type TutorChat = {
+  id: string;
+  createdAt: Date;
+  turns: TutorTurnRow[];
+};
+
 function toTutorTurnRow(r: {
   id: string;
   seq: number;
@@ -43,6 +51,7 @@ export async function findTutorConversation(
   ownerId: string,
   courseId: string,
   lessonRef: string,
+  conversationId?: string,
 ): Promise<ConversationResolution> {
   const [course] = await db
     .select({ id: courses.id })
@@ -76,14 +85,48 @@ export async function findTutorConversation(
     };
   }
 
-  const [existing] = await db
-    .select()
+  if (conversationId) {
+    const [chat] = await db
+      .select({ id: tutorConversations.id })
+      .from(tutorConversations)
+      .where(
+        and(
+          eq(tutorConversations.id, conversationId),
+          eq(tutorConversations.courseId, courseId),
+          eq(tutorConversations.lessonRef, lessonRef),
+        ),
+      )
+      .limit(1);
+    if (!chat) {
+      return {
+        ok: false,
+        reason: "not-found",
+        message: "That chat is not part of this Lesson.",
+      };
+    }
+    return { ok: true, conversationId: chat.id };
+  }
+
+  const [latest] = await db
+    .select({ id: tutorConversations.id })
     .from(tutorConversations)
     .where(
       and(eq(tutorConversations.courseId, courseId), eq(tutorConversations.lessonRef, lessonRef)),
     )
+    .orderBy(desc(tutorConversations.createdAt), desc(tutorConversations.id))
     .limit(1);
-  return { ok: true, conversationId: existing?.id };
+  return { ok: true, conversationId: latest?.id };
+}
+
+/** Starts a chat in the Lesson's margin. New chats are rows, not rewrites:
+ *  the older ones stay readable behind Previous chats. */
+export async function createTutorConversation(
+  db: Db,
+  courseId: string,
+  lessonRef: string,
+): Promise<string> {
+  const [chat] = await db.insert(tutorConversations).values({ courseId, lessonRef }).returning();
+  return chat.id;
 }
 
 export async function listTutorMessages(db: Db, conversationId: string): Promise<TutorTurnRow[]> {
@@ -99,12 +142,17 @@ export async function loadTutorHistory(
   db: Db,
   ownerId: string,
   courseId: string,
-): Promise<Map<string, TutorTurnRow[]>> {
+): Promise<Map<string, TutorChat[]>> {
   const conversations = await db
-    .select({ id: tutorConversations.id, lessonRef: tutorConversations.lessonRef })
+    .select({
+      id: tutorConversations.id,
+      lessonRef: tutorConversations.lessonRef,
+      createdAt: tutorConversations.createdAt,
+    })
     .from(tutorConversations)
     .innerJoin(courses, eq(courses.id, tutorConversations.courseId))
-    .where(and(eq(tutorConversations.courseId, courseId), eq(courses.ownerId, ownerId)));
+    .where(and(eq(tutorConversations.courseId, courseId), eq(courses.ownerId, ownerId)))
+    .orderBy(asc(tutorConversations.createdAt), asc(tutorConversations.id));
   if (conversations.length === 0) return new Map();
 
   const ids = conversations.map((c) => c.id);
@@ -121,10 +169,14 @@ export async function loadTutorHistory(
     byConversation.set(m.conversationId, list);
   }
 
-  const byLesson = new Map<string, TutorTurnRow[]>();
+  /* Oldest chat first; a chat with no turns yet is not history. */
+  const byLesson = new Map<string, TutorChat[]>();
   for (const c of conversations) {
     const turns = byConversation.get(c.id) ?? [];
-    if (turns.length > 0) byLesson.set(c.lessonRef, turns);
+    if (turns.length === 0) continue;
+    const chats = byLesson.get(c.lessonRef) ?? [];
+    chats.push({ id: c.id, createdAt: c.createdAt, turns });
+    byLesson.set(c.lessonRef, chats);
   }
   return byLesson;
 }
@@ -132,30 +184,16 @@ export async function loadTutorHistory(
 /** Both sides land together in one transaction; a concurrent sequence claim retries once against the new head. */
 export async function appendTutorTurn(
   db: Db,
-  ownerId: string,
-  courseId: string,
-  lessonRef: string,
+  conversationId: string,
   turn: { learner: string; tutor: string; anchor?: string | null },
 ): Promise<{ learner: TutorTurnRow; tutor: TutorTurnRow }> {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       return await db.transaction(async (tx) => {
-        await tx.insert(tutorConversations).values({ courseId, lessonRef }).onConflictDoNothing();
-        const [conversation] = await tx
-          .select()
-          .from(tutorConversations)
-          .where(
-            and(
-              eq(tutorConversations.courseId, courseId),
-              eq(tutorConversations.lessonRef, lessonRef),
-            ),
-          )
-          .limit(1);
-
         const [head] = await tx
           .select({ seq: tutorMessages.seq })
           .from(tutorMessages)
-          .where(eq(tutorMessages.conversationId, conversation.id))
+          .where(eq(tutorMessages.conversationId, conversationId))
           .orderBy(desc(tutorMessages.seq))
           .limit(1);
         const base = head?.seq ?? 0;
@@ -164,13 +202,13 @@ export async function appendTutorTurn(
           .insert(tutorMessages)
           .values([
             {
-              conversationId: conversation.id,
+              conversationId,
               seq: base + 1,
               role: "learner",
               content: turn.learner,
               anchor: turn.anchor ?? null,
             },
-            { conversationId: conversation.id, seq: base + 2, role: "tutor", content: turn.tutor },
+            { conversationId, seq: base + 2, role: "tutor", content: turn.tutor },
           ])
           .returning();
 

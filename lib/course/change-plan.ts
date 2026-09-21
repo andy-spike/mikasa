@@ -70,11 +70,8 @@ export const changePlanOpSchema = z.discriminatedUnion("kind", [
     secondTitle: z.string().min(1).max(200),
     secondSummary: z.string().max(500),
   }),
-  z.object({
-    kind: z.literal("mergeLesson"),
-    lessonId,
-    direction: z.enum(["next", "previous"]),
-  }),
+  /* mergeLesson is deliberately absent: the plan's vocabulary is edit-only,
+     and a merge is a learner's own verb, never the Tailor's proposal. */
   z.object({
     kind: z.literal("lessonProse"),
     lessonId,
@@ -158,11 +155,14 @@ export function opVerb(op: ChangePlanOp): string {
   return OP_VERBS[op.kind];
 }
 
-export function opEntry(op: ChangePlanOp): string {
+/* The target a plan row names. Ops that carry a title name themselves; ops
+   that carry a ref ask the caller's resolver, so a row never shows the
+   internal id a learner has never seen. */
+export function opEntry(op: ChangePlanOp, resolve?: (ref: string) => string | null): string {
   if ("title" in op) return op.title;
   if (op.kind === "splitLesson") return op.secondTitle;
-  if ("lessonId" in op) return op.lessonId;
-  return op.moduleId;
+  if ("lessonId" in op) return resolve?.(op.lessonId) ?? op.lessonId;
+  return resolve?.(op.moduleId) ?? op.moduleId;
 }
 
 export function opDetail(op: ChangePlanOp): string {

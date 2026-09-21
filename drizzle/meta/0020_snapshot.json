@@ -1,6 +1,6 @@
 {
-  "id": "caeee8e3-bfd5-4177-8f8f-8b5cea9eb51b",
-  "prevId": "a6cec991-0341-4606-b407-8a93fc7b4d06",
+  "id": "58f4ba86-5c99-475a-b6e1-2dc9686615a3",
+  "prevId": "7c552e64-88cf-4c13-865b-e45ae8a53eaf",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1436,6 +1436,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "quote": {
+          "name": "quote",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "detail": {
           "name": "detail",
           "type": "text",
@@ -1903,8 +1909,8 @@
         }
       },
       "indexes": {
-        "tailor_conversations_course_id_key": {
-          "name": "tailor_conversations_course_id_key",
+        "tailor_conversations_course_id_idx": {
+          "name": "tailor_conversations_course_id_idx",
           "columns": [
             {
               "expression": "course_id",
@@ -1913,7 +1919,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2051,8 +2057,8 @@
         }
       },
       "indexes": {
-        "tutor_conversations_course_lesson_key": {
-          "name": "tutor_conversations_course_lesson_key",
+        "tutor_conversations_course_lesson_idx": {
+          "name": "tutor_conversations_course_lesson_idx",
           "columns": [
             {
               "expression": "course_id",
@@ -2062,21 +2068,6 @@
             },
             {
               "expression": "lesson_ref",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "tutor_conversations_course_id_idx": {
-          "name": "tutor_conversations_course_id_idx",
-          "columns": [
-            {
-              "expression": "course_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

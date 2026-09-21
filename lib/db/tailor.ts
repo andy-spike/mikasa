@@ -46,6 +46,14 @@ export type TailorTurnRow = {
   createdAt: Date;
 };
 
+/** One chat with the Tailor. A Course may hold several; the newest is the
+ *  one the margin opens, and the rest wait behind Previous chats. */
+export type TailorChat = {
+  id: string;
+  createdAt: Date;
+  turns: TailorTurnRow[];
+};
+
 export type ChangeOperationRow = {
   id: string;
   position: number;
@@ -72,22 +80,41 @@ async function findTailorConversationId(
   db: Db,
   ownerId: string,
   courseId: string,
+  conversationId?: string,
 ): Promise<string | undefined> {
-  const [row] = await db
+  if (conversationId) {
+    const [row] = await db
+      .select({ id: tailorConversations.id })
+      .from(tailorConversations)
+      .innerJoin(courses, eq(courses.id, tailorConversations.courseId))
+      .where(
+        and(
+          eq(tailorConversations.id, conversationId),
+          eq(tailorConversations.courseId, courseId),
+          eq(courses.ownerId, ownerId),
+        ),
+      )
+      .limit(1);
+    return row?.id;
+  }
+
+  const [latest] = await db
     .select({ id: tailorConversations.id })
     .from(tailorConversations)
     .innerJoin(courses, eq(courses.id, tailorConversations.courseId))
     .where(and(eq(tailorConversations.courseId, courseId), eq(courses.ownerId, ownerId)))
+    .orderBy(desc(tailorConversations.createdAt), desc(tailorConversations.id))
     .limit(1);
-  return row?.id;
+  return latest?.id;
 }
 
 export async function findTailorConversation(
   db: Db,
   ownerId: string,
   courseId: string,
+  conversationId?: string,
 ): Promise<string | undefined> {
-  return findTailorConversationId(db, ownerId, courseId);
+  return findTailorConversationId(db, ownerId, courseId, conversationId);
 }
 
 function toTailorTurnRow(r: {
@@ -106,29 +133,11 @@ function toTailorTurnRow(r: {
   };
 }
 
-export async function getOrCreateTailorConversation(
-  db: Db,
-  ownerId: string,
-  courseId: string,
-): Promise<string | undefined> {
-  const course = await findOwnedCourse(db, ownerId, courseId);
-  if (!course) return undefined;
-
-  // Parallel calls can create the row twice: the unique index decides the
-  // winner, and the loser rereads the winning row instead of failing.
-  const [created] = await db
-    .insert(tailorConversations)
-    .values({ courseId })
-    .onConflictDoNothing()
-    .returning();
-  if (created) return created.id;
-
-  const [winner] = await db
-    .select()
-    .from(tailorConversations)
-    .where(eq(tailorConversations.courseId, courseId))
-    .limit(1);
-  return winner?.id;
+/** Starts a chat with the Tailor. New chats are rows, not rewrites: the
+ *  older ones stay readable behind Previous chats. */
+export async function createTailorConversation(db: Db, courseId: string): Promise<string> {
+  const [chat] = await db.insert(tailorConversations).values({ courseId }).returning();
+  return chat.id;
 }
 
 export async function listTailorMessages(db: Db, conversationId: string): Promise<TailorTurnRow[]> {
@@ -140,24 +149,52 @@ export async function listTailorMessages(db: Db, conversationId: string): Promis
   return rows.map(toTailorTurnRow);
 }
 
+/** Every chat the Learner has kept with the Tailor, oldest first. */
 export async function loadTailorHistory(
   db: Db,
   ownerId: string,
   courseId: string,
-): Promise<TailorTurnRow[]> {
-  const conversationId = await findTailorConversationId(db, ownerId, courseId);
-  if (!conversationId) return [];
-  return listTailorMessages(db, conversationId);
+): Promise<TailorChat[]> {
+  const conversations = await db
+    .select({
+      id: tailorConversations.id,
+      createdAt: tailorConversations.createdAt,
+    })
+    .from(tailorConversations)
+    .innerJoin(courses, eq(courses.id, tailorConversations.courseId))
+    .where(and(eq(tailorConversations.courseId, courseId), eq(courses.ownerId, ownerId)))
+    .orderBy(asc(tailorConversations.createdAt), asc(tailorConversations.id));
+  if (conversations.length === 0) return [];
+
+  const ids = conversations.map((c) => c.id);
+  const messages = await db
+    .select()
+    .from(tailorMessages)
+    .where(inArray(tailorMessages.conversationId, ids))
+    .orderBy(asc(tailorMessages.seq));
+
+  const byConversation = new Map<string, TailorTurnRow[]>();
+  for (const m of messages) {
+    const list = byConversation.get(m.conversationId) ?? [];
+    list.push(toTailorTurnRow(m));
+    byConversation.set(m.conversationId, list);
+  }
+
+  /* A chat with no turns yet is not history. */
+  const chats: TailorChat[] = [];
+  for (const c of conversations) {
+    const turns = byConversation.get(c.id) ?? [];
+    if (turns.length === 0) continue;
+    chats.push({ id: c.id, createdAt: c.createdAt, turns });
+  }
+  return chats;
 }
 
 export async function appendTailorTurn(
   db: Db,
-  ownerId: string,
-  courseId: string,
+  conversationId: string,
   turn: { learner: string; tailor: string },
 ): Promise<void> {
-  const conversationId = await getOrCreateTailorConversation(db, ownerId, courseId);
-  if (!conversationId) return;
   await db.transaction(async (tx) => {
     const [head] = await tx
       .select({ seq: max(tailorMessages.seq) })

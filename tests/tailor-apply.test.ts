@@ -69,11 +69,8 @@ const { db } = await import("@/lib/db");
 const { changeOperations, changePlans, courseSpecs, courses, outlines, users } =
   await import("@/lib/db/schema");
 const { applyOutlineOpAction, approveOutlineAction } = await import("@/lib/actions/outline");
-const {
-  acceptProposedOperationsAction,
-  applyPlanToOutlineAction,
-  reviewTailorOperationAction,
-} = await import("@/lib/actions/tailor");
+const { acceptProposedOperationsAction, applyPlanToOutlineAction, reviewTailorOperationAction } =
+  await import("@/lib/actions/tailor");
 const { createChangePlan } = await import("@/lib/db/tailor");
 const { signInWithGoogle } = await import("./helpers/auth");
 const { setRequestCookie } = await import("./helpers/request-context");

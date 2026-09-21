@@ -9,6 +9,7 @@ import { findOwnedCourse } from "@/lib/db/courses";
 import {
   appendTailorTurn,
   createChangePlan,
+  createTailorConversation,
   findTailorConversation,
   listTailorMessages,
 } from "@/lib/db/tailor";
@@ -20,6 +21,9 @@ import { historyMessages } from "@/lib/course/tutor";
 
 const turnSchema = z.object({
   message: z.string().min(1).max(4000),
+  /* The chat the turn belongs to. null opens a fresh one; omitted asks for
+     the Course's newest chat. */
+  conversationId: z.string().uuid().nullish(),
   effort: z.enum(["low", "medium", "high"]).default("low"),
 });
 
@@ -32,7 +36,7 @@ export async function POST(
 
   const parsed = turnSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return jsonError(400, "That request was not a Tailor turn.");
-  const { message, effort } = parsed.data;
+  const { message, effort, conversationId: requestedChatId } = parsed.data;
 
   const { courseId } = await params;
   const course = await findOwnedCourse(db, session.user.id, courseId);
@@ -51,8 +55,19 @@ export async function POST(
       }))
     : [];
 
-  const conversationId = await findTailorConversation(db, session.user.id, courseId);
-  const history = conversationId ? await listTailorMessages(db, conversationId) : [];
+  /* null asks for a fresh chat; the row is created when a turn completes, so
+     a stream that fails leaves no empty chat behind. Omitted or an id both
+     resolve to a stored chat. */
+  let chatId: string | undefined;
+  if (requestedChatId !== null) {
+    chatId = await findTailorConversation(
+      db,
+      session.user.id,
+      courseId,
+      requestedChatId ?? undefined,
+    );
+  }
+  const history = chatId ? await listTailorMessages(db, chatId) : [];
 
   const result = streamText({
     model: designModel(),
@@ -60,8 +75,8 @@ export async function POST(
     abortSignal: request.signal,
     instructions: [
       "You are the Tailor of Mikasa, a learning workspace. The Learner",
-      "wants to reshape their Course: add, remove, rename, move, split, or",
-      "merge Modules and Lessons, or rewrite a Lesson's prose or Exercise.",
+      "wants to reshape their Course: add, remove, rename, move, or split",
+      "Modules and Lessons, or rewrite a Lesson's prose or Exercise.",
       "",
       "Rules:",
       "- Propose at most 10 operations per plan, in apply order. Larger",
@@ -112,7 +127,8 @@ export async function POST(
       /* Only a cleanly finished stream becomes history. */
       const text = collectStreamText(event);
       if (!text.trim()) return;
-      await appendTailorTurn(db, session.user.id, courseId, {
+      const target = chatId ?? (await createTailorConversation(db, courseId));
+      await appendTailorTurn(db, target, {
         learner: message,
         tailor: text,
       });

@@ -74,6 +74,7 @@ async function turn(
   lessonId: string,
   message: string,
   anchor?: string,
+  conversationId?: string | null,
 ): Promise<{ status: number; text: string; errors: string[] }> {
   /* next/headers resolves the route's cookies from the request. */
   setRequestCookie(cookie || null);
@@ -81,13 +82,16 @@ async function turn(
     new Request(`${ORIGIN}/api/courses/${courseId}/tutor`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ lessonId, message, anchor }),
+      body: JSON.stringify({
+        lessonId,
+        message,
+        anchor,
+        ...(conversationId === undefined ? {} : { conversationId }),
+      }),
     }),
     { params: Promise.resolve({ courseId }) },
   );
-  const stream = response.body
-    ? await readUIMessageStream(response)
-    : { text: "", errors: [] };
+  const stream = response.body ? await readUIMessageStream(response) : { text: "", errors: [] };
   return { status: response.status, ...stream };
 }
 
@@ -260,13 +264,44 @@ describe("history restoration", () => {
     );
     const l1 = history.get("l1") ?? [];
     const l2 = history.get("l2") ?? [];
-    expect(l1.map((t) => [t.role, t.seq])).toEqual([
+    expect(l1).toHaveLength(1);
+    expect(l2).toHaveLength(1);
+    expect(l1[0].turns.map((t) => [t.role, t.seq])).toEqual([
       ["learner", 1],
       ["tutor", 2],
     ]);
-    expect(l1[0].content).toBe("First question?");
-    expect(l2).toHaveLength(2);
-    expect(l2[0].content).toBe("Second Lesson question?");
+    expect(l1[0].turns[0].content).toBe("First question?");
+    expect(l2[0].turns).toHaveLength(2);
+    expect(l2[0].turns[0].content).toBe("Second Lesson question?");
+  });
+});
+
+describe("chats", () => {
+  it("keeps a second chat beside the first", async () => {
+    const courseId = await seedCourse(OWNER);
+    await turn(ownerCookie, courseId, "l1", "First chat question?");
+    await turn(ownerCookie, courseId, "l1", "Second chat question?", undefined, null);
+
+    const chats = await db
+      .select()
+      .from(tutorConversations)
+      .where(eq(tutorConversations.courseId, courseId))
+      .orderBy(tutorConversations.createdAt);
+    expect(chats).toHaveLength(2);
+
+    const rows = await db.select().from(tutorMessages).orderBy(tutorMessages.seq);
+    expect(rows.filter((r) => r.conversationId === chats[0].id)).toHaveLength(2);
+    expect(rows.filter((r) => r.conversationId === chats[1].id)).toHaveLength(2);
+
+    const history = await loadTutorHistory(
+      db,
+      (await db.select().from(users).where(eq(users.email, OWNER)))[0].id,
+      courseId,
+    );
+    expect((history.get("l1") ?? []).map((chat) => chat.turns[0].content)).toEqual([
+      "First chat question?",
+      "Second chat question?",
+    ]);
   });
 });
 

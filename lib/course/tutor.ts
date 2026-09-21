@@ -2,6 +2,7 @@
 import type { ModelMessage } from "ai";
 import type { ReadingLesson, ReadingCourse, SourceLink } from "./reading";
 import type { TutorTurnRow } from "@/lib/db/tutor";
+import { formatDayStamp } from "@/lib/utils";
 
 const HISTORY_WINDOW = 20;
 
@@ -115,8 +116,27 @@ export function historyMessages(
   ];
 }
 
-export function turnViews<R extends string>(
-  turns: { role: R; content: string; anchor?: string | null }[],
-): { from: R; text: string; anchor: string | null }[] {
-  return turns.map((t) => ({ from: t.role, text: t.content, anchor: t.anchor ?? null }));
+/** A chat as the margin reads it: an id to open it by, a date, and its turns. */
+export type ChatView = {
+  id: string;
+  date: string;
+  turns: { from: "learner" | "tutor" | "tailor"; text: string; anchor?: string | null }[];
+};
+
+export function chatViews(
+  chats: {
+    id: string;
+    createdAt: Date;
+    turns: { role: string; content: string; anchor?: string | null }[];
+  }[],
+): ChatView[] {
+  return chats.map((chat) => ({
+    id: chat.id,
+    date: formatDayStamp(chat.createdAt),
+    turns: chat.turns.map((turn) => ({
+      from: turn.role === "learner" ? "learner" : turn.role === "tutor" ? "tutor" : "tailor",
+      text: turn.content,
+      anchor: turn.anchor ?? null,
+    })),
+  }));
 }

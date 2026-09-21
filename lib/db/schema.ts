@@ -351,10 +351,9 @@ export const tutorConversations = pgTable(
     lessonRef: text("lesson_ref").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (table) => [
-    uniqueIndex("tutor_conversations_course_lesson_key").on(table.courseId, table.lessonRef),
-    index("tutor_conversations_course_id_idx").on(table.courseId),
-  ],
+  // A Lesson may hold more than one chat: the newest is the one the margin
+  // opens, and the rest wait behind Previous chats.
+  (table) => [index("tutor_conversations_course_lesson_idx").on(table.courseId, table.lessonRef)],
 );
 
 export const tutorMessages = pgTable(
@@ -410,7 +409,9 @@ export const tailorConversations = pgTable(
       .references(() => courses.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (table) => [uniqueIndex("tailor_conversations_course_id_key").on(table.courseId)],
+  // A Course may hold more than one chat with the Tailor: the newest is the
+  // one at the margin's foot, the rest wait behind Previous chats.
+  (table) => [index("tailor_conversations_course_id_idx").on(table.courseId)],
 );
 
 export const tailorMessages = pgTable(

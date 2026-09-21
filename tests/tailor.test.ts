@@ -96,9 +96,7 @@ async function turn(
     }),
     { params: Promise.resolve({ courseId }) },
   );
-  const stream = response.body
-    ? await readUIMessageStream(response)
-    : { text: "", errors: [] };
+  const stream = response.body ? await readUIMessageStream(response) : { text: "", errors: [] };
   return { status: response.status, ...stream };
 }
 
@@ -160,7 +158,8 @@ describe("the conversation", () => {
       (await db.select().from(users).where(eq(users.email, OWNER)))[0].id,
       courseId,
     );
-    expect(history.map((t) => t.role)).toEqual(["learner", "tailor", "learner", "tailor"]);
+    expect(history).toHaveLength(1);
+    expect(history[0].turns.map((t) => t.role)).toEqual(["learner", "tailor", "learner", "tailor"]);
   });
 
   it("gives the model the Course's shape with stable ids", async () => {
