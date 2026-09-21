@@ -13,6 +13,6 @@ minimumReleaseAgeExclude:
   - "@better-auth/prisma-adapter@1.7.4"
   - "@better-auth/telemetry@1.7.4"
   - better-auth@1.7.4
-  - '@ai-sdk/gateway@4.0.81'
-  - '@ai-sdk/react@4.0.103'
+  - "@ai-sdk/gateway@4.0.81"
+  - "@ai-sdk/react@4.0.103"
   - ai@7.0.100
