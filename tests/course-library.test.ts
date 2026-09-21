@@ -182,14 +182,8 @@ describe("the state a row speaks in", () => {
   });
 
   it("counts the Tailor's proposed changes for the learner", () => {
-    const [one] = buildCourseLibrary(
-      [course({ plan: "proposed", proposedChanges: 1 })],
-      NOW,
-    );
-    const [many] = buildCourseLibrary(
-      [course({ plan: "proposed", proposedChanges: 3 })],
-      NOW,
-    );
+    const [one] = buildCourseLibrary([course({ plan: "proposed", proposedChanges: 1 })], NOW);
+    const [many] = buildCourseLibrary([course({ plan: "proposed", proposedChanges: 3 })], NOW);
 
     expect(one.group).toBe("needs");
     expect(one.state).toBe("changes");
@@ -241,7 +235,11 @@ describe("ordering the index", () => {
   it("reads needs-you, then in-progress, then done", () => {
     const items = buildCourseLibrary(
       [
-        course({ id: "done", completedAt: at(1), completions: ["l1", "l2", "l3"].map((lessonRef, i) => ({ lessonRef, doneAt: at(i + 1) })) }),
+        course({
+          id: "done",
+          completedAt: at(1),
+          completions: ["l1", "l2", "l3"].map((lessonRef, i) => ({ lessonRef, doneAt: at(i + 1) })),
+        }),
         course({ id: "reading", updatedAt: at(2) }),
         course({ id: "asking", plan: "proposed", proposedChanges: 2 }),
       ],

@@ -257,6 +257,25 @@
     border-radius: 0;
   }
 
+  /* Anything that acts on a click says so with the pointer: buttons, links,
+     menu items, options, tabs, switches, summaries — the whole system, not
+     one surface. Tailwind v4 leaves buttons at the browser's default arrow,
+     so it is named once here. A disabled control keeps the arrow, because it
+     will not act; a drag handle keeps its own resize cursor. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="menuitemradio"]:not([aria-disabled="true"]),
+  [role="menuitemcheckbox"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="switch"]:not([aria-disabled="true"]),
+  [role="checkbox"]:not([aria-disabled="true"]),
+  [role="radio"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+
   /* A rail under the pointer is direct manipulation, not motion: while the
      Resizer has `data-resizing` on <html>, nothing on the page transitions
      and the whole page holds the resize cursor, so the dragged edge and
@@ -581,6 +600,12 @@
   }
 }
 
+@keyframes mk-work {
+  to {
+    opacity: 0.45;
+  }
+}
+
 @keyframes mk-check {
   from {
     stroke-dashoffset: 22;
@@ -625,6 +650,12 @@
   animation: mk-open var(--dur-slow) var(--ease) both;
 }
 
+/* The in-flight mark: a pencil breathing while a run writes the Course.
+   Under reduced motion it holds still at full opacity. */
+.mk-work {
+  animation: mk-work 2200ms var(--ease) infinite alternate;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -632,6 +663,7 @@
   .mk-check,
   .mk-handoff,
   .mk-open,
+  .mk-work,
   .mk-rise {
     animation: none;
   }

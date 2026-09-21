@@ -51,7 +51,12 @@ export async function listOwnedCoursesForIndex(
         createdAt: changePlans.createdAt,
       })
       .from(changePlans)
-      .where(and(inArray(changePlans.courseId, ids), inArray(changePlans.status, ["proposed", "staged"]))),
+      .where(
+        and(
+          inArray(changePlans.courseId, ids),
+          inArray(changePlans.status, ["proposed", "staged"]),
+        ),
+      ),
   ]);
 
   // The revision with the highest number is the Course as it is published.

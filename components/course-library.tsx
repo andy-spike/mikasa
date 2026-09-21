@@ -2,7 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, X } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  CircleX,
+  Inbox,
+  LayoutGrid,
+  ListTree,
+  Pencil,
+  Plus,
+  Search,
+  SquarePen,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { CourseRowMenu } from "@/components/course-row-menu";
 import { Button } from "@/components/ui/button";
@@ -14,18 +27,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Hint } from "@/components/workspace/hint";
-import { DoneCheck, LiveMark, UnsetMark } from "@/components/workspace/marks";
+import { LiveMark } from "@/components/workspace/marks";
 import {
   GROUP_LABELS,
   type CourseLibraryGroup,
   type CourseLibraryItem,
+  type CourseLibraryState,
 } from "@/lib/course/library";
 import { cn } from "@/lib/utils";
-
-/* A Course that has not been written yet carries the dashed rule in the
-   mark column; a written one carries nothing unless it is live or done. */
-const UNWRITTEN = new Set(["designing", "writing", "reviewing", "outline-ready", "retry"]);
 
 type StatusFilter = "all" | CourseLibraryGroup;
 type SortKey = "recent" | "topic" | "progress";
@@ -36,24 +45,37 @@ const SORT_LABELS: Record<SortKey, string> = {
   progress: "Most complete",
 };
 
-const FILTERS: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "needs", label: GROUP_LABELS.needs },
-  { value: "in-progress", label: GROUP_LABELS["in-progress"] },
-  { value: "done", label: GROUP_LABELS.done },
+const FILTERS: { value: StatusFilter; label: string; icon: LucideIcon }[] = [
+  { value: "all", label: "All", icon: LayoutGrid },
+  { value: "needs", label: GROUP_LABELS.needs, icon: Inbox },
+  { value: "in-progress", label: GROUP_LABELS["in-progress"], icon: BookOpen },
+  { value: "done", label: GROUP_LABELS.done, icon: Check },
 ];
+
+/* Every state carries a mark. The accent triangle is the Course the learner
+   is up to; each other state is a Lucide icon in an ink step — second ink
+   while a state wants the learner or the machine, third ink once it is
+   settled. The Record keeps the vocabulary exhaustive: a new state cannot
+   reach the list without an icon. */
+const STATE_MARK: Record<CourseLibraryState, { icon: LucideIcon; ink: string; working?: boolean }> =
+  {
+    designing: { icon: Pencil, ink: "text-fg-2", working: true },
+    writing: { icon: Pencil, ink: "text-fg-2", working: true },
+    reviewing: { icon: Pencil, ink: "text-fg-2", working: true },
+    "outline-ready": { icon: ListTree, ink: "text-fg-2" },
+    changes: { icon: SquarePen, ink: "text-fg-2" },
+    retry: { icon: CircleX, ink: "text-fg-2" },
+    complete: { icon: Check, ink: "text-fg-3" },
+    resume: { icon: BookOpen, ink: "text-fg-3" },
+    revising: { icon: BookOpen, ink: "text-fg-3" },
+  };
 
 function RowMark({ item }: { item: CourseLibraryItem }) {
   if (item.isLive) return <LiveMark />;
-  if (item.state === "complete") {
-    return (
-      <span className="text-fg-3">
-        <DoneCheck />
-      </span>
-    );
-  }
-  if (UNWRITTEN.has(item.state)) return <UnsetMark />;
-  return null;
+  const { icon: Icon, ink, working } = STATE_MARK[item.state];
+  return (
+    <Icon aria-hidden className={cn("h-4 w-4", ink, working && "mk-work")} strokeWidth={1.75} />
+  );
 }
 
 function progressRatio(item: CourseLibraryItem): number {
@@ -170,11 +192,20 @@ export function CourseLibrary({ items }: { items: CourseLibraryItem[] }) {
           {FILTERS.map((option) => (
             <Button
               key={option.value}
-              variant={filter === option.value ? "compact" : "quiet"}
+              variant="quiet"
               aria-pressed={filter === option.value}
               onClick={() => setFilter(option.value)}
-              className={filter === option.value ? undefined : "px-2.5 py-1.5"}
+              /* One box in both states: choosing a filter steps the ground and
+                 the ink, never the type or the padding, so a click cannot
+                 resize the chip or shift the row. */
+              className={cn(
+                "px-2.5 py-1.5 text-[0.8125rem] font-medium",
+                filter === option.value
+                  ? "bg-over text-fg hover:bg-rule"
+                  : "text-fg-3 hover:text-fg",
+              )}
             >
+              <option.icon className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
               {option.label}
             </Button>
           ))}
@@ -198,8 +229,8 @@ export function CourseLibrary({ items }: { items: CourseLibraryItem[] }) {
       </p>
 
       {visible.length === 0 ? (
-        <div className="border-t border-hair pt-10">
-          <p className="text-[0.9375rem] leading-[1.66] text-fg-2">
+        <div className="mt-2 border-t border-hair pt-10">
+          <p className="text-[0.9375rem] font-medium leading-[1.66] text-fg">
             {query.trim() || filter !== "all"
               ? `No Courses match${query.trim() ? ` “${query.trim()}”` : ""}.`
               : "No Courses yet."}
@@ -207,9 +238,10 @@ export function CourseLibrary({ items }: { items: CourseLibraryItem[] }) {
           {query.trim() || filter !== "all" ? (
             <Button
               variant="quiet"
-              className="mt-1 px-0 underline decoration-hair underline-offset-2"
+              className="mt-2 px-0 underline decoration-hair underline-offset-2"
               onClick={resetFilters}
             >
+              <X className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
               Clear the search and filters
             </Button>
           ) : null}
@@ -223,39 +255,30 @@ export function CourseLibrary({ items }: { items: CourseLibraryItem[] }) {
                 key={item.id}
                 className="group relative border-b border-hair transition-colors duration-[120ms] ease-expo focus-within:bg-raised hover:bg-raised/60"
               >
-                <Hint
-                  label={
-                    <span className="block">
-                      <span className="block font-medium text-fg">{item.topic}</span>
-                      <span className="mt-0.5 block">{item.goal}</span>
-                    </span>
-                  }
+                <Link
+                  href={item.href}
+                  /* Rows run edge to edge in the list, so a ring at offset
+                     would lose its sides to the clip. Inset the way the
+                     workspace header's field already is. */
+                  className="grid grid-cols-[1rem_1fr] items-start gap-x-3 py-3.5 pr-9 pl-3 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-live"
                 >
-                  <Link
-                    href={item.href}
-                    /* Rows run edge to edge in the list, so a ring at offset
-                       would lose its sides to the clip. Inset the way the
-                       workspace header's field already is. */
-                    className="grid grid-cols-[0.75rem_1fr] items-start gap-x-3 py-3.5 pr-9 pl-3 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-live"
-                  >
-                    <span className="flex h-5 w-3 items-center justify-center">
-                      <RowMark item={item} />
+                  <span className="flex h-5 w-4 items-center justify-center">
+                    <RowMark item={item} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[0.9375rem] leading-snug font-semibold tracking-[-0.011em] text-fg">
+                      {item.topic}
                     </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[0.9375rem] leading-snug font-semibold tracking-[-0.011em] text-fg">
-                        {item.topic}
-                      </span>
-                      <span className="mt-0.5 block truncate text-[0.8125rem] leading-[1.55] text-fg-3">
-                        {item.goal}
-                      </span>
-                      <span className="tnum mt-1 block truncate text-[0.75rem] leading-[1.5] text-fg-dim">
-                        <span className={cn(needs && "font-medium text-fg")}>{item.fact}</span>
-                        <span aria-hidden="true"> · </span>
-                        {item.lastTouched}
-                      </span>
+                    <span className="mt-0.5 block truncate text-[0.8125rem] leading-[1.55] text-fg-3">
+                      {item.goal}
                     </span>
-                  </Link>
-                </Hint>
+                    <span className="tnum mt-1 block truncate text-[0.75rem] leading-[1.5] text-fg-dim">
+                      <span className={cn(needs && "font-medium text-fg")}>{item.fact}</span>
+                      <span aria-hidden="true"> · </span>
+                      {item.lastTouched}
+                    </span>
+                  </span>
+                </Link>
 
                 <div className="absolute top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity duration-[120ms] ease-expo group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
                   <CourseRowMenu courseId={item.id} topic={item.topic} />
