@@ -13,7 +13,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Before implementation, read `CONTEXT.md` and use its terms exactly.
 - For a GitHub Issue or its specification, read `docs/agents/issue-tracker.md` before using `gh`.
 - For domain behavior or an ADR, read `docs/agents/domain.md` and the relevant `docs/adr/` files first.
-- For frontend changes, read `DESIGN.md`. The Graphite Workspace is accepted. Connect real behavior without changing its screens, interactions, responsive behavior, or accessibility unless the request calls for a design change.
+- For frontend changes, read `DESIGN.md`. The Graphite Workspace is accepted. Connect real behavior without changing its screens, interactions, responsive behavior, or accessibility unless the request calls for a design change. Icons are a first-class vocabulary: reach for Lucide at 12–16px with `strokeWidth` 1.75 for a state or an affordance instead of drawing a new glyph (The Icon Rule).
 - For issue triage, read `docs/agents/triage-labels.md`.
 - For a schema change, read `lib/db/schema.ts` and the existing migrations. Run `pnpm db:generate`, apply the migration to dev with `pnpm db:migrate`, verify it, then apply it to production with `pnpm db:migrate:main`. Do not finish while production is behind.
 
@@ -32,12 +32,16 @@ Let the creation hooks finish. They install dependencies and copy `.env.local`. 
 
 Use `wt remove <branch>` for completed or abandoned worktrees. It preserves dirty or unmerged worktrees by default. Run `wt <command> --help` before using an unfamiliar Worktrunk option.
 
+## Formatting
+
+`pnpm format` (oxfmt) is tree-wide by design, and running it is always allowed: format the whole repository, even when it reformats files that are not part of this session's changes. That churn belongs in the same commit — never revert it, and never leave it behind for someone else. `pnpm format:check` must pass.
+
 ## Shipping to main
 
 Only ship when the user asks to ship, deploy, or integrate a branch. Pushing `main` deploys to production.
 
 1. Complete the schema procedure above before pushing a branch that changes `lib/db/schema.ts`.
-2. From the task worktree, commit and push the work. Run `pnpm test`, `pnpm typecheck`, and `pnpm lint`. Leave `.impeccable/hook.cache.json` and dependency-install drift in `pnpm-lock.yaml` or `package.json` uncommitted.
+2. From the task worktree, commit and push the work. Run `pnpm format`, `pnpm test`, `pnpm typecheck`, and `pnpm lint`. Leave `.impeccable/hook.cache.json` and dependency-install drift in `pnpm-lock.yaml` or `package.json` uncommitted.
 3. Fetch `origin`. Confirm the primary worktree is clean and `main` matches `origin/main`.
 4. From the task worktree, run `wt merge --no-commit --no-rebase`. If it cannot fast-forward `main`, stop and ask for direction.
 5. From the primary worktree, run `git push origin main`, then confirm `main` matches `origin/main`.
