@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,7 +14,13 @@ import {
 import { Hint } from "@/components/workspace/hint";
 import { readTheme, serverTheme, setTheme, subscribeTheme, type ThemeChoice } from "@/lib/theme";
 
-const THEMES = ["light", "dark", "system"] as const;
+/* Each choice carries its own picture: the sun, the moon, and the screen the
+   system picks for you. */
+const THEMES: { value: ThemeChoice; label: string; icon: LucideIcon }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
 
 function toggleTheme() {
   setTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
@@ -60,14 +67,15 @@ export function ThemeToggle() {
           value={theme}
           onValueChange={(value) => setTheme(value as ThemeChoice)}
         >
-          {THEMES.map((value) => (
+          {THEMES.map(({ value, label, icon: Icon }) => (
             <DropdownMenuRadioItem
               key={value}
               value={value}
               closeOnClick
               className="py-1.5 text-[0.8125rem] font-normal tracking-normal capitalize"
             >
-              {value}
+              <Icon aria-hidden className="h-3.5 w-3.5 text-fg-3" strokeWidth={1.75} />
+              {label}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

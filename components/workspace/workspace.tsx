@@ -22,10 +22,10 @@ import {
   type StagedPlanView,
 } from "@/lib/actions/tailor";
 import { rebuildFragmentsAction, searchIsIncompleteAction } from "@/lib/actions/courses";
-import type { PlanView, Turn } from "./panel";
+import type { PlanView } from "@/components/tailor-conversation";
 import { Outline, type ModuleView } from "./outline";
 import { LessonPane } from "./lesson";
-import { Panel, type PanelMode } from "./panel";
+import { Margin, type MarginChatView, type MarginMode } from "./margin";
 import { Resizer } from "./resizer";
 import { CommandPalette, type Command } from "./palette";
 import { ThemeToggle } from "./theme-toggle";
@@ -35,10 +35,11 @@ import { useSyncedState } from "@/hooks/use-synced-state";
 const OUTLINE_MIN = 16;
 const OUTLINE_MAX = 24;
 const OUTLINE_DEFAULT = 18;
-const PANEL_MIN = 18;
-const PANEL_MAX = 26;
-const PANEL_DEFAULT = 21;
-const COMPACT_PANEL_MAX = 21;
+const MARGIN_MIN = 18;
+const MARGIN_MAX = 26;
+const MARGIN_DEFAULT = 20;
+/* Below 1440 a rail may not claim more than this. */
+const COMPACT_RAIL_MAX = 21;
 
 const STAGE_MESSAGES: Record<string, string> = {
   lessons: "Writing the changed Lessons…",
@@ -66,132 +67,15 @@ function revisionStatusText(
   );
 }
 
-function SearchStaleNotice({
-  rebuilding,
-  onRebuild,
-}: {
-  rebuilding: boolean;
-  onRebuild: () => void;
-}) {
-  return (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-hair px-3.5 py-2">
-      <p className="text-[0.75rem] leading-[1.5] text-fg-3">Course search is out of date.</p>
-      <Button variant="quiet" onClick={onRebuild} disabled={rebuilding} className="shrink-0">
-        Rebuild
-      </Button>
-    </div>
-  );
-}
-
-function PublishedList({
-  rows,
-  failed,
-  onRetry,
-  onUndo,
-}: {
-  rows: PublishedPlanRow[];
-  failed: boolean;
-  onRetry: () => void;
-  onUndo: (planId: string) => void;
-}) {
-  if (rows.length === 0) {
-    if (!failed) return null;
-    return (
-      <div className="mt-5">
-        <p className="label text-fg-3">Published changes</p>
-        <p className="mt-3 text-[0.8125rem] leading-[1.5] text-fg-2">
-          Published changes could not load.
-        </p>
-        <Button variant="quiet" onClick={onRetry} className="mt-1 -ml-1">
-          Retry
-        </Button>
-      </div>
-    );
-  }
-  return (
-    <div className="mt-5">
-      <p className="label text-fg-3">Published changes</p>
-      <ul className="mt-3 space-y-3.5">
-        {rows.map((row) => (
-          <li key={row.plan.id} className="text-[0.8125rem] leading-[1.5]">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-fg-2">
-                Revision {row.publishedRevisionNumber} · {row.plan.operations.length}{" "}
-                {row.plan.operations.length === 1 ? "change" : "changes"}
-              </span>
-              {row.canUndo ? (
-                <Button variant="quiet" onClick={() => onUndo(row.plan.id)} className="shrink-0">
-                  Undo
-                </Button>
-              ) : (
-                <span className="text-[0.75rem] text-fg-3">{row.blockedReason}</span>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-      {failed && (
-        <Button variant="quiet" onClick={onRetry} className="mt-2 -ml-1">
-          Retry
-        </Button>
-      )}
-    </div>
-  );
-}
-
-function RevisionBanner({
-  status,
-  failed,
-  onRetry,
-  onDiscard,
-}: {
-  status: string;
-  failed: boolean;
-  onRetry: () => void;
-  onDiscard: () => void;
-}) {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="-mx-3.5 mb-5 border-y border-hair bg-canvas px-3.5 py-3"
-    >
-      <div className="flex items-start gap-2.5">
-        <span
-          aria-hidden
-          className={`mt-1.5 h-1.5 w-1.5 shrink-0 bg-fg-3 ${failed ? "" : "animate-pulse"}`}
-        />
-        <div className="min-w-0">
-          <p className="text-[0.8125rem] leading-[1.5] font-medium text-fg">{status}</p>
-          {!failed && (
-            <p className="mt-1 text-[0.75rem] leading-[1.5] text-fg-3">
-              You can keep navigating the Course while this finishes.
-            </p>
-          )}
-        </div>
-      </div>
-
-      {failed && (
-        <div className="mt-3 flex items-center gap-2 pl-4">
-          <Button onClick={onRetry} className="min-w-0 flex-1">
-            Retry the revision
-          </Button>
-          <Button variant="quiet" onClick={onDiscard} className="shrink-0">
-            Discard
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 type Props = {
   course: ReadingCourse;
   sources?: Map<string, SourceLink>;
   onMark: (lessonId: string) => Promise<CompletionActionResult>;
   onUnmark: (lessonId: string) => Promise<CompletionActionResult>;
-  tutorHistory?: Record<string, Turn[]>;
-  tailorTurns?: Turn[];
+  /** The open Lesson's chats with the Tutor, oldest first, keyed by Lesson. */
+  tutorChats?: Record<string, MarginChatView[]>;
+  /** The Course's chats with the Tailor, oldest first. */
+  tailorChats?: MarginChatView[];
   tailorPlan?: PlanView | null;
   stagedPlan?: StagedPlanView | null;
   searchStale?: boolean;
@@ -203,8 +87,8 @@ export function Workspace({
   sources,
   onMark,
   onUnmark,
-  tutorHistory,
-  tailorTurns,
+  tutorChats,
+  tailorChats,
   tailorPlan,
   stagedPlan,
   searchStale,
@@ -218,13 +102,16 @@ export function Workspace({
   });
   const [openId, setOpenId] = useState<string | null>(null);
   const [railChoice, setRailChoice] = useState<boolean | null>(null);
-  const [panel, setPanel] = useState<PanelMode | null>(null);
-  const [lastMode, setLastMode] = useState<PanelMode>("tutor");
+  /* `undefined` is "no choice yet", so the shell opens with both rails;
+     `null` is a learner who closed the margin. */
+  const [marginChoice, setMarginChoice] = useState<MarginMode | null | undefined>(undefined);
+  const [lastMode, setLastMode] = useState<MarginMode>("tutor");
   const [outlineWidth, setOutlineWidth] = useState(OUTLINE_DEFAULT);
-  const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT);
+  const [marginWidth, setMarginWidth] = useState(MARGIN_DEFAULT);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [justDone, setJustDone] = useState<string | null>(null);
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+  const [picked, setPicked] = useState<{ text: string; x: number; y: number } | null>(null);
   const [reveal, setReveal] = useState<{ quote: string; token: number } | null>(null);
   const [focusToken, setFocusToken] = useState(0);
   const [applying, setApplying] = useState(false);
@@ -233,19 +120,25 @@ export function Workspace({
   const router = useRouter();
   const compact = useMediaQuery("(max-width: 1279px)");
   const wide = useMediaQuery("(min-width: 1440px)", true);
-  const outlineMax = wide ? OUTLINE_MAX : COMPACT_PANEL_MAX;
-  const panelMax = wide ? PANEL_MAX : COMPACT_PANEL_MAX;
-  const railOpen = railChoice ?? wide;
+  const outlineMax = wide ? OUTLINE_MAX : COMPACT_RAIL_MAX;
+  const marginMax = wide ? MARGIN_MAX : COMPACT_RAIL_MAX;
+  /* Both rails open with a Course wherever the shell can hold them, from
+     1280 up: the Outline on the left and the margin on the right. Below that
+     each is a sheet, and a sheet opens only on a tap. */
+  const railOpen = railChoice ?? !compact;
+  const margin = marginChoice === undefined ? (compact ? null : lastMode) : marginChoice;
   const railOpenRef = useRef(railOpen);
   railOpenRef.current = railOpen;
-  const panelRef = useRef(panel);
-  panelRef.current = panel;
-  const restoreRailRef = useRef<boolean | null>(null);
+  const marginRef = useRef(margin);
+  marginRef.current = margin;
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const articleRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setOutlineWidth((width) => Math.min(width, outlineMax));
-    setPanelWidth((width) => Math.min(width, panelMax));
-  }, [outlineMax, panelMax]);
+    setMarginWidth((width) => Math.min(width, marginMax));
+  }, [outlineMax, marginMax]);
 
   const modules: ModuleView[] = useMemo(() => {
     let n = 0;
@@ -277,37 +170,41 @@ export function Workspace({
     [...flat.slice(0, openIndex)].reverse().find((l) => l.status !== "unset") ?? null;
   const next = flat.slice(openIndex + 1).find((l) => l.status !== "unset") ?? null;
 
-  function showPanel(mode: PanelMode) {
-    if (!wide) {
-      if (!compact) restoreRailRef.current = railOpenRef.current;
-      setRailChoice(false);
-    }
+  /* The passages this Lesson's threads grew from: each block holding one is
+     addressable by Show in the Lesson. */
+  const anchors = useMemo(
+    () =>
+      (tutorChats?.[open.id] ?? []).flatMap((chat) =>
+        chat.turns.map((turn) => turn.anchor).filter((anchor): anchor is string => Boolean(anchor)),
+      ),
+    [tutorChats, open.id],
+  );
+
+  function showMargin(mode: MarginMode) {
+    /* One sheet at a time: a compact screen has room for one overlay. */
+    if (compact) setRailChoice(false);
     setLastMode(mode);
-    setPanel(mode);
+    setMarginChoice(mode);
   }
 
-  function closePanel() {
-    setPanel(null);
-    if (!compact && !wide && restoreRailRef.current !== null) {
-      setRailChoice(restoreRailRef.current);
-    }
-    restoreRailRef.current = null;
+  function closeMargin() {
+    setMarginChoice(null);
   }
 
+  /* One sheet at a time: a compact screen has room for one overlay, so
+     opening the rail closes the margin, and never the other way round. */
   function setRailOpen(open: boolean) {
     setRailChoice(open);
-    if (open && !wide && panelRef.current !== null) {
-      setPanel(null);
-      restoreRailRef.current = null;
-    }
+    if (open && compact && marginRef.current !== null) setMarginChoice(null);
   }
 
   useEffect(() => {
-    const query = window.matchMedia("(max-width: 1439px)");
-    const onChange = (e: MediaQueryListEvent) => {
-      if (e.matches && railOpenRef.current && panelRef.current !== null) {
-        setRailChoice(false);
-      }
+    const query = window.matchMedia("(max-width: 1279px)");
+    const onChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) return;
+      /* The shell just became compact: no sheet opens itself. */
+      setRailChoice(false);
+      setMarginChoice(null);
     };
     query.addEventListener("change", onChange);
     return () => query.removeEventListener("change", onChange);
@@ -317,14 +214,55 @@ export function Workspace({
     setOpenId(id);
     setJustDone(null);
     setPendingAnchor(null);
+    setPicked(null);
     if (compact) setRailChoice(false);
   }
 
-  /* A selection in the Lesson becomes the Tutor's next question. */
-  function askAbout(text: string) {
-    setPendingAnchor(text);
+  /* A selection in the Lesson raises the bracket and its Ask. */
+  useEffect(() => {
+    function readSelection() {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+        setPicked(null);
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      const article = articleRef.current;
+      if (!article || !article.contains(range.commonAncestorContainer)) {
+        setPicked(null);
+        return;
+      }
+      const text = selection.toString().replace(/\s+/g, " ").trim();
+      if (text.length < 2) {
+        setPicked(null);
+        return;
+      }
+      const rect = range.getBoundingClientRect();
+      setPicked({
+        text: text.slice(0, 600),
+        x: Math.min(rect.right + 10, window.innerWidth - 152),
+        y: Math.min(rect.bottom + 8, window.innerHeight - 44),
+      });
+    }
+    document.addEventListener("selectionchange", readSelection);
+    return () => document.removeEventListener("selectionchange", readSelection);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const clear = () => setPicked(null);
+    el.addEventListener("scroll", clear, { passive: true });
+    return () => el.removeEventListener("scroll", clear);
+  }, []);
+
+  function askAboutSelection() {
+    if (!picked) return;
+    setPendingAnchor(picked.text);
+    setPicked(null);
+    window.getSelection()?.removeAllRanges();
     setFocusToken((token) => token + 1);
-    showPanel("tutor");
+    showMargin("tutor");
   }
 
   function revealQuote(quote: string) {
@@ -360,21 +298,13 @@ export function Workspace({
     });
   }
 
-  const tutorTurnsFor = useMemo<Turn[]>(
-    () => tutorHistory?.[open.id] ?? [],
-    [tutorHistory, open.id],
-  );
-
-  /* Neon holds the conversation; a finished turn refreshes the server view so
-     switching Lessons restores it. */
-  function tutorFinished() {
-    router.refresh();
-  }
-
   const [plan, setPlan] = useSyncedState(tailorPlan);
 
-  async function tailorFinished() {
+  /* A finished turn refreshes the server view, so switching Lessons or chats
+     restores it; the Tailor's turns can also leave a plan behind. */
+  async function marginFinished() {
     setPlan(await onRefreshPlan());
+    router.refresh();
   }
 
   const [staged, setStaged] = useState(false);
@@ -535,7 +465,11 @@ export function Workspace({
     return () => clearInterval(timer);
   }, [course.id, router, stagedRevision, setStagedRevision]);
 
-  const tailorTurnsStable = useMemo<Turn[]>(() => tailorTurns ?? [], [tailorTurns]);
+  const tutorChatsHere = useMemo<MarginChatView[]>(
+    () => tutorChats?.[open.id] ?? [],
+    [tutorChats, open.id],
+  );
+  const tailorChatsStable = useMemo<MarginChatView[]>(() => tailorChats ?? [], [tailorChats]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -548,9 +482,8 @@ export function Workspace({
         e.preventDefault();
         const next = !railOpenRef.current;
         setRailChoice(next);
-        if (next && window.matchMedia("(max-width: 1439px)").matches) {
-          setPanel(null);
-          restoreRailRef.current = null;
+        if (next && window.matchMedia("(max-width: 1279px)").matches) {
+          setMarginChoice(null);
         }
       }
     };
@@ -582,13 +515,13 @@ export function Workspace({
         id: "cmd-tutor",
         label: "Open the Tutor",
         group: "Actions",
-        run: () => showPanel("tutor"),
+        run: () => showMargin("tutor"),
       },
       {
         id: "cmd-tailor",
         label: "Open the Tailor",
         group: "Actions",
-        run: () => showPanel("tailor"),
+        run: () => showMargin("tailor"),
       },
       {
         id: "cmd-rail",
@@ -616,9 +549,8 @@ export function Workspace({
     // oxlint-disable-next-line react/exhaustive-deps
   }, [flat, open.id, open.exercise, doneAt, railOpen, router]);
 
-  const panelLabel = panel
-    ? `Close the ${panel === "tutor" ? "Tutor" : "Tailor"}`
-    : `Open the ${lastMode === "tutor" ? "Tutor" : "Tailor"}`;
+  const modeName = lastMode === "tutor" ? "Tutor" : "Tailor";
+  const marginLabel = margin ? `Close the ${modeName}` : `Open the ${modeName}`;
 
   return (
     <SidebarProvider
@@ -660,11 +592,11 @@ export function Workspace({
       />
 
       <SidebarProvider
-        open={panel !== null}
-        onOpenChange={(o) => (o ? showPanel(lastMode) : closePanel())}
+        open={margin !== null}
+        onOpenChange={(o) => (o ? showMargin(lastMode) : closeMargin())}
         isMobile={compact}
         className="min-h-0 min-w-0 flex-1"
-        style={{ "--sidebar-width": `${panelWidth}rem` } as CSSProperties}
+        style={{ "--sidebar-width": `${marginWidth}rem` } as CSSProperties}
       >
         <SidebarInset className="min-h-0 min-w-0 bg-canvas">
           <nav
@@ -674,13 +606,13 @@ export function Workspace({
             <Button
               variant="icon"
               onClick={() => setRailOpen(true)}
-              className={cn(!compact || railOpen ? "hidden" : "flex")}
               aria-label="Expand the Outline"
+              className={cn(!compact || railOpen ? "hidden" : "flex")}
             >
               <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
             </Button>
 
-            <div className="relative min-w-0 flex-1 md:absolute md:left-1/2 md:top-1/2 md:w-80 md:max-w-[calc(100%-9rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:flex-none">
+            <div className="relative min-w-0 flex-1 md:absolute md:top-1/2 md:left-1/2 md:w-80 md:max-w-[calc(100%-9rem)] md:-translate-x-1/2 md:-translate-y-1/2 md:flex-none">
               <Search
                 className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-fg-3"
                 strokeWidth={1.75}
@@ -700,22 +632,24 @@ export function Workspace({
               </kbd>
             </div>
 
+            {/* With the margin open the cluster steps clear of it, so the
+                shell keeps a live control where the rail cannot cover it. */}
             <div
               className="ml-auto flex shrink-0 items-center gap-1 transition-[margin-right] duration-160 ease-expo"
               style={
-                !compact && panel ? { marginRight: `calc(${panelWidth}rem - 1.5rem)` } : undefined
+                !compact && margin ? { marginRight: `calc(${marginWidth}rem - 1.5rem)` } : undefined
               }
             >
               <ThemeToggle />
-              <Hint label={panelLabel}>
+              <Hint label={marginLabel}>
                 <Button
                   variant="icon"
-                  onClick={() => (panel ? closePanel() : showPanel(lastMode))}
-                  aria-expanded={panel !== null}
-                  aria-label={panelLabel}
+                  onClick={() => (margin ? closeMargin() : showMargin(lastMode))}
+                  aria-expanded={margin !== null}
+                  aria-label={marginLabel}
                   className="h-8 w-8 p-2"
                 >
-                  {panel ? (
+                  {margin ? (
                     <PanelRightClose className="h-4 w-4" strokeWidth={1.75} />
                   ) : (
                     <PanelRight className="h-4 w-4" strokeWidth={1.75} />
@@ -725,83 +659,82 @@ export function Workspace({
             </div>
           </nav>
 
-          <div className="min-h-0 flex-1">
-            <LessonPane
-              key={open.id}
-              lesson={open}
-              total={flat.length}
-              stamp={doneAt[open.id]}
-              striking={justDone === open.id}
-              previous={previous ? { id: previous.id, n: previous.n, title: previous.title } : null}
-              next={next ? { id: next.id, n: next.n, title: next.title } : null}
-              sourceFor={sources ? (ref) => sources.get(ref) : undefined}
-              reveal={reveal}
-              onAskAbout={askAbout}
-              onMark={markDone}
-              onUnmark={unmark}
-              onOpen={openLesson}
-            />
-          </div>
+          <LessonPane
+            key={open.id}
+            lesson={open}
+            total={flat.length}
+            stamp={doneAt[open.id]}
+            striking={justDone === open.id}
+            anchors={anchors}
+            previous={previous ? { id: previous.id, n: previous.n, title: previous.title } : null}
+            next={next ? { id: next.id, n: next.n, title: next.title } : null}
+            sourceFor={sources ? (ref) => sources.get(ref) : undefined}
+            reveal={reveal}
+            portRef={scrollRef}
+            articleRef={articleRef}
+            onMark={markDone}
+            onUnmark={unmark}
+            onOpen={openLesson}
+          />
         </SidebarInset>
 
-        <Panel
-          mode={panel ?? lastMode}
+        <Margin
           courseId={course.id}
           lessonId={open.id}
-          lessonTitle={open.title}
-          tutorTurns={tutorTurnsFor}
-          onTutorFinished={tutorFinished}
+          mode={margin ?? lastMode}
+          onMode={(m) => {
+            setLastMode(m);
+            setMarginChoice(m);
+          }}
+          tutorChats={tutorChatsHere}
+          tailorChats={tailorChatsStable}
           pendingAnchor={pendingAnchor}
           onClearAnchor={() => setPendingAnchor(null)}
           onRevealAnchor={revealQuote}
           focusToken={focusToken}
-          tailorTurns={tailorTurnsStable}
-          onTailorFinished={tailorFinished}
-          tailorPlan={plan ?? undefined}
-          onMode={(m) => {
-            setLastMode(m);
-            setPanel(m);
-          }}
-          onClose={closePanel}
-          onApply={() => void applyPlan()}
+          searchStale={searchStaleNow}
+          rebuilding={rebuilding}
+          onRebuild={rebuildSearch}
+          plan={plan ?? null}
           applying={applying}
+          onApply={() => void applyPlan()}
           onDiscard={(id) => reviewOperation(id, "discarded")}
           onRestore={(id) => reviewOperation(id, "proposed")}
-          tutorNotice={
-            searchStaleNow ? (
-              <SearchStaleNotice rebuilding={rebuilding} onRebuild={rebuildSearch} />
-            ) : null
-          }
-          publishedSlot={
-            <PublishedList
-              rows={published}
-              failed={publishedFailed}
-              onRetry={() => setPublishedKey((k) => k + 1)}
-              onUndo={undoPlan}
-            />
-          }
-          revisionSlot={
-            revisionStatus ? (
-              <RevisionBanner
-                status={revisionStatus}
-                failed={stagedRevision?.failed ?? false}
-                onRetry={retryStagedRevision}
-                onDiscard={discardStaged}
-              />
-            ) : null
-          }
+          revisionStatus={revisionStatus}
+          revisionFailed={stagedRevision?.failed ?? false}
+          onRetryRevision={retryStagedRevision}
+          onDiscardRevision={discardStaged}
+          published={published}
+          publishedFailed={publishedFailed}
+          onRetryPublished={() => setPublishedKey((k) => k + 1)}
+          onUndo={undoPlan}
+          onFinished={() => void marginFinished()}
+          onClose={closeMargin}
           resizer={
             <Resizer
               side="right"
-              width={panelWidth}
-              min={PANEL_MIN}
-              max={panelMax}
-              defaultWidth={PANEL_DEFAULT}
-              onResize={setPanelWidth}
+              width={marginWidth}
+              min={MARGIN_MIN}
+              max={marginMax}
+              defaultWidth={MARGIN_DEFAULT}
+              onResize={setMarginWidth}
             />
           }
         />
       </SidebarProvider>
+
+      {picked ? (
+        <button
+          type="button"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={askAboutSelection}
+          style={{ left: picked.x, top: picked.y }}
+          className="fixed z-50 flex items-center gap-2 rounded-sm border border-hair bg-float px-2 py-1 text-[0.75rem] text-fg-2 transition-colors hover:text-fg"
+        >
+          <span aria-hidden className="block h-3.5 w-px bg-rule" />
+          Ask the Tutor
+        </button>
+      ) : null}
 
       <CommandPalette
         open={paletteOpen}

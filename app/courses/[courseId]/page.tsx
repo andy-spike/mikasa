@@ -11,8 +11,7 @@ import { markLessonDoneAction, markLessonUndoneAction } from "@/lib/actions/comp
 import { findProposedPlanAction, findStagedPlanAction } from "@/lib/actions/tailor";
 import { toReadingCourse, toSourceLinks } from "@/lib/course/reading";
 import { highlightReading } from "@/lib/course/highlight";
-import { turnViews } from "@/lib/course/tutor";
-import type { Turn } from "@/components/workspace/panel";
+import { chatViews, type ChatView } from "@/lib/course/tutor";
 import { requireLearner } from "@/lib/session";
 
 export default async function CoursePage({ params }: { params: Promise<{ courseId: string }> }) {
@@ -30,13 +29,15 @@ export default async function CoursePage({ params }: { params: Promise<{ courseI
   );
   const sources = toSourceLinks(published.sourceRows);
 
+  /* Every Lesson may hold several chats: the margin opens the newest and the
+     rest wait behind Previous chats. */
   const stored = await loadTutorHistory(db, user.id, courseId);
-  const tutorHistory: Record<string, Turn[]> = {};
-  for (const [lessonRef, turns] of stored) {
-    tutorHistory[lessonRef] = turnViews(turns);
+  const tutorChats: Record<string, ChatView[]> = {};
+  for (const [lessonRef, chats] of stored) {
+    tutorChats[lessonRef] = chatViews(chats);
   }
 
-  const tailorTurns = turnViews(await loadTailorHistory(db, user.id, courseId));
+  const tailorChats = chatViews(await loadTailorHistory(db, user.id, courseId));
   const proposedPlan = await findProposedPlanAction(courseId);
   const stagedPlan = await findStagedPlanAction(courseId);
 
@@ -48,8 +49,8 @@ export default async function CoursePage({ params }: { params: Promise<{ courseI
       sources={sources}
       onMark={markLessonDoneAction.bind(null, courseId)}
       onUnmark={markLessonUndoneAction.bind(null, courseId)}
-      tutorHistory={tutorHistory}
-      tailorTurns={tailorTurns}
+      tutorChats={tutorChats}
+      tailorChats={tailorChats}
       tailorPlan={proposedPlan}
       stagedPlan={stagedPlan}
       searchStale={searchStale}

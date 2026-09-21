@@ -25,6 +25,21 @@ export function formatDayStamp(date: Date): string {
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
+/**
+ * A run's measured elapsed, the quiet figure a margin carries: seconds under
+ * a minute, minutes under an hour, then hours and days, so a run left open
+ * overnight stays readable instead of counting past a thousand minutes.
+ */
+export function formatElapsed(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${String(minutes % 60).padStart(2, "0")}m`;
+  return `${Math.floor(hours / 24)}d ${String(hours % 24).padStart(2, "0")}h`;
+}
+
 const DAY = 86_400_000;
 
 /**

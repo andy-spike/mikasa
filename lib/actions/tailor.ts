@@ -5,7 +5,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { start } from "workflow/api";
 import { db } from "@/lib/db";
 import { requireLearner, requireOwnedCourse } from "@/lib/session";
-import { generationRuns } from "@/lib/db/schema";
+import { generationRuns, lessons } from "@/lib/db/schema";
 import {
   applyPlanToOutline,
   acceptProposedOperations,
@@ -19,11 +19,12 @@ import {
   undoPlanRevision,
 } from "@/lib/db/tailor";
 import type { ChangePlanRow } from "@/lib/db/tailor";
-import type { PlanView } from "@/components/workspace/panel";
+import type { PlanView } from "@/components/tailor-conversation";
 import { opDetail, opEntry, opVerb } from "@/lib/course/change-plan";
 import { stageRevisionWorkflow } from "@/workflows/course-revision";
 import { repairFragmentsWorkflow } from "@/workflows/repair-fragments";
 import { failGenerationRun } from "@/lib/db/outline";
+import { latestOutline } from "@/lib/db/design";
 
 const statusSchema = z.object({
   planId: z.string().uuid(),
@@ -42,13 +43,32 @@ function parsePlanIds(courseId: string, planId: string) {
 
 export type OperationReviewResult = { ok: boolean; message?: string };
 
-function toPlanView(row: ChangePlanRow): PlanView {
+/* Plan ops name Lessons and Modules by ref. The learner has never seen a
+   ref, so every plan row resolves it to the title it stands for. */
+async function refResolver(courseId: string): Promise<(ref: string) => string | null> {
+  const [lessonRows, outline] = await Promise.all([
+    db
+      .select({ ref: lessons.lessonRef, title: lessons.title })
+      .from(lessons)
+      .where(eq(lessons.courseId, courseId)),
+    latestOutline(db, courseId),
+  ]);
+  const titles = new Map<string, string>();
+  for (const row of lessonRows) titles.set(row.ref, row.title);
+  for (const outlineModule of outline?.data.modules ?? []) {
+    titles.set(outlineModule.id, outlineModule.title);
+    for (const lesson of outlineModule.lessons) titles.set(lesson.id, lesson.title);
+  }
+  return (ref) => titles.get(ref) ?? null;
+}
+
+function toPlanView(row: ChangePlanRow, resolve?: (ref: string) => string | null): PlanView {
   return {
     id: row.id,
     operations: row.operations.map((operation) => ({
       id: operation.id,
       verb: opVerb(operation.payload),
-      entry: opEntry(operation.payload),
+      entry: opEntry(operation.payload, resolve),
       detail: opDetail(operation.payload),
       status: operation.status,
     })),
@@ -58,7 +78,8 @@ function toPlanView(row: ChangePlanRow): PlanView {
 export async function findProposedPlanAction(courseId: string): Promise<PlanView | null> {
   const { user } = await requireLearner();
   const plan = await findProposedPlan(db, user.id, courseId);
-  return plan ? toPlanView(plan) : null;
+  if (!plan) return null;
+  return toPlanView(plan, await refResolver(courseId));
 }
 
 export type StagedPlanView = {
@@ -88,7 +109,7 @@ export async function findStagedPlanAction(courseId: string): Promise<StagedPlan
     .orderBy(desc(generationRuns.updatedAt))
     .limit(1);
   return {
-    plan: toPlanView(plan),
+    plan: toPlanView(plan, await refResolver(courseId)),
     failed: run?.status === "failed",
     error: run?.status === "failed" ? run.error : null,
     stage: run?.currentStep ?? null,
@@ -189,6 +210,7 @@ export async function listPublishedPlansAction(courseId: string): Promise<Publis
     .filter((p) => p.status === "published" && p.publishedRevisionNumber !== null)
     .sort((a, b) => b.publishedRevisionNumber! - a.publishedRevisionNumber!);
 
+  const resolve = await refResolver(courseId);
   return published.map((plan) => {
     const laterOverlap = published.some(
       (q) =>
@@ -198,7 +220,7 @@ export async function listPublishedPlansAction(courseId: string): Promise<Publis
           touches(q.touchedModules, plan.touchedModules)),
     );
     return {
-      plan: toPlanView(plan),
+      plan: toPlanView(plan, resolve),
       publishedRevisionNumber: plan.publishedRevisionNumber!,
       canUndo: !laterOverlap,
       blockedReason: laterOverlap

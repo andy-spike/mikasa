@@ -3,14 +3,9 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isTextUIPart, type ChatTransport, type UIMessage } from "ai";
-import { Slider } from "@base-ui/react/slider";
-import { ArrowDown, ArrowUp, ChevronDown, Square, X, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { EffortControl } from "@/components/effort-control";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Hint } from "@/components/workspace/hint";
@@ -29,7 +24,6 @@ export type PlanOperation = {
 
 export type PlanView = { id: string; operations: PlanOperation[] };
 
-const EFFORTS = ["low", "medium", "high"] as const satisfies readonly ReasoningEffort[];
 /* The route schema refuses a longer turn, so the field refuses to grow one. */
 const DRAFT_LIMIT = 4000;
 const DRAFT_LIMIT_WARN = 200;
@@ -189,7 +183,6 @@ export function Conversation({
 
   const [draft, setDraft] = useState("");
   const [effort, setEffort] = useState<ReasoningEffort>("low");
-  const [effortOpen, setEffortOpen] = useState(false);
   const [pinned, setPinned] = useState(true);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -381,75 +374,7 @@ export function Conversation({
             className="max-h-40 min-h-[1.55rem] w-full resize-none overflow-y-auto bg-transparent px-0 py-0 leading-[1.55] focus:bg-transparent disabled:opacity-60"
           />
           <div className="mt-1.5 flex items-center justify-between gap-2">
-            <DropdownMenu open={effortOpen} onOpenChange={setEffortOpen}>
-              <Hint label="Gemini 3.7 Flash reasoning effort">
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="quiet"
-                      aria-label={`Reasoning effort: ${effort}`}
-                      className="-ml-1 h-8 gap-1.5 px-1 text-[0.75rem] capitalize"
-                    >
-                      <Zap className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      {effort}
-                      <ChevronDown className="h-3 w-3" strokeWidth={1.75} />
-                    </Button>
-                  }
-                />
-              </Hint>
-              <DropdownMenuContent
-                side="top"
-                align="start"
-                className="w-60 p-3"
-                onKeyDown={(event) => {
-                  if (
-                    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(
-                      event.key,
-                    )
-                  )
-                    event.stopPropagation();
-                }}
-              >
-                <div className="flex items-center gap-2 text-[0.8125rem] text-fg">
-                  <Zap className="h-3.5 w-3.5 text-fg-3" strokeWidth={1.75} />
-                  <span className="font-medium">Gemini 3.7 Flash</span>
-                  <span className="ml-auto capitalize text-fg-3">{effort}</span>
-                </div>
-                <Slider.Root
-                  value={EFFORTS.indexOf(effort)}
-                  min={0}
-                  max={2}
-                  step={1}
-                  onValueChange={(value) => setEffort(EFFORTS[value])}
-                  onValueCommitted={() => setEffortOpen(false)}
-                  className="mt-4"
-                >
-                  <Slider.Control className="relative mx-2.5 flex h-6 touch-none items-center">
-                    <Slider.Track className="relative h-1.5 w-full overflow-hidden bg-raised">
-                      <Slider.Indicator className="h-full bg-fg-3" />
-                    </Slider.Track>
-                    {EFFORTS.map((value, index) => (
-                      <span
-                        key={value}
-                        className="pointer-events-none absolute h-1.5 w-1.5 -translate-x-1/2 bg-panel ring-1 ring-fg-3"
-                        style={{ left: `${index * 50}%` }}
-                      />
-                    ))}
-                    <Slider.Thumb
-                      getAriaLabel={() => "Reasoning effort"}
-                      getAriaValueText={(_, value) => EFFORTS[value]}
-                      className="h-5 w-5 bg-fg outline-none ring-canvas focus-visible:ring-2"
-                    />
-                  </Slider.Control>
-                </Slider.Root>
-                <div className="mt-1 flex justify-between text-[0.6875rem] capitalize text-fg-dim">
-                  {EFFORTS.map((value) => (
-                    <span key={value}>{value}</span>
-                  ))}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <EffortControl effort={effort} onEffort={setEffort} />
 
             <div className="flex items-center gap-2">
               {draft.length > DRAFT_LIMIT - DRAFT_LIMIT_WARN && (

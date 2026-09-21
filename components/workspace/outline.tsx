@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { ReadingLesson } from "@/lib/course/reading";
 import {
   Sidebar,
   SidebarContent,
@@ -18,7 +16,11 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { DoneCheck, LiveMark, UnsetMark } from "./marks";
+import { useScrollActivity } from "@/hooks/use-scroll-activity";
+import { cn } from "@/lib/utils";
+import type { ReadingLesson } from "@/lib/course/reading";
+import { BarCover } from "./bar-cover";
+import { DoneCheck, LiveMark } from "./marks";
 import { Hint } from "./hint";
 
 export type ModuleView = {
@@ -26,31 +28,6 @@ export type ModuleView = {
   title: string;
   lessons: (ReadingLesson & { n: number })[];
 };
-
-function LessonMark({
-  live,
-  stamp,
-  ghost,
-  handing,
-  striking,
-}: {
-  live: boolean;
-  stamp: string | undefined;
-  ghost: boolean;
-  handing: boolean;
-  striking: boolean;
-}) {
-  if (live) return <LiveMark handing={handing} />;
-  if (stamp) {
-    return (
-      <span className="text-fg-3">
-        <DoneCheck striking={striking} />
-      </span>
-    );
-  }
-  if (ghost) return <UnsetMark />;
-  return null;
-}
 
 type Props = {
   topic: string;
@@ -69,6 +46,9 @@ type Props = {
   resizer?: ReactNode;
 };
 
+/* The Outline: every Lesson in reading order, with the live mark spent on the
+   one the work sits on. Its own scroll port, so the bar rides the scroll and
+   the lane stays reserved. */
 export function Outline({
   topic,
   goal,
@@ -87,6 +67,9 @@ export function Outline({
 }: Props) {
   const { isMobile } = useSidebar();
   const openLessonRef = useRef<HTMLButtonElement>(null);
+  const port = useRef<HTMLDivElement>(null);
+
+  useScrollActivity(port);
 
   useEffect(() => {
     openLessonRef.current?.scrollIntoView({ block: "nearest" });
@@ -100,6 +83,7 @@ export function Outline({
       aria-label="Outline"
       className="border-hair duration-160 ease-expo"
     >
+      {/* The icon rail: a way back out, and the count that fits. */}
       <div className="hidden flex-col items-center gap-1 py-3 group-data-[collapsible=icon]:flex">
         <Button
           variant="icon-raised"
@@ -141,80 +125,85 @@ export function Outline({
         <p className="mt-2 text-[0.8125rem] leading-[1.5] text-fg-3">{goal}</p>
       </SidebarHeader>
 
-      <SidebarContent className="scroll-thin gap-0 overflow-y-auto border-t border-hair px-2 py-2 group-data-[collapsible=icon]:hidden">
-        {modules.map((m) => (
-          <SidebarGroup key={m.numeral} className="mb-2 p-0 last:mb-0">
-            <SidebarGroupLabel className="h-auto justify-start px-2 pt-4 pb-1.5 text-fg-3">
-              <h2 className="grid min-w-0 grid-cols-[1.5rem_1fr] text-[0.6875rem] leading-[1.35] font-semibold tracking-[0.06em] uppercase">
-                <span className="tnum">{m.numeral}</span>
-                <span>{m.title}</span>
-              </h2>
-            </SidebarGroupLabel>
+      {/* The rail is a port like the article and the margin: the rows end at
+          the lane (hence no right pad), and the hairline sits on the wrapper,
+          outside the scroller, so the cover never paints over it. */}
+      <div className="relative flex min-h-0 flex-1 flex-col border-t border-hair group-data-[collapsible=icon]:hidden">
+        {/* The end pad lets the last Lessons come up off the viewport floor:
+            scrolling to the bottom is a place, not the end of the list. */}
+        <SidebarContent
+          ref={port}
+          className="scroll-thin gap-0 overflow-y-auto pt-2 pb-24 pl-2 [scrollbar-gutter:stable]"
+        >
+          {modules.map((m) => (
+            <SidebarGroup key={m.numeral} className="mb-2 p-0 last:mb-0">
+              <SidebarGroupLabel className="h-auto justify-start px-2 pt-4 pb-1.5 text-fg-3">
+                <h2 className="grid min-w-0 grid-cols-[1.5rem_1fr] text-[0.6875rem] leading-[1.35] font-semibold tracking-[0.06em] text-fg-3 uppercase">
+                  <span className="tnum">{m.numeral}</span>
+                  <span>{m.title}</span>
+                </h2>
+              </SidebarGroupLabel>
 
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-0">
-                {m.lessons.map((l) => {
-                  const stamp = stampFor(l.id);
-                  const ghost = l.status === "unset";
-                  const isOpen = l.id === openId;
-                  const isLive = l.id === liveId;
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-0">
+                  {m.lessons.map((l) => {
+                    const lessonStamp = stampFor(l.id);
+                    const isOpen = l.id === openId;
+                    const isLive = l.id === liveId;
 
-                  return (
-                    <SidebarMenuItem key={l.id}>
-                      <Hint label={l.title} side="right">
-                        <SidebarMenuButton
-                          ref={isOpen ? openLessonRef : undefined}
-                          isActive={isOpen}
-                          render={ghost ? <div /> : undefined}
-                          aria-disabled={ghost || undefined}
-                          aria-current={isOpen ? "page" : undefined}
-                          aria-label={`${l.n}. ${l.title}${stamp ? ", complete" : isLive ? ", current Lesson" : ""}`}
-                          onClick={ghost ? undefined : () => onOpen(l.id)}
-                          className={cn(
-                            "row grid h-auto grid-cols-[0.75rem_1.25rem_1fr] items-center gap-x-2 overflow-visible px-2 text-left aria-disabled:opacity-100",
-                            isMobile ? "min-h-11 py-2.5" : "min-h-7 py-1",
-                            ghost && "hover:bg-transparent",
-                          )}
-                        >
-                          {/* The sidebar primitive sizes a descendant svg to
-                              16px; the rail's mark is drawn at 10px. */}
-                          <span className="flex h-4 w-3 items-center justify-center [&_svg]:size-2.5!">
-                            <LessonMark
-                              live={isLive}
-                              stamp={stamp}
-                              ghost={ghost}
-                              handing={handing}
-                              striking={justDoneId === l.id}
-                            />
-                          </span>
-
-                          <span
+                    return (
+                      <SidebarMenuItem key={l.id}>
+                        <Hint label={l.title} side="right">
+                          <SidebarMenuButton
+                            ref={isOpen ? openLessonRef : undefined}
+                            isActive={isOpen}
+                            aria-current={isOpen ? "page" : undefined}
+                            aria-label={`${l.n}. ${l.title}${lessonStamp ? ", complete" : isLive ? ", current Lesson" : ""}`}
+                            onClick={() => onOpen(l.id)}
                             className={cn(
-                              "tnum text-[0.75rem] tabular-nums",
-                              ghost ? "text-fg-dim" : isOpen ? "text-fg-2" : "text-fg-3",
+                              "row grid h-auto grid-cols-[0.75rem_1.25rem_1fr] items-center gap-x-2 overflow-visible px-2 text-left",
+                              isMobile ? "min-h-11 py-2.5" : "min-h-7 py-1",
                             )}
                           >
-                            {l.n}
-                          </span>
-
-                          <span
-                            className={cn(
-                              "truncate text-[0.8125rem] leading-5",
-                              ghost ? "text-fg-3" : isOpen ? "font-medium text-fg" : "text-fg-2",
-                            )}
-                          >
-                            {l.title}
-                          </span>
-                        </SidebarMenuButton>
-                      </Hint>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
-      </SidebarContent>
+                            {/* The sidebar primitive sizes a descendant svg to
+                                16px; the rail's mark is drawn at 10px. */}
+                            <span className="flex h-4 w-3 items-center justify-center [&_svg]:size-2.5!">
+                              {isLive ? (
+                                <LiveMark handing={handing} />
+                              ) : lessonStamp ? (
+                                <span className="text-fg-3">
+                                  <DoneCheck striking={justDoneId === l.id} />
+                                </span>
+                              ) : null}
+                            </span>
+                            <span
+                              className={cn(
+                                "tnum text-[0.75rem] tabular-nums",
+                                isOpen ? "text-fg-2" : "text-fg-3",
+                              )}
+                            >
+                              {l.n}
+                            </span>
+                            <span
+                              className={cn(
+                                "truncate text-[0.8125rem] leading-5",
+                                isOpen ? "font-medium text-fg" : "text-fg-2",
+                              )}
+                            >
+                              {l.title}
+                            </span>
+                          </SidebarMenuButton>
+                        </Hint>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
+        </SidebarContent>
+        <BarCover ground="panel" />
+      </div>
 
       {resizer}
     </Sidebar>

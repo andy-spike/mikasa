@@ -284,7 +284,7 @@ The Course is a warm desk, not a grey instrument. It keeps the working-shell pos
 
 Depth comes from light, and light has two warm settings. Paper runs four steps down from `#fffcf0`; charcoal runs four steps up from `#1b1a18`. The ground flips, the system does not: in both, the sidebars sit one step off the reading ground, the open row sits two, and what floats sits at the top of the stack. A stored choice decides which ground a learner gets, and with no stored choice the operating system does; the class is set on `<html>` before first paint, so the shell is never briefly the wrong colour. A fixed grain wash lies over the shell at very low opacity, multiply on paper and overlay on charcoal, so the surface has tooth without ever sitting behind body text at reading opacity. Hairlines divide but never enclose, except for code, which sits on the reading ground inside one hairline so its syntax roles stay legible. Type does the structural work that borders would do elsewhere: one sans for every word, one mono for every number that is data, and a single small tracked label style for the few things that need naming rather than reading.
 
-Colour is rationed. `#4a6b0a` on paper, `#9cb52d` on charcoal, marks where the work is — the Lesson you are up to, the page the run still owes work on, the one action a surface turns on — and nothing else outside code. Which Lesson is _open_ is carried by a raised ground, so position and progress never compete for the same signal. Everything the learner has already finished is neutral, and everything still ahead of them carries no mark at all. Inside code blocks alone, a full Flexoki syntax palette is spent on keywords, strings, numbers, functions, and comments, each clearing 4.5:1 on the reading ground it sits on. A Course is generated in one pass, so a generated Course has no missing Lesson; the dashed rule belongs to a Course still sitting at its Outline, where nothing has been written yet. This world replaced a square-cornered graphite instrument; that precision is evidence, not heritage. The rejected serif Reading Room stays rejected.
+Colour is rationed. `#4a6b0a` on paper, `#9cb52d` on charcoal, marks where the work is — the Lesson you are up to, the page the run still owes work on, the one action a surface turns on — and nothing else outside code. Which Lesson is _open_ is carried by a raised ground, so position and progress never compete for the same signal. Everything the learner has already finished is neutral, and everything still ahead of them carries no mark at all. Inside code blocks alone, a full Flexoki syntax palette is spent on keywords, strings, numbers, functions, and comments, each clearing 4.5:1 on the reading ground it sits on. A Course is generated in one pass, so a generated Course has no missing Lesson; the dashed rule belongs to the Lessons of a Course still sitting at its Outline, where nothing has been written yet. This world replaced a square-cornered graphite instrument; that precision is evidence, not heritage. The rejected serif Reading Room stays rejected.
 
 One surface is allowed to spend the accent as wayfinding: the landing is the desk seen from the visitor's side, so it carries one olive moment per section — a triangle beside a section heading, the pencil band and the half-written line in the hero's illustrated scene. It is the same mark, borrowed to say _this is where you are_, never a colour for an action: `Start a Course` stays greyscale in both grounds.
 
@@ -337,7 +337,7 @@ Every text step is legal body text on all four surfaces; the ramp is a hierarchy
 - **Second Ink** (`{colors.fg-2}`): Body prose, unopened Lesson titles, Tutor answers, code body. The colour most words in the product are set in.
 - **Third Ink** (`{colors.fg-3}`): Supporting text — Goal, module counts, captions, quiet buttons, placeholders, code comments. Placeholders use this step, so they clear body contrast too.
 - **Dim Ink** (`{colors.fg-dim}`): The lowest text step — completion dates, minute estimates, keycaps, separators, palette group headers. Still body-legal on the topmost surface in both themes.
-- **Mark** (`{colors.mark}`): Graphics only, never text. Its one consumer is the dashed rule that stands in for a Lesson in a Course that has not been generated yet — the Outline screen and the Courses list, never inside a Course the learner is reading.
+- **Mark** (`{colors.mark}`): Graphics only, never text. Its only consumer is the dashed rule that stands in for a Lesson in a Course that has not been generated yet — the Outline screen, the Writer's Column's queue, and the queued steps of a run — never inside a Course the learner is reading.
 
 ### Syntax — code blocks only
 
@@ -423,13 +423,13 @@ The navbar is fixed to the viewport top: a compact translucent canvas bar with a
 
 The demonstration's subject tabs join without gaps. Section headings carry no wayfinding triangle. The page sits over a notebook-paper ground: a faint ruled grid in the hairline token at 20% over canvas, holding still while content scrolls over it. It keeps animating nothing of its own and stays clear of reading text.
 
-**The shell.** Full viewport height, full viewport width, and never scrolled: Outline rail, reading column, panel, each region owning its own overflow. Both rails are fixed to the viewport's own edges, so the shell is not capped or centred — the room a wide screen has going spare is spent on the rail and the reading column's margins instead of on a boxed page.
+**The shell.** Full viewport height, full viewport width, and never scrolled: Outline rail, reading column, margin, each region owning its own overflow. The rail and the margin are fixed to the viewport's own edges, so the shell is not capped or centred — the room a wide screen has going spare is spent on the rails and the reading column's margins instead of on a boxed page.
 
-**The rail.** 20rem, and 23rem from `xl` up. Its rows are a three-column grid (`0.75rem 1.25rem 1fr`) carrying mark, number and title — three facts, one line, no wrap. The completion date and the minute estimate used to sit in a fourth column and were dropped: neither is a thing a learner scanning for their place acts on. Row padding is 0.375rem on a pointer and 0.75rem on touch, so a long Course scrolls rather than compressing. Collapsed, the rail leaves a 2.75rem stub carrying the reopen control and the done count — `collapsible="icon"`, because a rail that vanishes entirely takes the shell's left edge with it. The header carries the Topic and the Goal and nothing else; Depth, Grounding and the done fraction came off it, and the route to the Outline screen lives in the command palette.
+**The rail.** 18rem to open, draggable between 16 and 24rem — 21rem is the ceiling below 1440, where the reading column needs the room more. Its rows are a three-column grid (`0.75rem 1.25rem 1fr`) carrying mark, number and title — three facts, one line, no wrap. The completion date and the minute estimate used to sit in a fourth column and were dropped: neither is a thing a learner scanning for their place acts on. Row padding is 0.375rem on a pointer and 0.75rem on touch, so a long Course scrolls rather than compressing. Collapsed, the rail leaves a 2.75rem stub carrying the reopen control and the done count — `collapsible="icon"`, because a rail that vanishes entirely takes the shell's left edge with it. The header carries the Topic and the Goal and nothing else; Depth, Grounding and the done fraction came off it, and the route to the Outline screen lives in the command palette.
 
-**The reading column.** Gutters of 1.25rem, 2rem at `sm`, 2.5rem at `lg`, shared exactly by the chrome row and the article, so the Lesson sits on the same axis as the controls above it. Content blocks are capped at `--measure` (36rem); the article's own 44rem box only bounds the meta line.
+**The reading column.** Gutters of 1.25rem, 2rem at `sm`, 2.5rem at `lg`, shared exactly by the chrome row and the article, so the Lesson sits on the same axis as the controls above it. The article is capped at 41rem and content blocks at `--measure` (36rem), so a code block or a table cannot widen the sentence beside it.
 
-The column holds still by keeping the region around it a constant size, from both ends. When the rail collapses, the region takes a left pad of `calc(rail − 2.75rem)`. From `2xl` up, where there is room to spare, a closed panel keeps its 21rem in reserve as a right pad and the article centres in what is left — so the sentence sits in the middle of the space it will still occupy once the panel opens. Measured 0px drift at 1280, 1440, 1600 and 1920 when either the rail or the panel toggles.
+The column holds still because neither rail ever takes flex space: both are fixed to the viewport's own edges and reserve nothing, so the 41rem box stays centred in the viewport and the sentence keeps its place whether a rail is open, collapsed to its stub, or dragged wider. The chrome's right cluster steps clear of an open margin by `calc(margin − 1.5rem)`, so the shell keeps a live control where the rail cannot cover it. Measured 0px drift at 1280, 1440, 1600 and 1920 when the margin opens and closes and when the rail collapses and expands.
 
 **The landing.** The one surface that is not the shell: a 60rem frame with the shell's own gutters. Prose stays on the 36rem measure, the numbered steps and the definition rows cap their painted edges at 44rem so no hairline runs past the words it divides, and the Outline demonstration is the single element that spends the full 60rem. That contrast is the page's only width rhythm.
 
@@ -439,13 +439,15 @@ Each section below the hero carries exactly one olive moment — the live triang
 
 **The Tailor column.** On the Outline screen the right column is not a rail; it is a second column in the page's own flow, 20rem from `lg` up. Once a plan has more than a few changes in it, that column is taller than the viewport, and `position: sticky` can hold a tall element by its top or by its bottom but never both. So `hooks/use-sticky-follow.ts` moves the sticky `top` with the scroll and clamps it at each end: scroll down and the column rides up until its last change sits on the viewport floor, then stops; scroll up and it rides back down until its first row meets the header, then stops. It has no scrollport of its own — an inner scrollbar beside a scrolling page is two scroll surfaces competing for the same wheel. Below `lg` the column stacks under the Outline and the hook no-ops.
 
-**The panel.** 21rem, closed by default, at the right edge, `collapsible="offcanvas"`. Below 1280px, opening it collapses the rail — the shell never tries to show all three at a width that fits two. Parked off the canvas it is `inert`: out of the document, not merely out of sight.
+**The Outline screen's three lives.** One route, three surfaces, chosen by the Course's state and never by the reader. While Mikasa designs, the Now Column stands beside a proof column: a 22rem status column (23rem from `xl`) carrying the phase, a live elapsed figure, the four steps with their marks, a ruler with one tick per known Lesson and the frontier written in as it arrives, and Cancel. While the Outline waits for approval, the Ledger lays the Outline out as a ruled register — module bands and lesson rows with their reorder grips, capped at 96rem — with the sticky Tailor column beside it. While Mikasa writes, the Writer's Column carries the run's phase, the queue of Lessons and the check's findings in a 20rem margin, the page in hand at the 41rem measure, and, from `xl`, a 20rem rail of written pages. A published Course leaves this route for the reading shell. Each surface owns its own full-bleed layout, so none of them is wrapped in a centred container.
 
-**The Courses index.** The Courses surface is a minimal centered list at `40rem`: the h1 with the compact New Course control beside it, a panel-ground search field, a filter row of state buttons with a sort Select, a quiet count line, and the rows. A row is a mark, a Topic, its Goal, and one meta line — the fraction, or the state that wants the learner, with its last activity. The Topic and Goal truncate rather than reflowing, and rows carry no hint. Rows are links: one click opens the Course. The search narrows by Topic or Goal (`/` focuses it from anywhere on the page, Escape clears it); the filter picks All, Needs you, In progress, or Done; the sort orders by recency, Topic, or completion. The empty result names what found nothing and offers one control that clears the search and the filter together.
+**The margin.** 20rem to open, draggable between 18 and 26rem, at the right edge, `collapsible="offcanvas"`. It carries one mode at a time behind a two-segment switch: the Tutor, which changes nothing, and the Tailor, which writes nothing until a change is approved. Each mode keeps a list of chats rather than one thread — the newest opens, Previous chats lists the rest dated, and New chat starts a fresh one; a chat's first turn is what opens it, so an empty margin never asks the learner to name anything. A Course opens with both rails wherever the shell can hold them — the Outline left and the margin right from 1280px up — and with neither below that, where each is a sheet that opens only on a tap, and only one sheet opens at a time: the shell never tries to show all three at a width that fits two. Parked off the canvas the margin is `inert`: out of the document, not merely out of sight.
 
-**Below 768px.** Both rails become sheets — a base-ui dialog with a blurred scrim, focus moved in, Escape to close, the layer behind inert, and focus returned to the control that opened it. The sheet takes `min(22rem, 88vw)`. Rail rows grow to `py-3` for a 44px touch target. A Courses row keeps its single column all the way down — at 390px the Topic, Goal and meta line truncate rather than the row reflowing, because a scanning row that changes shape stops being scannable. A device that cannot hover sees the row's options control at all times, since there is no reveal to wait for.
+**The Courses index.** The Courses surface is a minimal centered list at `40rem`: the h1 with the compact New Course control beside it, a panel-ground search field, a filter row of state buttons with a sort Select, a quiet count line, and the rows. A row is a mark, a Topic, its Goal, and one meta line — the fraction, or the state that wants the learner, with its last activity. The mark column reads the Course's state in Lucide at 16px on a 1rem box, one icon per state and never a blank cell (the vocabulary is _Marks and state icons_); the accent triangle stays the one coloured mark. The Topic and Goal truncate rather than reflowing, and rows carry no hint. Rows are links: one click opens the Course. The search narrows by Topic or Goal (`/` focuses it from anywhere on the page, Escape clears it); the filter picks All, Needs you, In progress, or Done — each chip keeps one box, so choosing one steps the ground and the ink and never the type, and the row cannot shift under a click; the sort orders by recency, Topic, or completion. The empty result names what found nothing and offers one control that clears the search and the filter together.
 
-**Breakpoints:** 768 (`md`), 1024 (`lg`), 1280 (`xl`), 1536 (`2xl`), plus the 767px query behind the sheet behaviour and a 1279px check that trades the rail for the panel.
+**Below 1280px.** Both rails become sheets — a base-ui dialog with a blurred scrim, focus moved in, Escape to close, the layer behind inert, and focus returned to the control that opened it. Only one sheet opens at a time. The sheet takes `min(22rem, 88vw)`. Rail rows grow to `py-3` for a 44px touch target. A Courses row keeps its single column all the way down — at 390px the Topic, Goal and meta line truncate rather than the row reflowing, because a scanning row that changes shape stops being scannable. A device that cannot hover sees the row's options control at all times, since there is no reveal to wait for.
+
+**Breakpoints:** 768 (`md`), 1024 (`lg`), 1280 (`xl`), 1536 (`2xl`), plus the 767px query behind the sheet behaviour and the 1279px check that decides shell against sheets.
 
 ### Named Rules
 
@@ -477,13 +479,17 @@ Every corner in the product is square. Rows, chips, buttons, fields, code blocks
 
 The square corner is not decoration; it is the desk register — the instrument's precision rather than paper's softness. Depth here is light plus a faint grain wash, and division is a hairline. Nothing is pill-shaped, nothing is circular, and no element carries a full border for decoration, except code on its reading ground.
 
-Marks are drawn, not iconified in a font: a solid triangle in live olive for the current Lesson, a stroked check for done, a dashed rule for unset — all drawn on the same 12px box so a column of rows never shifts, and drawn at 10px in the Outline rail, where a mark sits beside a 12px number and a 13px title. Interface icons are Lucide at 14–16px, `strokeWidth` 1.75. The one exception to this whole section is Google's G on the sign-in button, a third-party mark that keeps its own geometry as well as its own colours.
+**Icons are the interface's hand.** A state, an affordance, or a fact that reads faster as a picture takes a Lucide icon at 12–16px, `strokeWidth` 1.75, in an ink step — size follows the surface, ink follows the state (second ink while it is unsettled, third once it is settled), and reaching for an icon is the normal answer rather than a thing to avoid. Three marks stay drawn, as the signature family: a solid triangle in live olive for the current Lesson, a stroked check for done, and a dashed rule for unset — all on the same 12px box so a column of rows never shifts, and all read in the Outline rail, the lesson page, the Writer's Column and a run's own steps, where a learner learns to read them. Every other state is iconified: the Courses list gives each of its states an icon in an ink step, so no row's mark column is ever blank. No state icon takes a colour of its own; the accent stays on the triangle, because the triangle is the one mark that says where the work is. The one exception to this whole section is Google's G on the sign-in button, a third-party mark that keeps its own geometry as well as its own colours.
 
 The focus ring is a 2px solid olive outline at 2px offset, following the shape of the thing it surrounds. A control that runs edge to edge inside a clipped or scrolling region — the workspace header's field, the Outline's Courses link, a Course row in the index — takes the same ring inset by 2px instead, because a ring hanging outside the clip loses the two sides that say what shape it surrounds.
 
 ### Named Rules
 
 **The Square Corner Rule.** Nothing carries a radius: the ramp is held at `0px`, so one edit could soften the world, but a corner is never what separates two things. An element that needs to read as separate takes a luminance step or a hairline first. Uppercase stays inside the one 0.6875rem label.
+
+**The Pointer Rule.** Anything that acts on a click wears the pointer: buttons, links, menu items, options, tabs, switches, summaries — the whole system, not one surface. A disabled control keeps the default arrow, because it will not act, and a drag handle keeps its own resize cursor. Nothing clickable pretends to be inert, and nothing inert pretends to be clickable.
+
+**The Icon Rule.** A state, an affordance, or a fact that reads faster as a picture gets a Lucide icon at 12–16px, `strokeWidth` 1.75, in an ink step. Reaching for one is the default; drawing a new glyph is the exception, and it belongs to the signature family alone. An icon is never decoration, never carries a colour of its own, and never becomes a second accent.
 
 ## Components
 
@@ -513,11 +519,11 @@ Four adaptations are recorded in the file, at the lines they change:
 - **No `⌘B` inside the provider.** Two providers would both answer it. The workspace binds it once, for the Outline, beside `⌘K`.
 - **`inert` when parked offcanvas.** A sidebar translated off the canvas is still in the tab order and the accessibility tree. The icon rail keeps its stub and stays reachable.
 
-`--sidebar-width` is set inline by the provider, where a breakpoint cannot reach it, so it reads `--mk-rail` and the class moves that instead.
+`--sidebar-width` is set inline by each provider from React state, because both rails are draggable and a breakpoint cannot reach a dragged width; `--sidebar-width-icon` holds the 2.75rem stub.
 
 ### Theme Switch
 
-One control in the chrome, holding no React state: the class on `<html>` is the state, which icon shows is a CSS question, and the choice is written to `localStorage` under `mk-theme`. It renders identically on the server and the client, so it needs no mounted flag and produces no hydration seam.
+One control in the chrome, holding no React state: the class on `<html>` is the state, which icon shows is a CSS question, and the choice is written to `localStorage` under `mk-theme`. It renders identically on the server and the client, so it needs no mounted flag and produces no hydration seam. The right-click menu names the three choices, each with its own picture — a sun, a moon, and a monitor for System — at third ink, with the check on the right.
 
 ### Desk Scene (signature, landing)
 
@@ -528,14 +534,23 @@ The landing hero's illustration, drawn as one SVG in `components/desk-scene.tsx`
 - **Alive once:** the steam strokes draw in on the scene's settle (`mk-steam`) and then breathe between its own opacity and 0.8 (`mk-breathe`, 7s alternate). Under `prefers-reduced-motion` the steam is drawn at rest and no animation runs.
 - **No frame:** the scene carries no card, hairline or shadow around it; it sits on the page the way its objects sit on the desk.
 
+### Marks and state icons
+
+A mark column carries state, never decoration, and the product draws it two ways:
+
+- **The signature family**, in `components/workspace/marks.tsx`: the live triangle in live olive, the done check, and the dashed rule for unset, all on one 12px box so a column of rows never shifts. It belongs to Lessons and to a run's own steps — the Outline rail, the lesson page, the Writer's Column's queue and ruler, and the design and generation step lists.
+- **Lucide**, at 12–16px with `strokeWidth` 1.75, in an ink step: the default for a state or an affordance everywhere else. The Courses list's mark column is the reference for the vocabulary: the accent triangle for the Course the learner is up to, a `ListTree` while the Outline waits for approval, a `SquarePen` while a Change plan waits for a decision, a `CircleX` for a build that failed, a `Pencil` that breathes while Mikasa writes (`mk-work`, 2.2s alternate, still under reduced motion), a `Check` for done, and a `BookOpen` for a Course the learner can keep reading. Second ink while a state wants the learner or the machine, third once it is settled — and every state carries a mark, so a blank cell never reads as an omission.
+
+An icon is never decoration and never a second colour: the accent stays on the triangle, an unsettled state sits at second ink, and a finished one at third. When a surface needs a state or a control read at a glance, the answer is an icon; a new glyph is only ever the signature family's.
+
 ### Outline Rail (signature)
 
-The Outline is a live, editable object beside the Lesson, not a table of contents, and the rail is built to look like one. Module headings are labels with a `done/total` count; Lesson rows are a fixed four-column grid.
+The Outline is a live object beside the Lesson, not a table of contents, and the rail is built to look like one. Module headings are labels over their Lessons; Lesson rows are a fixed three-column grid (`0.75rem 1.25rem 1fr`) carrying mark, number and title.
 
-- **Three states, three marks:** live is the accent triangle; done is a neutral check; unset is a dashed rule at `--mark` with its title at third ink. Inside a generated Course only the first two occur — a Lesson the learner has not reached yet is unmarked, not unfinished. Module headings carry their name and no count.
-- **Open:** raised ground, title at full ink and medium weight, `aria-current="true"`. Never the accent.
+- **Two states, two marks:** live is the accent triangle; done is a neutral check. The rail only exists inside a published Course, where every Lesson is written, so the dashed unset rule belongs to the Outline screen's own surfaces instead.
+- **Open:** raised ground, title at full ink and medium weight, `aria-current="page"`. Never the accent.
 - **Hover:** raised at 60% opacity. Rows transition background and colour over 120ms.
-- **Unset rows are `<div aria-disabled="true">`, not buttons.** No hover, no cursor change, no click target, no palette entry.
+- **Rows are buttons and every one is clickable.** A row opens its Lesson, and hovering names it in full through `Hint`, so a truncated title never hides the thing the row opens.
 
 ### Buttons
 
@@ -551,7 +566,7 @@ The Outline is a live, editable object beside the Lesson, not a table of content
 Where a title has to be cut — a Lesson in the rail, a count, a control that carries only an icon — hovering names the thing in full. The box wears what any small floating layer here wears: `float` ground, `lift`, 0.75rem at second ink, and no pointer, because nothing in this world draws one. It opens 400ms after the pointer stops, fades in on the 160ms default, and opens instantly while the pointer stays inside one group of them, so walking a rail reads as one gesture rather than a row of separate ones. Focus opens it too, so the pointerless reader is not left out. The browser's own black box is never the answer: nothing in the product names itself with a native `title`.
 
 - **One wrapper:** `Hint` in `components/workspace/hint.tsx` puts the trigger on its child, so a call site costs one line and no wrapper element, and the layout it sits in cannot move.
-- **Where a title has to be cut, a hint:** a Lesson in the rail, a Course row's Topic and Goal, a count, a control that carries only an icon. Resting on a Courses row names the Course in full — Topic over Goal — so truncation never hides the thing the row opens.
+- **Where a title has to be cut, a hint:** a Lesson in the rail, a count, a control that carries only an icon. A Course row carries none: the whole row is the link, and a box that opens over it competes with the click it is inviting.
 
 ### Command Palette (signature)
 
@@ -564,13 +579,15 @@ Navigation, not a shortcut: every set Lesson and every action is reachable witho
 - **Active option:** raised ground, full ink; arrow keys wrap, Enter runs, Escape closes.
 - **Empty state:** says that nothing in this Course matches, rather than leaving the absence unexplained. Every Lesson in a generated Course is in the palette, because every Lesson exists.
 
-### Panel (Tutor / Tailor)
+### Margin (Tutor / Tailor)
 
-One panel, two modes, an explicit segmented switch at the top on a canvas-inset ground with the active segment raised. It owns its own close, so the shell shows no second control naming the same thing. A one-line subtitle states the contract: the Tutor changes nothing, the Tailor writes nothing until approved.
+One margin, two modes, an explicit segmented switch at the top on a canvas-inset ground with the active segment raised, beside Previous chats and New chat. Its close lives in the shell's chrome at desktop widths and in its own header while it is a sheet — one control either way, never two naming the same thing. A one-line subtitle states the contract: the Tutor changes nothing, the Tailor writes nothing until approved.
 
-- **Tutor thread:** the learner's turns sit one luminance step up in a raised block; the Tutor's answers are unadorned prose at second ink. Pending state is a live-region line, not a spinner.
-- **Composer:** canvas-inset field that steps up to raised on focus-within; Enter sends, Shift-Enter breaks.
-- **Tailor plan:** hairline-divided rows on the panel's own ground — verb label, target, change, reason, then Approve/Discard or Applied/Undo. Deliberately not a card list. Once every change has a decision and at least one is approved, the Course revision starts immediately; a neutral live status names its current stage while the published Course remains readable.
+- **Tutor thread:** the learner's turns sit one luminance step up in a raised block; the Tutor's answers are unadorned prose at second ink. A turn that grew from a passage carries its quote above it, right-aligned against a rule; clicking the quote shows the passage back in the Lesson and flashes the block. Pending state is a live-region line, not a spinner.
+- **Chats:** the newest chat opens; Previous chats lists the rest with the day each began and how many turns it holds, and New chat starts a fresh one — the first turn is what creates it, so an empty margin never asks the learner to name anything. The list replaces the thread in place, so the composer never moves.
+- **Composer:** canvas-inset field that steps up to raised on focus-within; Enter sends, Shift-Enter breaks; Stop replaces Send while a turn streams, and a failed turn offers Retry rather than leaving the thread dead. A quiet effort control beside Send — low, medium, high — sets how hard the model thinks before it answers, because the right setting belongs to the question; it is the same control the Tailor column uses.
+- **Tailor plan:** hairline-divided rows on the margin's own ground — verb label, target, change, reason, then Approve/Discard or Applied/Undo. Deliberately not a card list. Once every change has a decision and at least one is approved, the Course revision starts immediately; a neutral live status names its current stage while the published Course remains readable.
+- **Published changes:** each published revision is a row that can be undone, and the chat that caused it survives it.
 
 ### Prose Blocks
 
@@ -581,7 +598,7 @@ One panel, two modes, an explicit segmented switch at the top on a canvas-inset 
 
 ### Motion
 
-Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bounce — at 120ms for row and colour changes, 160ms for the default, 240ms for entrances. A port's scrollbar rides on the same ease: inked with the first scroll event, lingering 1.6s after the last one, gone over 240ms, and back the moment the port moves again. The authored moment is marking an Exercise done: one handoff in two halves, the check stroking itself onto the row just finished (340ms dash) while the accent lifts into place on the next Lesson (300ms). It fires on a real mark, never on first paint or a revisit. Under `prefers-reduced-motion`, both end states remain and all movement is dropped.
+Everything eases on `cubic-bezier(0.2, 0, 0, 1)` — exponential ease-out, no bounce — at 120ms for row and colour changes, 160ms for the default, 240ms for entrances. A port's scrollbar rides on the same ease: inked with the first scroll event, lingering 1.6s after the last one, gone over 240ms, and back the moment the port moves again. The authored moment is marking an Exercise done: one handoff in two halves, the check stroking itself onto the row just finished (340ms dash) while the accent lifts into place on the next Lesson (300ms). It fires on a real mark, never on first paint or a revisit. One small loop is allowed: the pencil on a Course that is being written breathes between full opacity and 0.45 on a 2.2s alternate, so a working Course reads as alive in a list that does not refresh itself. Under `prefers-reduced-motion`, both end states remain and all movement is dropped.
 
 The landing adds two motions and no more. The hero settles on arrival: its lines rise one breath after another (`mk-rise`, 600ms, 90ms stagger), the scene settles at 220ms, and the scene's steam draws itself in at 420ms, then breathes between its own opacity and 0.8 on a 7s alternate — the page's only loop. Scrolling, each section fades up 16px once (`mk-settle`, 560ms) when it first enters the viewport, through `components/reveal.tsx`: `rootMargin: 0px 0px -8% 0px`, disconnect after the first intersect. The hero wash drifts 2% over 22s. Nothing settles twice, nothing enters twice, and reduced motion resolves every element to its end state.
 
@@ -609,6 +626,7 @@ The landing adds two motions and no more. The hero settles on arrival: its lines
 - **Do** let a port's scrollbar ride with the scroll — inked on the first scroll event, gone a beat after the last one — and reserve its lane, so the bar never crosses content and the column never shifts when it comes and goes.
 - **Do** cut a row to the fewest facts that let a reader act on it, and put the rest one click away.
 - **Do** give a title that had to be cut, and a control that carries only an icon, a `Hint` — the same box on hover and on focus.
+- **Do** reach for a Lucide icon at 12–16px, `strokeWidth` 1.75, when a state or a control reads faster as a picture, and let its ink be a luminance step rather than a colour.
 - **Do** move focus into a full-screen overlay, close it on Escape, mark the layers behind `inert`, and return focus to the control that opened it.
 - **Do** keep both end states and drop the movement under `prefers-reduced-motion`.
 - **Do** answer every new `:root` colour in `.dark`, and check both grounds against the contrast floors before shipping either.
@@ -627,8 +645,8 @@ The landing adds two motions and no more. The hero settles on arrival: its lines
 - **Don't** render an unwritten Lesson as a disabled button, and don't list one in the command palette. Every Lesson of a generated Course is listed, because there are no unwritten ones left in it.
 - **Don't** add a shadow to anything that is not a floating modal layer; step the luminance instead.
 - **Don't** let a native `title` ship: it wears the browser's black box, not this world. A hint is the only box that names a control.
-- **Don't** let opening or closing the rail or the panel shift the reading column by a single pixel.
-- **Don't** duplicate a control the panel already owns; while the panel is open, the shell shows no second control naming the same thing.
+- **Don't** let opening or closing the rail or the margin shift the reading column by a single pixel.
+- **Don't** duplicate a control the margin already owns; while the margin is open, the shell shows no second control naming the same thing.
 - **Don't** round a corner. The ramp is held at `0px`; a thing that needs to read as separate takes a luminance step or a hairline. Uppercase stays inside the one 0.6875rem label.
 - **Don't** hardcode a colour at a call site, or define one in only one ground.
 - **Don't** let the accent change meaning between the two grounds — it is darkened for paper, not repurposed.

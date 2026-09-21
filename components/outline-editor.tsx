@@ -3,26 +3,34 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Combine, Plus, Scissors, X } from "lucide-react";
+import { MotionConfig, Reorder, motion, useDragControls, type DragControls } from "motion/react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  GripVertical,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Scissors,
+  X,
+} from "lucide-react";
 import { applyOutlineOpAction, approveOutlineAction } from "@/lib/actions/outline";
-import { cancelGenerationAction } from "@/lib/actions/courses";
 import {
   acceptProposedOperationsAction,
   applyPlanToOutlineAction,
   reviewTailorOperationAction,
 } from "@/lib/actions/tailor";
-import type { OutlineEditorCourse } from "@/lib/course/view";
+import type { SourceLink } from "@/lib/course/reading";
 import type { OutlineOp } from "@/lib/course/structure";
-import { TailorConversation, type PlanView, type Turn } from "./tailor-conversation";
-import { Button } from "./ui/button";
-import { CancelRunButton } from "./cancel-run-button";
-import { Hint } from "./workspace/hint";
-import { DoneCheck, UnsetMark } from "./workspace/marks";
-import { field } from "@/lib/ui";
-import { cn } from "@/lib/utils";
-import { Textarea } from "./ui/textarea";
+import type { OutlineEditorCourse } from "@/lib/course/view";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { useStickyFollow } from "@/hooks/use-sticky-follow";
 import { useSyncedState } from "@/hooks/use-synced-state";
+import { field } from "@/lib/ui";
+import { cn } from "@/lib/utils";
+import { TailorConversation, type PlanView, type Turn } from "./tailor-conversation";
+import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
@@ -31,85 +39,75 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Textarea } from "./ui/textarea";
+import { Hint } from "./workspace/hint";
+
+const EASE = [0.2, 0, 0, 1] as const;
+
+/* The rename input replaces a line of text without changing the row's height:
+   same leading as the text it stands in for, no vertical padding. */
+const renameField = "bg-panel text-fg outline-none transition-colors focus:bg-raised";
 
 type Module = OutlineEditorCourse["modules"][number];
+type Lesson = Module["lessons"][number];
 
-function reviewStatusText(runStep: string | null | undefined): string {
-  if (runStep?.startsWith("corrections:")) {
-    return `Correction round ${runStep.slice("corrections:".length)}: fixing what the review found.`;
-  }
-  if (runStep === "publish") return "The review passed. Publishing the Course.";
-  if (runStep?.startsWith("lesson:")) return "Correcting what the review found.";
-  return "The review pass is running: structure, accuracy, learning design.";
-}
-
-function RowAction({
-  label,
-  title,
-  onClick,
-  disabled,
-  className,
-  children,
-}: {
-  label: string;
-  title: string;
-  onClick: () => void;
-  disabled?: boolean;
-  className: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Hint label={title}>
-      <Button
-        variant="icon-raised"
-        onClick={onClick}
-        disabled={disabled}
-        aria-label={label}
-        className={className}
-      >
-        {children}
-      </Button>
-    </Hint>
-  );
-}
-
-function RenameInput({
-  initial,
-  label,
-  className,
-  onCommit,
-  onCancel,
-}: {
-  initial: string;
-  label: string;
-  className: string;
-  onCommit: (value: string) => void;
-  onCancel: () => void;
-}) {
-  return (
-    <input
-      autoFocus
-      defaultValue={initial}
-      aria-label={label}
-      onBlur={(e) => onCommit(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") onCommit(e.currentTarget.value);
-        if (e.key === "Escape") onCancel();
-      }}
-      className={className}
-    />
-  );
-}
+/** The Course's own evidence for its shape; Why this shape reads from it. */
+export type OutlineEvidence = {
+  terminalPerformances: string[];
+  premise: string | null;
+  runningExample: string | null;
+};
 
 type Props = {
   course: OutlineEditorCourse;
-  runStep?: string | null;
+  /** The Sources the design consulted. Omitted when the Course has none. */
+  sources?: SourceLink[];
+  /** Why this shape. Null, or absent, when the Outline has no specification. */
+  spec?: OutlineEvidence | null;
+  /** The measured design run, for example "1m 52s". Omitted when unknown. */
+  draftedIn?: string | null;
   tailorTurns?: Turn[];
   tailorPlan?: PlanView | null;
   onRefreshPlan?: () => Promise<PlanView | null>;
 };
 
-export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefreshPlan }: Props) {
+function domainOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+/* A plan applies on the server, so the changed rows arrive with the refreshed
+   Outline; they hold a highlight for a beat, as the mock's register does. */
+function changedLessonIds(before: Module[], after: Module[]): string[] {
+  const previous = new Map(before.flatMap((m) => m.lessons).map((l) => [l.id, l]));
+  const changed: string[] = [];
+  for (const lesson of after.flatMap((m) => m.lessons)) {
+    const was = previous.get(lesson.id);
+    if (!was || was.title !== lesson.title || was.summary !== lesson.summary) {
+      changed.push(lesson.id);
+    }
+  }
+  return changed;
+}
+
+export function OutlineEditor({
+  course,
+  sources,
+  spec,
+  draftedIn,
+  tailorTurns,
+  tailorPlan,
+  onRefreshPlan,
+}: Props) {
   const router = useRouter();
   const tailorRef = useRef<HTMLElement | null>(null);
   useStickyFollow(tailorRef);
@@ -118,10 +116,8 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
   const [edits, setEdits] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
-  const [splitting, setSplitting] = useState<Module["lessons"][number] | null>(null);
-  const [generating, setGenerating] = useState(
-    course.phase === "generating" || course.phase === "reviewing",
-  );
+  const [splitting, setSplitting] = useState<Lesson | null>(null);
+  const [flash, setFlash] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
 
   const [plan, setPlan] = useSyncedState(tailorPlan);
@@ -129,15 +125,10 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
   const [adopted, setAdopted] = useState(course.version);
   if (course.version !== adopted) {
     setAdopted(course.version);
+    setFlash(changedLessonIds(modules, course.modules));
     setModules(course.modules);
     setVersion(course.version);
     setError(null);
-  }
-
-  const [adoptedPhase, setAdoptedPhase] = useState(course.phase);
-  if (course.phase !== adoptedPhase) {
-    setAdoptedPhase(course.phase);
-    setGenerating(course.phase === "generating" || course.phase === "reviewing");
   }
 
   const lessons = useMemo(() => modules.flatMap((m) => m.lessons), [modules]);
@@ -146,12 +137,18 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     return modules.map((m) => ({ ...m, lessons: m.lessons.map((l) => ({ ...l, n: ++n })) }));
   }, [modules]);
 
-  const polling = generating || course.phase !== "editing";
+  const lessonCount = lessons.length;
+  const whyThisShape =
+    spec && (spec.terminalPerformances.length > 0 || spec.premise || spec.runningExample)
+      ? spec
+      : null;
+
+  /* The changed rows hold a highlight for a beat after the plan applies. */
   useEffect(() => {
-    if (!polling) return;
-    const timer = setInterval(() => router.refresh(), 4000);
-    return () => clearInterval(timer);
-  }, [polling, router]);
+    if (flash.length === 0) return;
+    const timer = window.setTimeout(() => setFlash([]), 900);
+    return () => window.clearTimeout(timer);
+  }, [flash]);
 
   function failWith(message: string, reason: string) {
     setError(message);
@@ -179,12 +176,8 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
   function approve() {
     submit(async () => {
       const result = await approveOutlineAction(course.id, version);
-      if (result.ok) {
-        setGenerating(true);
-        router.refresh();
-      } else {
-        failWith(result.message, result.reason);
-      }
+      if (result.ok) router.refresh();
+      else failWith(result.message, result.reason);
     });
   }
 
@@ -243,360 +236,666 @@ export function OutlineEditor({ course, runStep, tailorTurns, tailorPlan, onRefr
     if (mod && next !== mod.title) run({ kind: "renameModule", moduleId: id, title: next });
   }
 
-  if (generating) {
-    const reviewing = course.phase === "reviewing";
-    const savedIndex =
-      runStep && runStep.startsWith("lesson:")
-        ? lessons.findIndex((l) => runStep.slice(7) === l.id)
-        : -1;
-    // currentStep points at the last saved Lesson, so the next one is doing.
-    const doingIndex = reviewing || runStep === "complete" ? -1 : savedIndex + 1;
-    const allDone = doingIndex < 0 || doingIndex >= lessons.length;
-    const writingNumber = allDone ? lessons.length : doingIndex + 1;
-    const reviewStatus = reviewing ? reviewStatusText(runStep) : null;
-    return (
-      <div className="mx-auto w-full max-w-[38rem] px-5 pt-10 pb-24 sm:px-8" aria-live="polite">
-        <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
-          {course.topic}
-        </h1>
-        <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
-          {reviewing
-            ? `All ${lessons.length} Lessons are written. ${reviewStatus ?? ""}`
-            : `Generating all ${lessons.length} Lessons in one pass, against the shape you just approved.`}
-        </p>
-        {!reviewing && (
-          <p className="tnum mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
-            {runStep && !runStep.startsWith("lesson:") && runStep !== "complete"
-              ? "Starting."
-              : `Lesson ${Math.min(writingNumber, lessons.length)} of ${lessons.length}.`}
-          </p>
-        )}
-        <p className="mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
-          You can leave this page. The Course will be here when you come back.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
-          <CancelRunButton
-            idleLabel="Cancel generation"
-            confirmLabel="Discard the partial Course?"
-            pendingLabel="Discarding…"
-            onConfirm={() => cancelGenerationAction(course.id)}
-            onDone={(result) => {
-              if (result.ok) {
-                setError(null);
-                router.refresh();
-              } else {
-                setError(
-                  result.reason === "too-late"
-                    ? "This Course already moved past generation. Reload the page."
-                    : "The Course could not be discarded.",
-                );
-              }
-            }}
-          />
-          <Button variant="quiet" render={<Link href="/courses" />} className="ml-auto">
-            Back to Courses
-          </Button>
-        </div>
-        {error && (
-          <p role="alert" className="mt-3 text-[0.8125rem] leading-[1.5] text-fg-2">
-            {error}
-          </p>
-        )}
-        <ol className="mt-6 border-t border-hair">
-          {lessons.map((lesson, i) => {
-            const done = allDone || i < doingIndex;
-            const doing = !allDone && i === doingIndex;
-            return (
-              <li
-                key={lesson.id}
-                className="grid grid-cols-[0.75rem_1fr_auto] items-center gap-x-2 border-b border-hair px-2 py-1.5"
-                aria-current={doing ? "true" : undefined}
-              >
-                <span className="flex h-4 w-3 items-center justify-center text-fg-3">
-                  {done ? <DoneCheck /> : <UnsetMark />}
-                </span>
-                <span className="min-w-0">
-                  <span
-                    className={cn(
-                      "block truncate text-[0.8125rem] leading-5 text-fg-2",
-                      doing && "font-medium text-fg",
-                    )}
-                  >
-                    <span className="tnum mr-2 text-fg-3">{i + 1}</span>
-                    {lesson.title}
-                  </span>
-                </span>
-                <span className="text-[0.75rem] leading-[1.5] text-fg-3">
-                  {done ? "Done" : doing ? "Doing" : "Queued"}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+  function moveLesson(moduleId: string, lessonId: string, toIndex: number) {
+    if (pending) return;
+    run({ kind: "moveLesson", lessonId, toModuleId: moduleId, toIndex });
+  }
+
+  /* Reorder hands back the new value order mid-drag, so the register renumbers
+     in place; the change is committed once, on drag end, as one moveLesson. */
+  const reorderStart = useRef<{ moduleId: string; ids: string[]; next: string[] } | null>(null);
+
+  function trackReorder(moduleId: string, lessonIds: string[]) {
+    const start = reorderStart.current;
+    if (start && start.moduleId === moduleId) start.next = lessonIds;
+    setModules((mods) =>
+      mods.map((m) => {
+        if (m.id !== moduleId) return m;
+        const byId = new Map(m.lessons.map((l) => [l.id, l]));
+        return {
+          ...m,
+          lessons: lessonIds.flatMap((id) => {
+            const lesson = byId.get(id);
+            return lesson ? [lesson] : [];
+          }),
+        };
+      }),
     );
   }
 
-  return (
-    <div className="mx-auto w-full max-w-[68rem] px-5 sm:px-8">
-      <div className="flex flex-col lg:flex-row lg:gap-10">
-        <div className="min-w-0 flex-1 pt-10">
-          <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
-            {course.topic}
-          </h1>
-          <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.6] text-fg-2">
-            {course.goal}
+  function beginReorder(moduleId: string, lessonIds: string[]) {
+    reorderStart.current = { moduleId, ids: lessonIds, next: lessonIds };
+  }
+
+  function endReorder(moduleId: string) {
+    const start = reorderStart.current;
+    reorderStart.current = null;
+    if (!start || start.moduleId !== moduleId) return;
+    const ids = start.next;
+    if (ids.join() === start.ids.join()) return;
+    const moved = ids.find(
+      (id) => ids.filter((x) => x !== id).join() === start.ids.filter((x) => x !== id).join(),
+    );
+    if (!moved) return;
+    run({
+      kind: "moveLesson",
+      lessonId: moved,
+      toModuleId: moduleId,
+      toIndex: ids.indexOf(moved),
+    });
+  }
+
+  /* One bar per breakpoint: inside the register column on wide screens, and
+     after the Tailor on small ones so the commit follows the whole page. */
+  const footbar = (visibility: string) => (
+    <div className={cn("sticky bottom-0 mt-10 border-t border-hair bg-canvas py-4", visibility)}>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+        <Button onClick={approve} disabled={pending}>
+          Generate the Lessons
+        </Button>
+        <p className="tnum text-[0.75rem] leading-[1.5] text-fg-3">
+          <Count value={`${modules.length} ${modules.length === 1 ? "Module" : "Modules"}`} />
+          <span className="text-fg-dim"> · </span>
+          <Count value={`${lessonCount} ${lessonCount === 1 ? "Lesson" : "Lessons"}`} />
+        </p>
+        <p className="tnum text-[0.75rem] text-fg-3">
+          {edits > 0 ? `${edits} ${edits === 1 ? "change" : "changes"} saved` : "No changes yet"}
+        </p>
+        {error && (
+          <p role="alert" className="w-full text-[0.8125rem] leading-[1.5] text-fg-2">
+            {error}
           </p>
+        )}
+      </div>
+    </div>
+  );
 
-          <div className="mt-10">
-            {numbered.map((m, mi) => (
-              <section key={m.id} className="mb-7 last:mb-0">
-                <div className="group/mod flex items-center justify-between gap-3 border-b border-hair pb-2">
-                  {editing === m.id ? (
-                    <RenameInput
-                      initial={m.title}
-                      label="Module title"
-                      className={`${field} flex-1 py-1`}
-                      onCommit={(value) => commitRename(m.id, value)}
-                      onCancel={() => setEditing(null)}
-                    />
-                  ) : (
-                    <Hint label="Rename this Module">
-                      <Button
-                        variant="bare"
-                        onClick={() => setEditing(m.id)}
-                        className="label block truncate text-fg-3"
-                      >
-                        {m.numeral}. {m.title}
-                      </Button>
-                    </Hint>
-                  )}
+  const reduce = usePrefersReducedMotion();
 
-                  <span className="flex shrink-0 items-center">
-                    <RowAction
-                      label={`Move ${m.title} up`}
-                      title="Move this Module up"
-                      onClick={() => run({ kind: "moveModule", moduleId: m.id, toIndex: mi - 1 })}
-                      disabled={mi === 0 || pending}
-                      className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover/mod:opacity-100 disabled:opacity-20"
-                    >
-                      <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </RowAction>
-                    <RowAction
-                      label={`Move ${m.title} down`}
-                      title="Move this Module down"
-                      onClick={() => run({ kind: "moveModule", moduleId: m.id, toIndex: mi + 1 })}
-                      disabled={mi === numbered.length - 1 || pending}
-                      className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover/mod:opacity-100 disabled:opacity-20"
-                    >
-                      <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </RowAction>
-                    <RowAction
-                      label={`Remove ${m.title}`}
-                      title="Remove this Module and its Lessons"
-                      onClick={() => run({ kind: "removeModule", moduleId: m.id })}
-                      disabled={pending}
-                      className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover/mod:opacity-100"
-                    >
-                      <X className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    </RowAction>
-                  </span>
-                </div>
+  return (
+    <MotionConfig reducedMotion="user">
+      <div className="mx-auto w-full max-w-[96rem] px-5 sm:px-8">
+        <motion.div
+          className="flex flex-col lg:flex-row lg:gap-10"
+          initial={reduce ? false : { opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.24, ease: EASE }}
+        >
+          <div className="min-w-0 flex-1 pt-10">
+            <div className="mb-7">
+              <Button variant="quiet" render={<Link href="/courses" />} className="group -ml-1">
+                <ArrowLeft
+                  className="h-3.5 w-3.5 shrink-0 transition-transform duration-120 ease-expo group-hover:-translate-x-1"
+                  strokeWidth={1.75}
+                />
+                Back to Courses
+              </Button>
+            </div>
+            <h1 className="text-[1.875rem] leading-[1.16] font-semibold tracking-[-0.026em] text-fg">
+              {course.topic}
+            </h1>
+            <p className="mt-3 max-w-(--measure) text-[0.9375rem] leading-[1.66] text-fg-2">
+              {course.goal}
+            </p>
+            {draftedIn && (
+              <p className="tnum mt-2 text-[0.75rem] leading-[1.5] text-fg-3">
+                Drafted in {draftedIn}
+              </p>
+            )}
 
-                <ul>
-                  {m.lessons.map((l, li) => (
-                    <li
-                      key={l.id}
-                      className="group row grid grid-cols-[1.5rem_1fr_auto] items-start gap-x-2.5 border-b border-hair px-2 py-3 hover:bg-panel"
-                    >
-                      <span className="tnum pt-px text-[0.75rem] leading-5 text-fg-3">{l.n}</span>
+            <div className="mt-8">
+              {numbered.map((m, mi) => (
+                <section key={m.id} className="mb-6 last:mb-0">
+                  <div className="group/mod flex items-center justify-between gap-3 border-b border-hair pb-2">
+                    {editing === m.id ? (
+                      <RenameInput
+                        initial={m.title}
+                        label="Module title"
+                        className={`${renameField} label min-w-0 flex-1 px-1.5 py-0`}
+                        onCommit={(value) => commitRename(m.id, value)}
+                        onCancel={() => setEditing(null)}
+                      />
+                    ) : (
+                      <Hint label="Rename this Module">
+                        <Button
+                          variant="bare"
+                          onClick={() => setEditing(m.id)}
+                          className="label block truncate text-fg-3"
+                        >
+                          {m.numeral}. {m.title}
+                        </Button>
+                      </Hint>
+                    )}
 
-                      <span className="min-w-0">
-                        {editing === l.id ? (
-                          <RenameInput
-                            initial={l.title}
-                            label="Lesson title"
-                            className={`${field} py-1`}
-                            onCommit={(value) => commitRename(l.id, value)}
-                            onCancel={() => setEditing(null)}
-                          />
-                        ) : (
-                          <Hint label="Rename this Lesson">
-                            <Button
-                              variant="bare"
-                              onClick={() => setEditing(l.id)}
-                              className="block w-full truncate text-left text-[0.8125rem] leading-5 font-medium text-fg"
-                            >
-                              {l.title}
-                            </Button>
-                          </Hint>
-                        )}
-                        <span className="mt-1 block text-[0.8125rem] leading-[1.5] text-fg-3">
-                          {l.summary}
-                        </span>
+                    <span className="flex shrink-0 items-center gap-x-3">
+                      <span className="tnum text-[0.75rem] leading-[1.5] text-fg-dim">
+                        {m.lessons.length} {m.lessons.length === 1 ? "Lesson" : "Lessons"}
                       </span>
-
-                      <span className="flex items-center pt-0.5">
+                      <span className="hidden items-center sm:flex sm:opacity-0 sm:group-hover/mod:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100!">
                         <RowAction
-                          label={`Move ${l.title} up`}
-                          title="Move this Lesson up"
+                          label={`Move ${m.title} up`}
+                          title="Move this Module up"
                           onClick={() =>
-                            run({
-                              kind: "moveLesson",
-                              lessonId: l.id,
-                              toModuleId: m.id,
-                              toIndex: li - 1,
-                            })
+                            run({ kind: "moveModule", moduleId: m.id, toIndex: mi - 1 })
                           }
-                          disabled={li === 0 || pending}
-                          className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-20"
+                          disabled={mi === 0 || pending}
+                          className="p-1 disabled:opacity-20"
                         >
                           <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.75} />
                         </RowAction>
                         <RowAction
-                          label={`Move ${l.title} down`}
-                          title="Move this Lesson down"
+                          label={`Move ${m.title} down`}
+                          title="Move this Module down"
                           onClick={() =>
-                            run({
-                              kind: "moveLesson",
-                              lessonId: l.id,
-                              toModuleId: m.id,
-                              toIndex: li + 1,
-                            })
+                            run({ kind: "moveModule", moduleId: m.id, toIndex: mi + 1 })
                           }
-                          disabled={li === m.lessons.length - 1 || pending}
-                          className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-20"
+                          disabled={mi === numbered.length - 1 || pending}
+                          className="p-1 disabled:opacity-20"
                         >
                           <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.75} />
                         </RowAction>
                         <RowAction
-                          label={`Split ${l.title}`}
-                          title="Split this Lesson in two"
-                          onClick={() => setSplitting(l)}
+                          label={`Remove ${m.title}`}
+                          title="Remove this Module and its Lessons"
+                          onClick={() => run({ kind: "removeModule", moduleId: m.id })}
                           disabled={pending}
-                          className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-                        >
-                          <Scissors className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </RowAction>
-                        <RowAction
-                          label={`Merge ${l.title} with the next Lesson`}
-                          title="Merge the next Lesson into this one"
-                          onClick={() =>
-                            run({ kind: "mergeLesson", lessonId: l.id, direction: "next" })
-                          }
-                          disabled={li === m.lessons.length - 1 || pending}
-                          className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-20"
-                        >
-                          <Combine className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </RowAction>
-                        <RowAction
-                          label={`Remove ${l.title}`}
-                          title="Remove this Lesson"
-                          onClick={() => run({ kind: "removeLesson", lessonId: l.id })}
-                          disabled={pending}
-                          className="p-1 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                          className="p-1"
                         >
                           <X className="h-3.5 w-3.5" strokeWidth={1.75} />
                         </RowAction>
                       </span>
+                      <RowMenu
+                        label="Module actions"
+                        items={[
+                          {
+                            key: "rename",
+                            label: "Rename",
+                            icon: <Pencil strokeWidth={1.75} />,
+                            onSelect: () => setEditing(m.id),
+                          },
+                          {
+                            key: "up",
+                            label: "Move up",
+                            icon: <ArrowUp strokeWidth={1.75} />,
+                            onSelect: () =>
+                              run({ kind: "moveModule", moduleId: m.id, toIndex: mi - 1 }),
+                            disabled: mi === 0 || pending,
+                          },
+                          {
+                            key: "down",
+                            label: "Move down",
+                            icon: <ArrowDown strokeWidth={1.75} />,
+                            onSelect: () =>
+                              run({ kind: "moveModule", moduleId: m.id, toIndex: mi + 1 }),
+                            disabled: mi === numbered.length - 1 || pending,
+                          },
+                          {
+                            key: "remove",
+                            label: "Remove Module",
+                            icon: <X strokeWidth={1.75} />,
+                            onSelect: () => run({ kind: "removeModule", moduleId: m.id }),
+                            disabled: pending,
+                          },
+                        ]}
+                      />
+                    </span>
+                  </div>
+
+                  <Reorder.Group
+                    as="ul"
+                    axis="y"
+                    values={m.lessons}
+                    onReorder={(next) =>
+                      trackReorder(
+                        m.id,
+                        next.map((l) => l.id),
+                      )
+                    }
+                  >
+                    {m.lessons.map((l, li) => (
+                      <DragRow
+                        key={l.id}
+                        value={l}
+                        onDragStart={() =>
+                          beginReorder(
+                            m.id,
+                            m.lessons.map((x) => x.id),
+                          )
+                        }
+                        onDragEnd={() => endReorder(m.id)}
+                        className={cn(
+                          "group row grid grid-cols-[1.25rem_1.5rem_minmax(0,1fr)_auto] items-center gap-x-2.5 border-b border-hair px-2 py-2.5 transition-colors duration-500 hover:bg-panel",
+                          flash.includes(l.id) && "bg-panel",
+                        )}
+                      >
+                        {(controls) => (
+                          <>
+                            <span className="flex h-4 w-5 items-center justify-center text-fg-3">
+                              <Hint label="Drag to reorder">
+                                <Button
+                                  variant="icon-raised"
+                                  aria-label={`Reorder ${l.title}`}
+                                  className="cursor-grab touch-none p-0.5 text-fg-dim active:cursor-grabbing"
+                                  onPointerDown={(event) => {
+                                    if (pending) return;
+                                    controls.start(event);
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "ArrowUp" && li > 0) {
+                                      event.preventDefault();
+                                      moveLesson(m.id, l.id, li - 1);
+                                    }
+                                    if (event.key === "ArrowDown" && li < m.lessons.length - 1) {
+                                      event.preventDefault();
+                                      moveLesson(m.id, l.id, li + 1);
+                                    }
+                                  }}
+                                >
+                                  <GripVertical className="h-3.5 w-3.5" strokeWidth={1.75} />
+                                </Button>
+                              </Hint>
+                            </span>
+
+                            <span className="tnum text-[0.75rem] leading-5 text-fg-dim">{l.n}</span>
+
+                            <span className="min-w-0 lg:flex lg:items-baseline lg:gap-x-3">
+                              {editing === l.id ? (
+                                <RenameInput
+                                  initial={l.title}
+                                  label="Lesson title"
+                                  className={`${renameField} w-full px-1.5 py-0 text-[0.8125rem] leading-5 lg:w-[18rem] lg:shrink-0`}
+                                  onCommit={(value) => commitRename(l.id, value)}
+                                  onCancel={() => setEditing(null)}
+                                />
+                              ) : (
+                                <Hint label="Rename this Lesson">
+                                  <Button
+                                    variant="bare"
+                                    onClick={() => setEditing(l.id)}
+                                    className="block max-w-full truncate text-left text-[0.8125rem] leading-5 font-medium text-fg lg:w-[18rem] lg:shrink-0"
+                                  >
+                                    {l.title}
+                                  </Button>
+                                </Hint>
+                              )}
+                              <span className="mt-0.5 block truncate text-[0.8125rem] leading-[1.5] text-fg-3 lg:mt-0 lg:min-w-0 lg:flex-1">
+                                {l.summary}
+                              </span>
+                            </span>
+
+                            <span className="hidden items-center justify-end sm:flex sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100!">
+                              <RowAction
+                                label={`Move ${l.title} up`}
+                                title="Move this Lesson up"
+                                onClick={() => moveLesson(m.id, l.id, li - 1)}
+                                disabled={li === 0 || pending}
+                                className="p-1 disabled:opacity-20"
+                              >
+                                <ArrowUp className="h-3.5 w-3.5" strokeWidth={1.75} />
+                              </RowAction>
+                              <RowAction
+                                label={`Move ${l.title} down`}
+                                title="Move this Lesson down"
+                                onClick={() => moveLesson(m.id, l.id, li + 1)}
+                                disabled={li === m.lessons.length - 1 || pending}
+                                className="p-1 disabled:opacity-20"
+                              >
+                                <ArrowDown className="h-3.5 w-3.5" strokeWidth={1.75} />
+                              </RowAction>
+                              <RowAction
+                                label={`Split ${l.title}`}
+                                title="Split this Lesson in two"
+                                onClick={() => setSplitting(l)}
+                                disabled={pending}
+                                className="p-1"
+                              >
+                                <Scissors className="h-3.5 w-3.5" strokeWidth={1.75} />
+                              </RowAction>
+                              <RowAction
+                                label={`Remove ${l.title}`}
+                                title="Remove this Lesson"
+                                onClick={() => run({ kind: "removeLesson", lessonId: l.id })}
+                                disabled={pending}
+                                className="p-1"
+                              >
+                                <X className="h-3.5 w-3.5" strokeWidth={1.75} />
+                              </RowAction>
+                            </span>
+                            <RowMenu
+                              label={`Actions for ${l.title}`}
+                              items={[
+                                {
+                                  key: "rename",
+                                  label: "Rename",
+                                  icon: <Pencil strokeWidth={1.75} />,
+                                  onSelect: () => setEditing(l.id),
+                                },
+                                {
+                                  key: "up",
+                                  label: "Move up",
+                                  icon: <ArrowUp strokeWidth={1.75} />,
+                                  onSelect: () => moveLesson(m.id, l.id, li - 1),
+                                  disabled: li === 0 || pending,
+                                },
+                                {
+                                  key: "down",
+                                  label: "Move down",
+                                  icon: <ArrowDown strokeWidth={1.75} />,
+                                  onSelect: () => moveLesson(m.id, l.id, li + 1),
+                                  disabled: li === m.lessons.length - 1 || pending,
+                                },
+                                {
+                                  key: "split",
+                                  label: "Split in two",
+                                  icon: <Scissors strokeWidth={1.75} />,
+                                  onSelect: () => setSplitting(l),
+                                  disabled: pending,
+                                },
+                                {
+                                  key: "remove",
+                                  label: "Remove Lesson",
+                                  icon: <X strokeWidth={1.75} />,
+                                  onSelect: () => run({ kind: "removeLesson", lessonId: l.id }),
+                                  disabled: pending,
+                                },
+                              ]}
+                            />
+                          </>
+                        )}
+                      </DragRow>
+                    ))}
+                  </Reorder.Group>
+
+                  <Button
+                    variant="quiet"
+                    onClick={() =>
+                      run({
+                        kind: "addLesson",
+                        moduleId: m.id,
+                        title: "Untitled Lesson",
+                        summary: "Say what this one is for.",
+                      })
+                    }
+                    disabled={pending}
+                    className="mt-2.5 ml-2"
+                  >
+                    <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    Add a Lesson
+                  </Button>
+                </section>
+              ))}
+
+              <Button
+                variant="quiet"
+                onClick={() => run({ kind: "addModule", title: "Untitled Module" })}
+                disabled={pending}
+                className="mt-2"
+              >
+                <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Add a Module
+              </Button>
+            </div>
+
+            {sources && sources.length > 0 && (
+              <section className="mt-14 border-t border-hair pt-6">
+                <h2 className="label text-fg-3">Sources</h2>
+                <ul className="mt-3 grid gap-x-10 sm:grid-cols-2 2xl:grid-cols-4">
+                  {sources.map((source) => (
+                    <li key={source.ref} className="border-b border-hair py-2.5">
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block truncate text-[0.8125rem] leading-5 text-fg-2 hover:text-fg"
+                      >
+                        {source.title}
+                      </a>
+                      <span className="tnum mt-0.5 block truncate text-[0.75rem] leading-[1.5] text-fg-dim">
+                        {domainOf(source.url)}
+                      </span>
                     </li>
                   ))}
                 </ul>
-
-                <Button
-                  variant="quiet"
-                  onClick={() =>
-                    run({
-                      kind: "addLesson",
-                      moduleId: m.id,
-                      title: "Untitled Lesson",
-                      summary: "Say what this one is for.",
-                    })
-                  }
-                  className="mt-2.5 ml-2"
-                >
-                  <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  Add a Lesson
-                </Button>
               </section>
-            ))}
+            )}
 
-            <Button
-              variant="quiet"
-              onClick={() => run({ kind: "addModule", title: "Untitled Module" })}
-              className="mt-2"
-            >
-              <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Add a Module
-            </Button>
+            {whyThisShape && (
+              <section className="mt-14 border-t border-hair pt-6">
+                <h2 className="label text-fg-3">Why this shape</h2>
+                <div className="mt-4 grid gap-x-10 gap-y-6 lg:grid-cols-2">
+                  {whyThisShape.terminalPerformances.length > 0 && (
+                    <div className="max-w-(--measure)">
+                      <p className="label text-fg-dim">You&apos;ll be able to</p>
+                      <ul>
+                        {whyThisShape.terminalPerformances.map((performance) => (
+                          <li
+                            key={performance}
+                            className="border-b border-hair py-3 text-[0.8125rem] leading-5 text-fg-2"
+                          >
+                            {performance}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {(whyThisShape.premise || whyThisShape.runningExample) && (
+                    <div className="max-w-(--measure) space-y-6">
+                      {whyThisShape.premise && (
+                        <div>
+                          <p className="label text-fg-dim">The premise</p>
+                          <p className="mt-3 text-[0.8125rem] leading-[1.6] text-fg-3">
+                            {whyThisShape.premise}
+                          </p>
+                        </div>
+                      )}
+                      {whyThisShape.runningExample && (
+                        <div>
+                          <p className="label text-fg-dim">Running example</p>
+                          <p className="mt-3 text-[0.8125rem] leading-[1.6] text-fg-3">
+                            {whyThisShape.runningExample}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {footbar("hidden lg:block")}
           </div>
 
-          <div className="sticky bottom-0 mt-10 border-t border-hair bg-canvas py-4">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-              <Button onClick={approve} disabled={pending}>
-                Generate the Lessons
-              </Button>
-
-              <p className="tnum text-[0.75rem] text-fg-3">
-                {edits > 0
-                  ? `${edits} ${edits === 1 ? "change" : "changes"} saved`
-                  : "No changes yet"}
-              </p>
-
-              {error && (
-                <p role="alert" className="w-full text-[0.8125rem] leading-[1.5] text-fg-2">
-                  {error}
-                </p>
-              )}
-
-              <Button variant="quiet" render={<Link href="/courses" />} className="ml-auto">
-                Back to Courses
-              </Button>
+          <aside
+            ref={tailorRef}
+            className="w-full shrink-0 border-t border-hair pt-8 pb-20 lg:sticky lg:top-0 lg:w-[20rem] lg:self-start lg:border-t-0 lg:border-l lg:pt-10 lg:pb-2 lg:pl-8"
+          >
+            <h2 className="label text-fg-3">Tailor</h2>
+            <p className="mt-2 text-[0.8125rem] leading-[1.6] text-fg-3">
+              Nothing is written until you apply it.
+            </p>
+            <div className="mt-5">
+              <TailorConversation
+                chatId={`outline-${course.id}`}
+                endpoint={`/api/courses/${course.id}/tailor`}
+                turns={tailorTurns ?? []}
+                onFinish={tailorFinished}
+                plan={plan ?? undefined}
+                onApply={applyPlan}
+                applying={pending}
+                onDiscard={(id) => reviewOperation(id, "discarded")}
+                onRestore={(id) => reviewOperation(id, "proposed")}
+                scrollport={false}
+              />
             </div>
-          </div>
-        </div>
+          </aside>
 
-        <aside
-          ref={tailorRef}
-          className="w-full shrink-0 border-t border-hair pt-8 pb-20 lg:sticky lg:top-0 lg:w-[20rem] lg:self-start lg:border-t-0 lg:border-l lg:pt-10 lg:pb-10 lg:pl-8"
-        >
-          <h2 className="label text-fg-3">Tailor</h2>
-          <p className="mt-2 text-[0.8125rem] leading-[1.6] text-fg-3">
-            Nothing is written until you apply it.
-          </p>
-          <div className="mt-5">
-            <TailorConversation
-              chatId={`outline-${course.id}`}
-              endpoint={`/api/courses/${course.id}/tailor`}
-              turns={tailorTurns ?? []}
-              onFinish={tailorFinished}
-              plan={plan ?? undefined}
-              onApply={applyPlan}
-              applying={pending}
-              onDiscard={(id) => reviewOperation(id, "discarded")}
-              onRestore={(id) => reviewOperation(id, "proposed")}
-              scrollport={false}
-            />
-          </div>
-        </aside>
+          {footbar("lg:hidden")}
+        </motion.div>
+
+        {splitting && (
+          <SplitDialog
+            key={splitting.id}
+            onClose={() => setSplitting(null)}
+            onSplit={(secondTitle, secondSummary) => {
+              run({
+                kind: "splitLesson",
+                lessonId: splitting.id,
+                secondTitle,
+                secondSummary,
+              });
+              setSplitting(null);
+            }}
+          />
+        )}
       </div>
+    </MotionConfig>
+  );
+}
 
-      {splitting && (
-        <SplitDialog
-          key={splitting.id}
-          onClose={() => setSplitting(null)}
-          onSplit={(secondTitle, secondSummary) => {
-            run({
-              kind: "splitLesson",
-              lessonId: splitting.id,
-              secondTitle,
-              secondSummary,
-            });
-            setSplitting(null);
-          }}
+/* Reorder drag controls come from a hook, one per row; this wrapper owns the
+   hook and hands the controls to the grip in the row's left gutter. */
+function DragRow({
+  value,
+  onDragStart,
+  onDragEnd,
+  className,
+  children,
+}: {
+  value: Lesson;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  className: string;
+  children: (controls: DragControls) => React.ReactNode;
+}) {
+  const controls = useDragControls();
+  return (
+    <Reorder.Item
+      as="li"
+      value={value}
+      dragListener={false}
+      dragControls={controls}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={className}
+    >
+      {children(controls)}
+    </Reorder.Item>
+  );
+}
+
+function RowAction({
+  label,
+  title,
+  onClick,
+  disabled,
+  className,
+  children,
+}: {
+  label: string;
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  className: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Hint label={title}>
+      <Button
+        variant="icon-raised"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        className={className}
+      >
+        {children}
+      </Button>
+    </Hint>
+  );
+}
+
+function RowMenu({
+  label,
+  items,
+}: {
+  label: string;
+  items: {
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+    onSelect: () => void;
+    disabled?: boolean;
+  }[];
+}) {
+  return (
+    <DropdownMenu>
+      <Hint label={label}>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="icon-raised" aria-label={label} className="p-1 sm:hidden">
+              <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
+            </Button>
+          }
         />
-      )}
-    </div>
+      </Hint>
+      <DropdownMenuContent align="end" className="min-w-44">
+        {items.map((item) => (
+          <DropdownMenuItem
+            key={item.key}
+            onClick={item.onSelect}
+            disabled={item.disabled}
+            className="py-2.5"
+          >
+            {item.icon}
+            {item.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function RenameInput({
+  initial,
+  label,
+  className,
+  onCommit,
+  onCancel,
+}: {
+  initial: string;
+  label: string;
+  className: string;
+  onCommit: (value: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <input
+      autoFocus
+      defaultValue={initial}
+      aria-label={label}
+      onBlur={(e) => onCommit(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onCommit(e.currentTarget.value);
+        if (e.key === "Escape") onCancel();
+      }}
+      className={className}
+    />
+  );
+}
+
+/* A figure that settles when it changes: the totals are the page's argument,
+   so they move when a change lands. */
+function Count({ value, className }: { value: string; className?: string }) {
+  const reduce = usePrefersReducedMotion();
+  return (
+    <motion.span
+      key={value}
+      initial={reduce ? false : { opacity: 0, y: -3 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.24, ease: EASE }}
+      className={cn("inline-block", className)}
+    >
+      {value}
+    </motion.span>
   );
 }
 
