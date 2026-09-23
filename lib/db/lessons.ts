@@ -306,6 +306,7 @@ export async function getLessonContentsForVersion(
             selfExplanationPrompt: r.selfExplanationPrompt,
             exercise: r.exercise,
             bridge: r.bridge,
+            contextSummary: r.contextSummary,
           }),
         ]
       : [];

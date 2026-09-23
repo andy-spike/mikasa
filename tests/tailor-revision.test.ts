@@ -120,6 +120,7 @@ function lessonJson(title: string): string {
     selfExplanationPrompt: "Why this order?",
     exercise: { task: `Do ${title}.`, check: "It runs." },
     bridge: "Next.",
+    contextSummary: `${title} extends the example.`,
   });
 }
 
@@ -202,6 +203,8 @@ describe("stagePlanRevisionAction", () => {
 
     const rows = await db.select().from(lessons).where(eq(lessons.outlineVersion, 2));
     expect(rows.map((r) => [r.lessonRef, r.title])).toEqual([["l3", "Lesson three, Repainted"]]);
+    const original = await db.select().from(lessons).where(eq(lessons.outlineVersion, 1));
+    expect(rows[0].contextSummary).toBe(original.find((r) => r.lessonRef === "l3")!.contextSummary);
 
     const [plan] = await db.select().from(changePlans).where(eq(changePlans.id, planId));
     expect(plan.status).toBe("staged");
@@ -271,10 +274,12 @@ describe("stageRevisionWorkflow", () => {
     expect(v2.map((r) => r.lessonRef)).toEqual(["l1", "l3"]);
     const l1v2 = v2.find((r) => r.lessonRef === "l1")!;
     expect(JSON.stringify(l1v2.body)).toContain("Repainted");
+    expect(l1v2.contextSummary).toBe("Lesson one extends the example.");
     const v1 = await db.select().from(lessons).where(eq(lessons.outlineVersion, 1));
     const l3v1 = v1.find((r) => r.lessonRef === "l3")!;
     const l3v2 = v2.find((r) => r.lessonRef === "l3")!;
     expect(l3v2.body).toEqual(l3v1.body);
+    expect(l3v2.contextSummary).toBe(l3v1.contextSummary);
     expect(l3v2.title).toBe("Lesson three, Repainted");
 
     expect(reviewSlices.combinedScope).toEqual([["l1", "l3"]]);

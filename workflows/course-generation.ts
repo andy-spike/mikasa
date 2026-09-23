@@ -62,9 +62,8 @@ export async function generateCourseWorkflow(
     const order = await stepOrder(activeContext);
     await stepMarkStep(runId, "lessons");
 
-    // One Lesson at a time, in reading order (ADR 0009): each Lesson sees the
-    // actual prose of the Lessons before it, so shared scaffolding is
-    // established once and extended instead of reinvented per Lesson.
+    // One Lesson at a time, in reading order: earlier summaries and the
+    // complete previous Lesson carry established scaffolding forward.
     const alreadyWritten = new Set(activeContext.written);
     const pending = order.filter((l) => !alreadyWritten.has(l.id));
 

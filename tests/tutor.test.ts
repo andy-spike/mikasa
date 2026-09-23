@@ -64,6 +64,7 @@ function seedCourse(ownerEmail: string): Promise<string> {
         selfExplanationPrompt: "s",
         exercise: { task: "t", check: "c" },
         bridge: "b",
+        contextSummary: "The Lesson extends the example.",
       }),
   });
 }

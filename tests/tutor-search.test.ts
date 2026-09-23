@@ -90,6 +90,7 @@ const WINDOW_LESSON = {
   selfExplanationPrompt: "Why no fold?",
   exercise: { task: "Write a window query.", check: "Every row kept." },
   bridge: "Next, joins.",
+  contextSummary: "The Lesson establishes the running window total.",
 };
 
 function seedCourse(ownerEmail: string): Promise<string> {

@@ -33,6 +33,18 @@ const blockSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
+export const lessonContextSummarySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(
+    (summary) =>
+      [...new Intl.Segmenter(undefined, { granularity: "word" }).segment(summary)].filter(
+        (part) => part.isWordLike,
+      ).length <= 80,
+    "A Lesson context summary must be at most 80 words.",
+  );
+
 export const lessonContentSchema = z.object({
   body: z.array(blockSchema).min(1),
   workedExample: z.array(blockSchema).min(1),
@@ -40,11 +52,15 @@ export const lessonContentSchema = z.object({
   selfExplanationPrompt: z.string().min(1),
   exercise: z.object({ task: z.string().min(1), check: z.string().min(1) }),
   bridge: z.string().min(1),
+  contextSummary: lessonContextSummarySchema,
 });
 
 export const generatedLessonContentSchema = lessonContentSchema.extend({
   body: z.array(blockSchema).min(3).max(7),
   workedExample: z.array(blockSchema).min(1).max(4),
+  // Keep an invalid summary available for one summary-only repair while
+  // retaining a valid Lesson from the same model response.
+  contextSummary: z.unknown(),
 });
 
 export type LessonContent = z.infer<typeof lessonContentSchema> & {

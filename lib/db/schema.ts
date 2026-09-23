@@ -223,6 +223,7 @@ export const lessons = pgTable(
     selfExplanationPrompt: text("self_explanation_prompt").notNull(),
     exercise: jsonb("exercise").$type<{ task: string; check: string }>().notNull(),
     bridge: text("bridge").notNull(),
+    contextSummary: text("context_summary").notNull().default(""),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

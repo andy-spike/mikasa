@@ -1,6 +1,6 @@
 // Shared durable steps for Course generation and staged revisions. Both
 // workflows generate Lessons one at a time in reading order, review the whole
-// candidate with one structural pass plus one critical factual model pass,
+// candidate with one structural pass plus one factual and continuity model pass,
 // and correct affected Lessons one at a time.
 import type { PromptSource } from "@/lib/course/generate";
 import type { FindingKind } from "@/lib/course/review";
@@ -16,6 +16,7 @@ export type ReviewFindingPayload = {
   detail: string;
   correction: string;
   sourceQuery?: string;
+  relatedLessonRefs?: string[];
 };
 
 // Module loaders, resolved once so concurrent steps share one resolution. Resolving
@@ -34,6 +35,7 @@ const loadDbReview = once(() => import("@/lib/db/review"));
 const loadDbSchema = once(() => import("@/lib/db/schema"));
 const loadDrizzle = once(() => import("drizzle-orm"));
 const loadGenerate = once(() => import("@/lib/course/generate"));
+const loadLessonContext = once(() => import("@/lib/course/lesson-context"));
 const loadSpecification = once(() => import("@/lib/course/specification"));
 const loadDesign = once(() => import("@/lib/course/design"));
 const loadReview = once(() => import("@/lib/course/review"));
@@ -185,12 +187,10 @@ export async function stepGenerateLesson(
   const { db } = await loadDb();
   const { generateLesson } = await loadGenerate();
   const { getLessonContentsForVersion, saveLessonContent } = await loadDbLessons();
-  const { lessonContextExcerpt } = await loadReview();
   const { generationModel } = await loadModel();
 
-  // Sequential generation (ADR 0009): the Lesson sees the actual prose of
-  // every Lesson before it in reading order, so it continues what exists —
-  // shared scaffolding, names, example state — instead of inventing its own.
+  // Sequential generation sees every earlier Lesson context summary and the
+  // complete immediately previous Lesson, so it continues what exists.
   // The Lesson, its successor, and the Source pool all derive from the
   // context, so callers pass no stale snapshots.
   const order = context.outline.data.modules.flatMap((m) => m.lessons);
@@ -200,10 +200,13 @@ export async function stepGenerateLesson(
   const nextLesson = order[current + 1] ?? null;
   const sources = context.sources;
   const written = await getLessonContentsForVersion(db, context.course.id, context.outline.version);
-  const excerptOf = new Map(written.map((c) => [c.lessonId, lessonContextExcerpt(c)]));
-  const priorLessons = order
-    .slice(0, current)
-    .map((l) => ({ title: l.title, summary: l.summary, excerpt: excerptOf.get(l.id) }));
+  const byId = new Map(written.map((lesson) => [lesson.lessonId, lesson]));
+  const priorLessons = order.slice(0, current).map((l) => {
+    const content = byId.get(l.id);
+    if (!content) throw new Error(`Earlier Lesson "${l.title}" has no content.`);
+    return { title: l.title, contextSummary: content.contextSummary };
+  });
+  const previousLesson = current > 0 ? byId.get(order[current - 1].id) : undefined;
 
   const content = await withModelFailurePolicy(() =>
     generateLesson(generationModel(), {
@@ -212,6 +215,7 @@ export async function stepGenerateLesson(
       lesson,
       nextLesson,
       priorLessons,
+      previousLesson,
       sources,
     }),
   );
@@ -261,7 +265,7 @@ export async function stepStructuralReview(
   });
 }
 
-// One critical factual model review over the complete candidate. Invalid or
+// One model review over the complete candidate and its private summaries. Invalid or
 // empty targets throw, never pass.
 export async function stepCombinedReview(
   courseId: string,
@@ -314,7 +318,7 @@ export async function stepSaveReviewFindings(
   );
 }
 
-// Structural checks run first. The critical factual model review runs only
+// Structural checks run first. The complete candidate model review runs only
 // when structure permits it.
 export async function runReviewRound(
   courseId: string,
@@ -366,39 +370,40 @@ export async function stepCorrectLesson(
   const current = all.find((l) => l.lessonId === lessonRef);
   if (!current) return;
 
-  const { correctLesson, lessonContextExcerpt } = await loadReview();
+  const { correctLesson } = await loadReview();
 
-  // Corrections reconcile against the candidate as it stands: every other
-  // Lesson's current content, so fixes agree with what the review judged.
-  // Generation keeps to summaries by design; corrections cannot repair
-  // cross-Lesson claims they cannot see.
+  // Every other Lesson contributes its summary. A Lesson named by the same
+  // finding also contributes its complete current content.
   const order = context.outline.data.modules.flatMap((m) => m.lessons);
+  const namedRefs = new Set(findings.flatMap((finding) => finding.relatedLessonRefs ?? []));
   const prior = order
     .filter((l) => l.id !== lessonRef)
     .map((l) => {
       const content = all.find((x) => x.lessonId === l.id);
       return {
         title: l.title,
-        summary: l.summary,
-        excerpt: content ? lessonContextExcerpt(content) : undefined,
+        contextSummary: content?.contextSummary ?? "",
+        fullContent: namedRefs.has(l.id) ? content : undefined,
       };
     });
-
-  const corrected = await withModelFailurePolicy(() =>
-    correctLesson(
-      generationModel(),
-      {
-        topic: context.course.topic,
-        goal: context.course.goal,
-        language: context.course.language,
-      },
-      context.spec,
-      current,
-      findings as Parameters<typeof correctLesson>[4],
-      prior,
-      { preserveExercise: options?.preserveExercise, sources: context.sources },
-    ),
-  );
+  const proseFindings = findings.filter((finding) => finding.kind !== "summary");
+  const corrected = proseFindings.length
+    ? await withModelFailurePolicy(() =>
+        correctLesson(
+          generationModel(),
+          {
+            topic: context.course.topic,
+            goal: context.course.goal,
+            language: context.course.language,
+          },
+          context.spec,
+          current,
+          proseFindings as Parameters<typeof correctLesson>[4],
+          prior,
+          { preserveExercise: options?.preserveExercise, sources: context.sources },
+        ),
+      )
+    : current;
   // Explicit Learner Exercise requirements survive corrections: the
   // specification's adjustment is the authority, not the model's rewrite.
   const adjustment = context.spec.adjustments?.find((a) => a.lessonId === lessonRef);
@@ -409,7 +414,28 @@ export async function stepCorrectLesson(
           exercise: { task: adjustment.exercise.task, check: adjustment.exercise.check },
         }
       : corrected;
-  await saveLessonContent(db, courseId, outlineVersion, runId, finalContent, { touchRun: false });
+  const { contextSummary: previousSummary, ...previousContent } = current;
+  const { contextSummary: _existingSummary, ...correctedContent } = finalContent;
+  const summaryNeedsRepair = findings.some((finding) => finding.kind === "summary");
+  const contextSummary =
+    !summaryNeedsRepair && JSON.stringify(previousContent) === JSON.stringify(correctedContent)
+      ? previousSummary
+      : await withModelFailurePolicy(async () => {
+          const { regenerateLessonContextSummary } = await loadLessonContext();
+          return regenerateLessonContextSummary(
+            generationModel(),
+            context.course.language,
+            correctedContent,
+          );
+        });
+  await saveLessonContent(
+    db,
+    courseId,
+    outlineVersion,
+    runId,
+    { ...finalContent, contextSummary },
+    { touchRun: false },
+  );
 }
 
 export function groupFindingsByLesson(

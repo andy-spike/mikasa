@@ -148,6 +148,13 @@
       "when": 1790006549077,
       "tag": "0020_handy_quentin_quire",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790125608401,
+      "tag": "0021_talented_drax",
+      "breakpoints": true
     }
   ]
 }

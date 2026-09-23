@@ -8,13 +8,30 @@ vi.mock("@/lib/db", async () => {
   return { db: await makeTestDb() };
 });
 
+const modelState = vi.hoisted(() => ({
+  current: undefined as ReturnType<typeof import("./helpers/fake-model").scriptedModel> | undefined,
+}));
+vi.mock("@/lib/model", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/model")>("@/lib/model");
+  return {
+    ...actual,
+    generationModel: () => modelState.current!.model,
+    embedTexts: async (texts: string[]) => texts.map(() => new Array<number>(1536).fill(0.01)),
+  };
+});
+
 import { json, scriptedModel } from "./helpers/fake-model";
 import { makeTestDb } from "./helpers/test-db";
 import { makeOutline, makeSpec } from "./helpers/fixtures";
 import type { LessonContent } from "@/lib/course/content";
 
-const { applyLessonCorrections, correctLesson, MAX_CORRECTION_ROUNDS, structuralFindings } =
-  await import("@/lib/course/review");
+const {
+  applyLessonCorrections,
+  combinedFindings,
+  correctLesson,
+  MAX_CORRECTION_ROUNDS,
+  structuralFindings,
+} = await import("@/lib/course/review");
 const { parseLessonContent } = await import("@/lib/course/content");
 const {
   currentRevision,
@@ -24,8 +41,8 @@ const {
   publishRevision,
   saveFindings,
 } = await import("@/lib/db/review");
-const { saveLessonContent } = await import("@/lib/db/lessons");
-const { courses, courseSpecs, generationRuns, outlines, revisions, users } =
+const { getLessonContentsForVersion, saveLessonContent } = await import("@/lib/db/lessons");
+const { courses, courseSpecs, generationRuns, outlines, revisions, sources, users } =
   await import("@/lib/db/schema");
 
 const OUTLINE = makeOutline([2]);
@@ -61,6 +78,7 @@ function contentFor(lessonId: string, overrides: Partial<Record<string, unknown>
     selfExplanationPrompt: "Why this way?",
     exercise: { task: "Do it.", check: "It ran." },
     bridge: "Next comes more.",
+    contextSummary: `Lesson ${lessonId.slice(1)} extends the chat app.`,
     ...overrides,
   });
 }
@@ -82,6 +100,7 @@ function rawContentFor(
     selfExplanationPrompt: "Why this way?",
     exercise: { task: "Do it.", check: "It ran." },
     bridge: "Next comes more.",
+    contextSummary: `Lesson ${lessonId.slice(1)} extends the chat app.`,
     ...overrides,
   } as LessonContent;
 }
@@ -175,6 +194,163 @@ describe("structuralFindings", () => {
       lessons: [contentFor("l1"), contentFor("l2")],
     });
     expect(findings.some((f) => f.detail.includes("later Lesson"))).toBe(true);
+  });
+});
+
+describe("complete Course review", () => {
+  it("repairs an early summary, rechecks later Lessons, and publishes only after correction", async () => {
+    db = (await import("@/lib/db")).db as unknown as typeof db;
+    const courseId = await seedCandidate();
+    await db.insert(sources).values({
+      courseId,
+      ref: "src-1",
+      title: "Docs",
+      url: "https://example.com/docs",
+      excerpt: "The app is ChatApp.",
+    });
+    const [run] = await db
+      .select()
+      .from(generationRuns)
+      .where(eq(generationRuns.courseId, courseId));
+    await saveLessonContent(
+      db,
+      courseId,
+      1,
+      run.id,
+      contentFor("l1", {
+        body: [{ kind: "p", text: "The shared app is ChatApp." }],
+        contextSummary: "The shared app is WrongApp.",
+      }),
+    );
+    await saveLessonContent(
+      db,
+      courseId,
+      1,
+      run.id,
+      contentFor("l2", {
+        body: [{ kind: "p", text: "Continue WrongApp." }],
+        contextSummary: "Continue WrongApp.",
+      }),
+    );
+    modelState.current = scriptedModel([
+      json({
+        findings: [
+          {
+            kind: "summary",
+            lessonRefs: ["l1"],
+            quote: "WrongApp",
+            detail: "Misnames the app.",
+            correction: "Read Lesson one.",
+          },
+        ],
+      }),
+      json({ contextSummary: "The shared app is ChatApp." }),
+      json({
+        findings: [
+          {
+            kind: "continuity",
+            lessonRefs: ["l2"],
+            quote: "WrongApp",
+            detail: "Uses the old name.",
+            correction: "Use ChatApp.",
+          },
+        ],
+      }),
+      json({ replacements: [{ quote: "WrongApp", replacement: "ChatApp", replaceAll: false }] }),
+      json({ contextSummary: "Continue ChatApp." }),
+      json({ findings: [] }),
+    ]);
+    const { generateCourseWorkflow } = await import("@/workflows/course-generation");
+
+    const result = await generateCourseWorkflow(courseId, run.id, 1);
+
+    expect(result).toMatchObject({ ok: true, revisionNumber: 1 });
+    expect(modelState.current.calls()).toBe(6);
+    const saved = await getLessonContentsForVersion(db, courseId, 1);
+    expect(saved[0].contextSummary).toBe("The shared app is ChatApp.");
+    expect(saved[1].body[0]).toMatchObject({ text: "Continue ChatApp." });
+    expect(saved[1].contextSummary).toBe("Continue ChatApp.");
+    expect(modelState.current.prompts[2]).toContain("The shared app is ChatApp.");
+  });
+
+  it("accepts a harmful quote from a saved Lesson context summary", async () => {
+    const courseId = await seedCandidate();
+    const [run] = await db
+      .select()
+      .from(generationRuns)
+      .where(eq(generationRuns.courseId, courseId));
+    await saveLessonContent(
+      db,
+      courseId,
+      1,
+      run.id,
+      contentFor("l1", { contextSummary: "The shared app is named WrongApp." }),
+    );
+    await saveLessonContent(db, courseId, 1, run.id, contentFor("l2"));
+    const saved = await getLessonContentsForVersion(db, courseId, 1);
+    const model = scriptedModel([
+      json({
+        findings: [
+          {
+            kind: "summary",
+            lessonRefs: ["l1"],
+            quote: "WrongApp",
+            detail: "The Lesson calls the app ChatApp; later Lessons will use the wrong name.",
+            correction: "Regenerate from Lesson one.",
+          },
+          {
+            kind: "continuity",
+            lessonRefs: ["l2"],
+            quote: "Stale quote from before summary repair.",
+            detail: "Lesson two follows the stale name.",
+            correction: "Follow Lesson one after its summary is repaired.",
+          },
+        ],
+      }),
+    ]);
+
+    const findings = await combinedFindings(
+      model.model,
+      { topic: "the Vercel AI SDK", goal: "build my own AI chat app", language: "en" },
+      SPEC,
+      OUTLINE,
+      [],
+      saved,
+    );
+    expect(findings).toMatchObject([{ kind: "summary", lessonRef: "l1", quote: "WrongApp" }]);
+    expect(findings).toHaveLength(1);
+    expect(model.prompts[0]).toContain("The shared app is named WrongApp.");
+  });
+
+  it("repairs a misleading summary from its Lesson without rewriting prose", async () => {
+    db = (await import("@/lib/db")).db as unknown as typeof db;
+    const courseId = await seedCandidate();
+    const [run] = await db
+      .select()
+      .from(generationRuns)
+      .where(eq(generationRuns.courseId, courseId));
+    const original = contentFor("l1", { contextSummary: "The shared app is named WrongApp." });
+    await saveLessonContent(db, courseId, 1, run.id, original);
+    modelState.current = scriptedModel([
+      json({ contextSummary: "The shared app uses the name ChatApp." }),
+    ]);
+    const { stepCorrectLesson } = await import("@/workflows/course-steps");
+
+    await stepCorrectLesson(courseId, 1, run.id, "l1", [
+      {
+        kind: "summary",
+        lessonRef: "l1",
+        quote: "WrongApp",
+        detail: "Later Lessons would use the wrong name.",
+        correction: "Regenerate from Lesson one.",
+      },
+    ]);
+
+    const [saved] = await getLessonContentsForVersion(db, courseId, 1);
+    expect(saved.contextSummary).toBe("The shared app uses the name ChatApp.");
+    expect(saved.body).toEqual(original.body);
+    expect(modelState.current.calls()).toBe(1);
+    expect(modelState.current.prompts[0]).toContain("Explanation.");
   });
 });
 
@@ -275,14 +451,16 @@ describe("correctLesson", () => {
       [
         {
           title: "Lesson one",
-          summary: "First.",
-          excerpt: "EXERCISE: Wrap one card | CHECK: class names match the contract",
+          contextSummary: "Lesson one wraps one card.",
+          fullContent: contentFor("l1", {
+            exercise: { task: "Wrap one card", check: "class names match the contract" },
+          }),
         },
       ],
     );
 
-    expect(model.prompts[0]).toContain("currently stand");
-    expect(model.prompts[0]).toContain("EXERCISE: Wrap one card | CHECK: class names match");
+    expect(model.prompts[0]).toContain("private context summaries");
+    expect(model.prompts[0]).toContain('"task":"Wrap one card"');
   });
 
   it("rejects ambiguous replacements unless the model explicitly replaces all matches", () => {
@@ -425,6 +603,14 @@ describe("reading path", () => {
     expect(reading?.lessonRows).toHaveLength(2);
     expect(reading?.sourceRows).toHaveLength(0);
     expect(reading?.outline.version).toBe(1);
+    const { toReadingCourse } = await import("@/lib/course/reading");
+    const publicCourse = toReadingCourse(
+      reading!.course,
+      reading!.outline.data,
+      reading!.lessonRows,
+    );
+    expect(publicCourse.modules[0].lessons[0].summary).toBe(OUTLINE.modules[0].lessons[0].summary);
+    expect(publicCourse.modules[0].lessons[0]).not.toHaveProperty("contextSummary");
 
     expect(await findOwnedPublishedCourse(db, "someone-else", courseId)).toBeUndefined();
   });

@@ -19,7 +19,7 @@ export {
   MAX_CORRECTION_ROUNDS,
 } from "./review-policy";
 
-export type FindingKind = "structural" | "factual";
+export type FindingKind = "structural" | "factual" | "summary" | "continuity";
 
 export type Finding = {
   kind: FindingKind;
@@ -28,13 +28,14 @@ export type Finding = {
   detail: string;
   correction: string;
   sourceQuery?: string;
+  relatedLessonRefs?: string[];
 };
 
-// The combined model review returns one row per critical factual issue with a
+// The combined model review returns one row per blocking issue with a
 // nonempty lessonRefs array; the workflow expands multi-Lesson rows into the
 // persisted per-Lesson shape so the table schema does not change.
 export type CombinedModelFinding = {
-  kind: "factual";
+  kind: "factual" | "summary" | "continuity";
   lessonRefs: string[];
   quote: string;
   detail: string;
@@ -46,7 +47,7 @@ const combinedFindingsSchema = z.object({
   findings: z
     .array(
       z.object({
-        kind: z.enum(["factual"]),
+        kind: z.enum(["factual", "summary", "continuity"]),
         lessonRefs: z.array(z.string()).min(1),
         quote: z.string().min(1),
         detail: z.string().min(1),
@@ -166,7 +167,8 @@ export function structuralFindings(input: StructuralInput): Finding[] {
   return findings;
 }
 
-// One model review for critical factual accuracy only. Reviews the whole
+// One model review for critical factual accuracy and harmful continuity.
+// Reviews the whole
 // candidate every round; an invalid or empty target list is a review error,
 // never a pass. Advisory issues are discarded: return an empty array for
 // style, bridge wording, throughline preference, or exercise polish.
@@ -188,14 +190,18 @@ export async function combinedFindings(
     providerOptions: designProviderOptions(),
     schema: combinedFindingsSchema,
     prompt: [
-      "You review a complete course candidate before it publishes. One job:",
-      "report critical factual errors only: wrong facts, outdated versions,",
-      "broken code, or claims the Sources contradict. A learner must get hurt",
-      "if it ships.",
+      "You review a complete Course candidate before it publishes. Report:",
+      "critical factual errors (wrong facts, outdated versions, broken code,",
+      "or claims the Sources contradict); conflicts between Lessons that would",
+      "mislead a Learner; and private Lesson context summaries that misstate",
+      "their Lesson in a way that could mislead later Lessons.",
       "Discard everything advisory: style, bridge wording, throughline taste,",
       "exercise polish. When in doubt, return no finding.",
-      "Return at most 3 findings, ordered by harm. Each finding needs the exact",
-      "quote from the Lesson, what is wrong with it, and a concrete fix.",
+      "Return at most 3 findings, ordered by harm. Quote the exact bad text",
+      "from the Lesson for factual or continuity findings, or from its private",
+      "context summary for summary findings. Give a concrete fix.",
+      "If a summary could mislead later Lessons, report its summary finding",
+      "first. Later Lesson conflicts will be rechecked after it is repaired.",
       "",
       `Topic: ${course.topic}`,
       `Goal: ${course.goal}`,
@@ -216,12 +222,15 @@ export async function combinedFindings(
             `RECALL: ${content.recallPrompt} | SELF-EXPLAIN: ${content.selfExplanationPrompt}`,
             `EXERCISE: ${content.exercise.task} | CHECK: ${content.exercise.check}`,
             `BRIDGE: ${content.bridge}`,
+            `PRIVATE CONTEXT SUMMARY: ${content.contextSummary}`,
           ].join("\n");
         }),
       ),
       "",
-      "Return findings: kind must be factual, lessonRefs (nonempty array of exact Lesson ids above;",
-      "use several ids when one issue spans Lessons), quote (the exact Lesson text that is wrong), detail (what is wrong with that quote), correction (what to change),",
+      "Return findings: kind is factual, summary, or continuity; lessonRefs",
+      "is a nonempty array of exact Lesson ids above (use several ids when one",
+      "issue spans Lessons); quote is exact text from each named Lesson or",
+      "its private context summary for summary findings; detail explains the harm; correction says what to change;",
       "and an optional sourceQuery (one web search that would settle the fact). Empty array if none.",
     ].join("\n"),
   });
@@ -229,7 +238,10 @@ export async function combinedFindings(
   if (!output) throw new GenerationError("The combined review returned nothing.");
   const lessonById = new Map(lessons.map((lesson) => [lesson.lessonId, lesson]));
   const expanded: Finding[] = [];
-  for (const f of output.findings) {
+  const selected = output.findings.some((finding) => finding.kind === "summary")
+    ? output.findings.filter((finding) => finding.kind === "summary")
+    : output.findings;
+  for (const f of selected) {
     if (!f.lessonRefs || f.lessonRefs.length === 0) {
       throw new GenerationError(
         `The review returned a finding with no target Lesson: ${f.detail}. A finding must name at least one Lesson.`,
@@ -244,7 +256,10 @@ export async function combinedFindings(
       }
       const target = lessonById.get(ref);
       const hasExactQuote =
-        target && lessonTextSlots(target, true).some((slot) => slot.get().includes(quote));
+        target &&
+        (f.kind === "summary"
+          ? target.contextSummary.includes(quote)
+          : lessonTextSlots(target, true).some((slot) => slot.get().includes(quote)));
       if (!quote || !hasExactQuote) {
         throw new GenerationError(
           `The review quotes text that Lesson "${ref}" does not contain: ${f.quote}. Quote the Lesson exactly.`,
@@ -253,11 +268,12 @@ export async function combinedFindings(
     }
     for (const ref of f.lessonRefs) {
       expanded.push({
-        kind: "factual" as const,
+        kind: f.kind,
         lessonRef: ref,
         quote,
         detail: f.detail,
         correction: f.correction,
+        relatedLessonRefs: f.lessonRefs,
         ...(f.sourceQuery?.trim() ? { sourceQuery: f.sourceQuery.trim() } : {}),
       });
     }
@@ -265,9 +281,8 @@ export async function combinedFindings(
   return expanded;
 }
 
-// Corrections must agree with the candidate the review judged, so the
-// corrector sees every other Lesson as it currently stands. Generation sees
-// the same prose context (ADR 0009): neither writes blind.
+// Kept for existing callers that need a compact prose rendering. Writers use
+// context summaries and the complete previous Lesson instead.
 export const SIBLING_CONTEXT_MAX_CHARS = 3500;
 
 export function lessonContextExcerpt(lesson: LessonContent): string {
@@ -432,7 +447,7 @@ export async function correctLesson(
   spec: CourseSpecification,
   lesson: LessonContent,
   findings: Finding[],
-  priorLessons: { title: string; summary: string; excerpt?: string }[],
+  priorLessons: { title: string; contextSummary: string; fullContent?: LessonContent }[],
   options?: {
     preserveExercise?: boolean;
     sources?: { ref: string; title: string; url: string; excerpt: string }[];
@@ -474,10 +489,13 @@ export async function correctLesson(
       "",
       priorLessons.length
         ? [
-            "The other Lessons as they currently stand, in reading order. Your corrections must agree",
-            "with what they actually say; when a finding names another Lesson, match what is shown here:",
+            "The other Lessons' private context summaries in reading order.",
+            "For Lessons named in a finding, their complete current content is also shown:",
             ...priorLessons.map((l) =>
-              [`- ${l.title} — ${l.summary}`, ...(l.excerpt ? [l.excerpt] : [])].join("\n"),
+              [
+                `- ${l.title}: ${l.contextSummary}`,
+                ...(l.fullContent ? [JSON.stringify(l.fullContent)] : []),
+              ].join("\n"),
             ),
           ].join("\n")
         : "",

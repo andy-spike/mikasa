@@ -1,5 +1,7 @@
 # Sequential Lesson generation with sibling prose
 
+The earlier-Lesson prose context in this decision is superseded by ADR 0010. The decision to write Lessons one at a time in reading order remains in force.
+
 Lessons are written one at a time in reading order, and each Lesson sees the actual prose of the Lessons before it (capped excerpts, same as corrections). The correction cap rises from two rounds to three. This supersedes the parallel-execution clause of ADR 0001; the Outline approval gate and the whole-Course review stand unchanged.
 
 Parallel writers saw only titles and summaries, so every Lesson reinvented shared scaffolding — the `@supports` guard was "introduced" by three Lessons in one Course, one Lesson's "complete styles.css" silently omitted rules earlier Lessons established, and recaps promised what neighbors never delivered. Corrections with sibling context fixed each named instance, but the re-review kept finding the neighboring instances of the same defect families: across six observed runs the open-finding counts never reached zero in two rounds (14→11→8, 9→7→13, 13→12→13, 18→20→7). A finding rooted in how Lessons relate cannot be fixed by rewriting one Lesson blind.

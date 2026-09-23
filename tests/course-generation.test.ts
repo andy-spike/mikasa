@@ -38,6 +38,7 @@ const { users, courses, outlines, courseSpecs, sources, generationRuns, lessons 
   await import("@/lib/db/schema");
 const {
   finishGeneration,
+  getLessonContentsForVersion,
   getLessonsForVersion,
   loadGenerationContext,
   saveLessonContent,
@@ -124,6 +125,7 @@ function lessonJson(title: string, sourceRefs: string[] = []): string {
     selfExplanationPrompt: "Why this order?",
     exercise: { task: `Do ${title}.`, check: "It runs." },
     bridge: "Next.",
+    contextSummary: `${title} extends the chat app.`,
   });
 }
 
@@ -312,6 +314,100 @@ describe("generateLesson", () => {
 });
 
 describe("a full candidate", () => {
+  it("repairs only an invalid private summary before saving a valid Lesson", async () => {
+    const courseId = await seedCourse();
+    const [run] = await db
+      .insert(generationRuns)
+      .values({ courseId, outlineVersion: 1 })
+      .returning();
+    const lesson = JSON.parse(lessonJson("Lesson one"));
+    lesson.contextSummary = "word ".repeat(81);
+    const model = scriptedModel([
+      json(lesson),
+      json({ contextSummary: "The chat app establishes StreamPanel." }),
+    ]);
+    const content = await generateLesson(model.model, {
+      course: { topic: "t", goal: "g", background: "", language: "en", depth: "reach" },
+      spec: SPEC,
+      lesson: OUTLINE.modules[0].lessons[0],
+      nextLesson: OUTLINE.modules[0].lessons[1],
+      priorLessons: [],
+      sources: [],
+    });
+    await saveLessonContent(db, courseId, 1, run.id, content);
+
+    const [saved] = await getLessonContentsForVersion(db, courseId, 1);
+    expect(saved.contextSummary).toBe("The chat app establishes StreamPanel.");
+    expect(saved.body).toEqual(lesson.body);
+    expect(model.calls()).toBe(2);
+    expect(model.prompts[1]).toContain("How **Lesson one** works.");
+  });
+
+  it("fails after one unsuccessful summary-only repair", async () => {
+    const lesson = JSON.parse(lessonJson("Lesson one"));
+    lesson.contextSummary = { invalid: true };
+    const model = scriptedModel([json(lesson), json({ contextSummary: "" })]);
+
+    await expect(
+      generateLesson(model.model, {
+        course: { topic: "t", goal: "g", background: "", language: "en", depth: "reach" },
+        spec: SPEC,
+        lesson: OUTLINE.modules[0].lessons[0],
+        nextLesson: OUTLINE.modules[0].lessons[1],
+        priorLessons: [],
+        sources: [],
+      }),
+    ).rejects.toThrow(GenerationError);
+    expect(model.calls()).toBe(2);
+  });
+
+  it("passes saved summaries and only the complete previous Lesson to the next writer", async () => {
+    const courseId = await seedCourse();
+    const context = (await loadGenerationContext(db, courseId, 1))!;
+    const [run] = await db
+      .insert(generationRuns)
+      .values({ courseId, outlineVersion: 1 })
+      .returning();
+    const first = {
+      ...JSON.parse(lessonJson("Lesson one")),
+      contextSummary: "The chat app adds StreamPanel in Lesson one.",
+    };
+    const second = {
+      ...JSON.parse(lessonJson("Lesson two")),
+      contextSummary: "The chat app adds ToolPanel in Lesson two.",
+      bridge: "Pass ToolPanel to the next Lesson.",
+    };
+    const { parseLessonContent } = await import("@/lib/course/content");
+    await saveLessonContent(db, courseId, 1, run.id, parseLessonContent("l1", "Lesson one", first));
+    await saveLessonContent(
+      db,
+      courseId,
+      1,
+      run.id,
+      parseLessonContent("l2", "Lesson two", second),
+    );
+    const saved = await getLessonContentsForVersion(db, courseId, 1);
+    const model = scriptedModel([lessonJson("Lesson three")]);
+
+    await generateLesson(model.model, {
+      course: context.course,
+      spec: context.spec,
+      lesson: context.outline.data.modules[1].lessons[0],
+      nextLesson: context.outline.data.modules[1].lessons[1],
+      priorLessons: saved.map((lesson) => ({
+        title: lesson.title,
+        contextSummary: lesson.contextSummary,
+      })),
+      previousLesson: saved[1],
+      sources: context.sources,
+    });
+
+    expect(model.prompts[0]).toContain("The chat app adds StreamPanel in Lesson one.");
+    expect(model.prompts[0]).toContain("The chat app adds ToolPanel in Lesson two.");
+    expect(model.prompts[0]).toContain("Pass ToolPanel to the next Lesson.");
+    expect(model.prompts[0]).not.toContain("How **Lesson one** works.");
+  });
+
   it("writes every Lesson in dependency order through the same functions the steps call", async () => {
     const courseId = await seedCourse();
     const context = (await loadGenerationContext(db, courseId, 1))!;
@@ -328,7 +424,8 @@ describe("a full candidate", () => {
     ]);
 
     const order = generationOrder(context.spec, context.outline.data);
-    const prior: { title: string; summary: string }[] = [];
+    const prior: { title: string; contextSummary: string }[] = [];
+    let previousLesson: Awaited<ReturnType<typeof generateLesson>> | undefined;
     for (const lesson of order) {
       const content = await generateLesson(model.model, {
         course: context.course,
@@ -336,10 +433,12 @@ describe("a full candidate", () => {
         lesson,
         nextLesson: order[order.indexOf(lesson) + 1] ?? null,
         priorLessons: prior,
+        previousLesson,
         sources: context.sources,
       });
       await saveLessonContent(db, courseId, 1, run.id, content);
-      prior.push({ title: lesson.title, summary: lesson.summary });
+      prior.push({ title: lesson.title, contextSummary: content.contextSummary });
+      previousLesson = content;
     }
 
     const finished = await finishGeneration(db, courseId, 1, run.id);

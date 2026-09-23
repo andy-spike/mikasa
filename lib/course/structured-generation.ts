@@ -23,6 +23,7 @@ export type StructuredGenerationStage =
   | "course-specification-module"
   | "course-specification-reconciliation"
   | "lesson-generation"
+  | "lesson-context-summary"
   | "course-review"
   | "lesson-correction"
   | "capability-preflight";
@@ -42,6 +43,7 @@ const STAGE_POLICIES: Record<StructuredGenerationStage, StagePolicy> = {
   "course-specification-module": { timeoutMs: 600_000, maxRetries: 1 },
   "course-specification-reconciliation": { timeoutMs: 600_000, maxRetries: 1 },
   "lesson-generation": { timeoutMs: 600_000, maxRetries: 1 },
+  "lesson-context-summary": { timeoutMs: 120_000, maxRetries: 1 },
   "course-review": { timeoutMs: 600_000, maxRetries: 1 },
   "lesson-correction": { timeoutMs: 600_000, maxRetries: 1 },
   "capability-preflight": { timeoutMs: 60_000, maxRetries: 0 },

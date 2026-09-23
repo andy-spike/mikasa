@@ -226,6 +226,7 @@ describe("retrying a failed generation", () => {
         selfExplanationPrompt: "s",
         exercise: { task: "t", check: "c" },
         bridge: "b",
+        contextSummary: "Lesson one extends the example.",
       }),
     );
     await resetGenerationRun(db, courseId, run.id);
@@ -268,6 +269,7 @@ async function contentFor(lessonId: string) {
     selfExplanationPrompt: "s",
     exercise: { task: "t", check: "c" },
     bridge: "b",
+    contextSummary: "Lesson one extends the example.",
   });
 }
 

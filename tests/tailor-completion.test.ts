@@ -89,6 +89,7 @@ function lessonJson(title: string): string {
     selfExplanationPrompt: "Why this order?",
     exercise: { task: `Do ${title}.`, check: "It runs." },
     bridge: "Next.",
+    contextSummary: `${title} extends the example.`,
   });
 }
 
@@ -447,6 +448,7 @@ describe("undoing a published change", () => {
     const l1v4 = v4.find((r) => r.lessonRef === "l1")!;
     expect(l1v4.body).toEqual(v1.find((r) => r.lessonRef === "l1")!.body);
     expect(l1v4.body).not.toEqual(v2.find((r) => r.lessonRef === "l1")!.body);
+    expect(l1v4.contextSummary).toBe(v1.find((r) => r.lessonRef === "l1")!.contextSummary);
     expect(await completionRows()).toEqual([
       ["l1", l1DoneAt],
       ["l2", l2DoneAt],

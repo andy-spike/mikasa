@@ -5,9 +5,8 @@
 // Gateway models; keeping them out of the bundle keeps the warning away.
 import type { Finding } from "./review";
 
-// Three rounds: with prose-aware generation and class-wide corrections the
-// re-review keeps finding neighbor instances; the third round drains what two
-// cannot (see the E2E finding arcs in ADR 0009).
+// Three rounds: the complete Course review can find later conflicts after an
+// earlier summary or Lesson is corrected (see ADRs 0009 and 0010).
 export const MAX_CORRECTION_ROUNDS = 3;
 
 export const CORRECTION_SOURCE_QUERY_CAP = 3;

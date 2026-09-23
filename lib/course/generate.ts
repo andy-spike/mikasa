@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { generationProviderOptions } from "@/lib/model";
 import {
   generatedLessonContentSchema,
+  lessonContextSummarySchema,
   parseLessonContent,
   type ContentBlock,
   type LessonContent,
@@ -11,6 +12,7 @@ import type { CourseSpecification, OutlineData } from "./types";
 import { contractWriteBlock, finalExerciseLines, languageName, sourceLine } from "./prompt-blocks";
 import { GenerationError } from "./specification";
 import { generateStructuredStage } from "./structured-generation";
+import { regenerateLessonContextSummary } from "./lesson-context";
 
 export { GenerationError } from "./specification";
 
@@ -46,7 +48,8 @@ export async function generateLesson(
     spec: CourseSpecification;
     lesson: { id: string; title: string; summary: string };
     nextLesson: { title: string } | null;
-    priorLessons: { title: string; summary: string; excerpt?: string }[];
+    priorLessons: { title: string; contextSummary: string }[];
+    previousLesson?: LessonContent;
     sources: PromptSource[];
   },
 ): Promise<LessonContent> {
@@ -79,7 +82,7 @@ export async function generateLesson(
       "part of one coherent course, not a standalone explainer.",
       "Precedence when sources disagree, in order: 1) the spec alignment for",
       "this Lesson. 2) the example contract verbatim. 3) the prior Lessons'",
-      "prose. 4) the Sources. The spec wins over prior prose.",
+      "summaries and the previous Lesson. 4) the Sources. The spec wins over prior Lessons.",
       "Accuracy: only state facts you can support from the spec, the prior",
       "Lessons, or the Sources below. Do not invent versions, APIs, or",
       "behavior. If a fact is uncertain, omit it or state the limit — never",
@@ -111,15 +114,17 @@ export async function generateLesson(
       "",
       ...finalExerciseLines(input.spec),
       "",
-      "The Lessons before this one, as they currently stand. This Lesson continues",
-      "from them: keep the names, rules, and scaffolding they already established",
+      "Private context summaries for every earlier Lesson, in reading order.",
+      "Continue from them: keep the names, rules, and scaffolding they established",
       "(shared styles, guards, classes, the running example) and extend them —",
       "never introduce them again as if new:",
       ...(input.priorLessons.length
-        ? input.priorLessons.map((l) =>
-            [`- ${l.title} — ${l.summary}`, ...(l.excerpt ? [l.excerpt] : [])].join("\n"),
-          )
+        ? input.priorLessons.map((l) => `- ${l.title}: ${l.contextSummary}`)
         : ["- (this is the first)"]),
+      "",
+      "The complete immediately previous Lesson, including its explanation,",
+      "worked example, prompts, Exercise, and bridge:",
+      input.previousLesson ? JSON.stringify(input.previousLesson) : "(this is the first Lesson)",
       "",
       `THIS Lesson: ${input.lesson.title} — ${input.lesson.summary}`,
       `It teaches the performance: ${alignment.performance}`,
@@ -148,6 +153,9 @@ export async function generateLesson(
       "  the way it is.",
       "- exercise: the one task, and 'check': the concrete evidence it is done.",
       `- bridge: one or two sentences into ${input.nextLesson ? `the next Lesson, "${input.nextLesson.title}"` : "the course's final Exercise, which is the Goal made real"}.`,
+      "- contextSummary: private context for later Lessons, at most 80 words",
+      "  in the Course Language. Record exact shared example changes, names,",
+      "  decisions, and promises. Copy technical identifiers unchanged. No teaching recap.",
       "",
       "Return JSON only.",
     ]
@@ -157,7 +165,23 @@ export async function generateLesson(
 
   if (!output) throw new GenerationError(`No content came back for "${input.lesson.title}".`);
 
-  const content = parseLessonContent(input.lesson.id, input.lesson.title, output);
+  const checkedSummary = lessonContextSummarySchema.safeParse(output.contextSummary);
+  const contextSummary = checkedSummary.success
+    ? checkedSummary.data
+    : await regenerateLessonContextSummary(model, input.course.language, {
+        lessonId: input.lesson.id,
+        title: input.lesson.title,
+        body: output.body,
+        workedExample: output.workedExample,
+        recallPrompt: output.recallPrompt,
+        selfExplanationPrompt: output.selfExplanationPrompt,
+        exercise: output.exercise,
+        bridge: output.bridge,
+      });
+  const content = parseLessonContent(input.lesson.id, input.lesson.title, {
+    ...output,
+    contextSummary,
+  });
   assertKnownSourceRefs(content, new Set(input.sources.map((source) => source.ref)));
   return content;
 }

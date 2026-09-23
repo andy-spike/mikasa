@@ -103,6 +103,7 @@ function lessonJson(title: string): string {
     selfExplanationPrompt: "Why this order?",
     exercise: { task: `Do ${title}.`, check: "It runs." },
     bridge: "Next.",
+    contextSummary: `${title} extends the example.`,
   });
 }
 

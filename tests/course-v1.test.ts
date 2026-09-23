@@ -96,6 +96,7 @@ function lessonJson(title: string): string {
     selfExplanationPrompt: "Why?",
     exercise: { task: `Do ${title}.`, check: "Done." },
     bridge: "Next.",
+    contextSummary: `${title} extends the running example.`,
   });
 }
 
@@ -131,7 +132,7 @@ describe("generation prompt carries shared context", () => {
     }
   });
 
-  it("the prompt carries the prior Lessons' actual prose and orders continuation", async () => {
+  it("the prompt carries earlier summaries and the complete previous Lesson", async () => {
     const outline = outline4();
     const spec = spec4(outline);
     const model = scriptedModel([lessonJson("Lesson two")]);
@@ -144,15 +145,18 @@ describe("generation prompt carries shared context", () => {
       priorLessons: [
         {
           title: "Lesson one",
-          summary: "The opener",
-          excerpt: "BRIDGE: Next we widen the guard.",
+          contextSummary: "The opener establishes the guard.",
         },
       ],
+      previousLesson: parseLessonContent("l1", "Lesson one", {
+        ...JSON.parse(lessonJson("Lesson one")),
+        bridge: "Next we widen the guard.",
+      }),
       sources: [],
     });
-    expect(model.prompts[0]).toContain("as they currently stand");
+    expect(model.prompts[0]).toContain("The opener establishes the guard.");
     expect(model.prompts[0]).toContain("never introduce them again");
-    expect(model.prompts[0]).toContain("BRIDGE: Next we widen the guard.");
+    expect(model.prompts[0]).toContain("Next we widen the guard.");
   });
 
   it("correction prompts carry the final Exercise too", async () => {
@@ -268,6 +272,7 @@ describe("sources", () => {
       selfExplanationPrompt: "W?",
       exercise: { task: "Do.", check: "Done." },
       bridge: "Next.",
+      contextSummary: "Lesson one extends the running example.",
     });
     expect(
       structuralFindings({
@@ -634,11 +639,10 @@ describe("compiled-workflow scheduling check", () => {
       expect(text).not.toContain("LESSON_WAVE_SIZE");
       expect(text).not.toContain("stepPlanSources");
     }
-    // The sequential step itself builds the sibling-prose context: it reads
-    // the written Lessons and caps each excerpt, so the writer continues what
-    // exists instead of inventing it.
+    // The shared step loads earlier summaries and the complete previous Lesson.
     expect(steps).toContain("getLessonContentsForVersion");
-    expect(steps).toContain("lessonContextExcerpt");
+    expect(steps).toContain("contextSummary");
+    expect(steps).toContain("previousLesson");
     // The shared review path runs structural first, then one critical factual
     // model pass.
     expect(steps).toContain("stepCombinedReview");

@@ -109,5 +109,6 @@ export function lessonContent(lessonId: string, title: string, text: string): Le
     selfExplanationPrompt: "Explain it.",
     exercise: { task: "Paint one.", check: "It holds." },
     bridge: "Next.",
+    contextSummary: `${title} extends the running example.`,
   });
 }

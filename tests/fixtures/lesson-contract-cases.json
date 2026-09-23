@@ -12,7 +12,8 @@
       "recallPrompt": "What is the key idea?",
       "selfExplanationPrompt": "Why does it work?",
       "exercise": { "task": "Try it.", "check": "The result is correct." },
-      "bridge": "Next, extend it."
+      "bridge": "Next, extend it.",
+      "contextSummary": "The Lesson establishes the example for later Lessons."
     }
   },
   {
@@ -24,7 +25,8 @@
       "recallPrompt": "Recall?",
       "selfExplanationPrompt": "Why?",
       "exercise": { "task": "Try it.", "check": "Done." },
-      "bridge": "Next."
+      "bridge": "Next.",
+      "contextSummary": "The Lesson establishes the example."
     }
   },
   {
@@ -40,7 +42,8 @@
       "recallPrompt": "Recall?",
       "selfExplanationPrompt": "Why?",
       "exercise": { "task": "Try it.", "check": "Done." },
-      "bridge": "Next."
+      "bridge": "Next.",
+      "contextSummary": "The Lesson establishes the example."
     }
   }
 ]

@@ -756,6 +756,7 @@ export async function stagePlanRevision(
         selfExplanationPrompt: row.selfExplanationPrompt,
         exercise: row.exercise,
         bridge: row.bridge,
+        contextSummary: row.contextSummary,
       });
     }
     if (copies.length > 0) await tx.insert(lessons).values(copies);
@@ -1215,6 +1216,7 @@ export async function undoPlanRevision(
         selfExplanationPrompt: source.selfExplanationPrompt,
         exercise: source.exercise,
         bridge: source.bridge,
+        contextSummary: source.contextSummary,
       });
     }
     if (rows.length > 0) await tx.insert(lessons).values(rows);
