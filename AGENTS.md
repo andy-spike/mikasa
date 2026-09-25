@@ -43,8 +43,10 @@ Only ship when the user asks to ship, deploy, or integrate a branch. Pushing `ma
 1. Complete the schema procedure above before pushing a branch that changes `lib/db/schema.ts`.
 2. From the task worktree, commit and push the work. Run `pnpm format`, `pnpm test`, `pnpm typecheck`, and `pnpm lint`. Leave `.impeccable/hook.cache.json` and dependency-install drift in `pnpm-lock.yaml` or `package.json` uncommitted.
 3. Fetch `origin`. Confirm the primary worktree is clean and `main` matches `origin/main`.
-4. From the task worktree, run `wt merge --no-commit --no-rebase`. If it cannot fast-forward `main`, stop and ask for direction.
+4. From the task worktree, run `wt merge --no-commit --no-rebase --no-remove`. Keep the task worktree until the Codex session ends so its hooks still have a working directory. If the merge cannot fast-forward `main`, stop and ask for direction.
 5. From the primary worktree, run `git push origin main`, then confirm `main` matches `origin/main`.
+
+After the Codex session ends, remove the merged task worktree with `wt remove <branch>` from another worktree.
 
 Never force-push `main`. Stash entries are repository-wide, so name the entry when popping it.
 
