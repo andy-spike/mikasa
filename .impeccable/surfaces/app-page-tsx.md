@@ -7,7 +7,11 @@ related_targets: []
 
 # Surface brief: landing
 
-## Current direction: living course demo
+## Current direction: the sheet
+
+Distill pass at the user's request: the assembling Course showed too much of the real product and read as cluttered. The landing is now hero, one story, and the closing invitation. The story is notes written on the notebook ruling, going Goal → Outline → Course → Lesson beside four short steps (`components/landing-story.tsx`). `DESIGN.md` records it under "Landing update: notes on the paper". Boundaries: no product chrome, no card around the notes, one story, one olive moment at a time.
+
+## Earlier direction: living course demo
 
 Follow-up hero direction: center the headline, copy, and actions with no diagram beneath them, and fill the first viewport exactly (100dvh minus the fixed bar) with the content vertically centered. An earlier goal-to-course hero diagram and its lead question were removed by user decision; the living course demonstration carries the interaction with its own subject tabs. The headline mask reveal and underline draw remain. The user explicitly requested a landing-only exception to reduced-motion behavior for the hero and course-demo animations; app behavior remains unchanged. No continuous animation loops.
 

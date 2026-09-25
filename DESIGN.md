@@ -403,6 +403,30 @@ One graphic in the product is exempt from everything above: Google's G on the si
 
 ## Layout
 
+### Landing update: notes on the paper
+
+The landing is three things on notebook paper: the hero, one story, and the closing invitation. The paper is a faint ruling with one margin line beside the story column (`.landing-paper` in `app/landing.css`), drawn from `--rule` at 16% (22% on charcoal, 30% for the margin) and faded at the sides. It sits well below reading contrast. The ruling is anchored to the viewport on a `--pitch` of 2rem (1.75rem below 1024px), and the margin line drops below 1100px, where it would cross text.
+
+The story (`components/landing-story.tsx`) pairs four short steps (Say what you want to do, Shape the Outline first, Learn it as one Course, Finish each Lesson by doing) with notes written straight onto that ruling. There is no card, no uppercase label, and no counter. Every line is one pitch tall, and each baseline sits just above its rule. The pinned notes snap their top to the pitch (`.story-pin`), so they write on the page's own lines. On phones they pin under the header on an opaque patch of the same paper (`.landing-ruled`), so text scrolling beneath disappears while the lines run on unbroken.
+
+The story stands at the last step whose copy has crossed the reading line: just past the middle of the viewport on desktop, and on phones low enough to sit below the pinned notes. Crossing is counted rather than watched in a band, so a jump, an anchor, or a restored scroll lands on the right step. Nothing plays before the first step's copy crosses.
+
+The notes move as if drawn by one hand, with the constants at the top of `components/landing-story.tsx`:
+
+- **One pen.** Every stroke draws at 480px/s and every written word at 60 characters/s, both on one easing, so a long line takes longer than a short one. Drawings ink stroke by stroke, each starting as the last one lifts. Dashed strokes reveal through a drawn mask so they keep their dash.
+- **In by ink, out by fade.** Things arrive by being drawn, written (a soft-edged wipe), or typed, and every exit is the same 0.25s fade.
+- **One move.** Rows opening and folding, the Lesson title rising, and the triangle travelling share one 0.5s move on `--ease`.
+- **Drawings sit on the paper.** Like the words, a drawing's long horizontal edges lie on the rules of its four lines, never a few pixels off them. The camera's top, seam, and bottom are on rules, and the Exercise scene stands on the bottom rule. Inside a drawing, parts keep one rhythm: 12 in from an edge and 8 between parts.
+
+The states:
+
+1. The Learner types the Goal with the caret following the text, then a rangefinder inks in beneath it, seen from the front: body and top-plate seam, shutter button, dial and hot shoe, strap lugs, viewfinder, and a lens drawn ring by ring with a knurled focus ring. Dashed window light falls toward it from the upper right, and the glass catches a glint in the last stroke.
+2. One continuous stroke draws the tree's spine top to bottom. Each row's branch, mark, and words follow as the pen passes: a square node per module, a dot per Lesson. Then the Learner's hand drags the added Lesson in on a lifted `float` ground, sets it down, and its branch and dot draw.
+3. Progress plays on a 0.75s beat: the triangle moves down and each Lesson it leaves checks off. Then finished modules fold to one line with their checks and a filled node, later modules fold to a Lesson count, and the triangle rides its row up. When it travels to a new Lesson it lifts (shrinks and fades) and settles, so it glides over whatever lies between.
+4. The current Lesson's title rises out of its row to head the Lesson, the triangle riding with it. The Exercise draws: one window and three portraits at three distances, the far side of each face hatched darker the further it stands from the glass, and the softest face circled by hand. The same hand clicks "Mark done", the check strokes in, and the triangle hands off to the next Lesson.
+
+The Goal, the title, and the triangle persist across states; the camera, the Outline, and the Lesson are stages sharing one grid cell. Scrolling back reverses cleanly, and skipping steps lands on the settled state. The notes reserve the height of the full Outline, so they never change size. The Outline and the Lesson share one grid cell. The active step drives the notes in both directions; inactive steps fade to 28% and drop 6px. The notes are `aria-hidden`, and the step copy carries the story. The olive stays one moment at a time. This supersedes the assembling Course and the guided walk described next.
+
 ### Landing update: guided walk
 
 The hero is centered: headline, supporting copy, and actions, with no diagram beneath it, and it fills the first viewport — `min-height: calc(100dvh − 3.5rem)` with the content vertically centered — so the walk begins exactly at the fold. The guided walk follows directly as the first section: five steps (Goal, Outline, Lesson, Help & changes, Begin), each its own scroll section with a mono numeral, a label, and one clear idea. A sticky subject bar keeps Photography, Jazz harmony, and Databases reachable while scrolling, updating the goal, background, outline, and exercise through shared state; a quiet anchor index jumps to each step. The headline reveals through a mask and its olive underline draws once. Step content settles once on entry and subject changes replay a short assemble, finishing in under a second, never looping. At the user's explicit request, the landing hero and walk motion are exceptions to the app's reduced-motion rules. This replaces the earlier living-course-demo, static-hero, reduced-motion, and hero-diagram descriptions in this landing section.

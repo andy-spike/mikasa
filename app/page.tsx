@@ -1,16 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import Link from "next/link";
+import type { ReactNode } from "react";
 import { ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { LandingWalk } from "@/components/landing-walk";
-import { ReadingProgress } from "@/components/landing-motion";
+import { LandingStory } from "@/components/landing-story";
 import "./landing.css";
 import { Reveal } from "@/components/reveal";
 import { GoogleMark } from "@/components/google-mark";
-import { ThemeToggle } from "@/components/workspace/theme-toggle";
-import { authClient } from "@/lib/auth-client";
+import { MarketingFooter, MarketingHeader, useGoogleSignIn } from "@/components/marketing-chrome";
 
 function StartCourseButton({
   signingIn,
@@ -37,62 +34,18 @@ function StartCourseButton({
 }
 
 export default function Landing() {
-  const [selectedSubject, setSelectedSubject] = useState(0);
-  const [signingIn, setSigningIn] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  function signIn() {
-    if (signingIn) return;
-    setSigningIn(true);
-    setFailed(false);
-    authClient.signIn
-      .social({ provider: "google", callbackURL: "/courses" })
-      .catch(() => setFailed(true))
-      .finally(() => setSigningIn(false));
-  }
+  const { signingIn, failed, signIn } = useGoogleSignIn();
 
   return (
-    <div id="top" className="landing-page min-h-full bg-canvas">
-      <div aria-hidden="true" className="landing-texture pointer-events-none fixed inset-0 z-0" />
-      <ReadingProgress />
+    <div id="top" className="landing-page relative min-h-full bg-canvas">
+      <div aria-hidden="true" className="landing-paper" />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:z-10 focus:bg-canvas focus:p-4"
       >
         Skip to content
       </a>
-      <header className="fixed inset-x-0 top-0 z-30 border-b border-hair bg-canvas/80 backdrop-blur">
-        <div className="mx-auto flex max-w-[77rem] items-center gap-4 px-5 py-2.5 sm:px-8 lg:px-10">
-          <Link
-            href="/"
-            aria-label="Mikasa home"
-            className="text-[0.9375rem] font-semibold tracking-[-0.011em]"
-          >
-            Mikasa
-          </Link>
-          <nav
-            aria-label="Main navigation"
-            className="ml-auto flex items-center gap-5 text-[0.8125rem] text-fg-3"
-          >
-            <a href="#walk" className="hidden py-2 transition-colors hover:text-fg sm:block">
-              Walk
-            </a>
-            <a href="#start" className="hidden py-2 transition-colors hover:text-fg sm:block">
-              Start
-            </a>
-            <ThemeToggle />
-            <Button
-              variant="primary"
-              onClick={signIn}
-              disabled={signingIn}
-              className="min-h-9 gap-2 px-4 py-1"
-            >
-              <GoogleMark className="block h-4 w-4" />
-              Sign in
-            </Button>
-          </nav>
-        </div>
-      </header>
+      <MarketingHeader />
 
       <main
         id="main"
@@ -130,11 +83,10 @@ export default function Landing() {
               </h1>
               <p
                 style={{ animationDelay: "90ms" }}
-                className="mk-rise mx-auto mt-6 max-w-[36rem] text-base leading-[1.72] text-fg-2"
+                className="mk-rise mx-auto mt-6 max-w-[34rem] text-base leading-[1.72] text-balance text-fg-2"
               >
-                The thing you have always wanted to understand. The skill you finally want to learn.
-                Turn it into a complete AI-generated course, built around your goal and what you
-                already know.
+                Tell Mikasa what you want to learn. You shape the Outline, then it writes the whole
+                Course around your Goal.
               </p>
               <div
                 style={{ animationDelay: "180ms" }}
@@ -145,10 +97,10 @@ export default function Landing() {
                   {signingIn ? "Connecting to Google…" : "Create your course"}
                 </StartCourseButton>
                 <a
-                  href="#walk"
+                  href="#how"
                   className="group flex min-h-11 items-center gap-2 rounded-sm text-[0.8125rem] text-fg-2 transition-colors hover:text-fg"
                 >
-                  Walk through it{" "}
+                  How it works{" "}
                   <ArrowDown
                     size={14}
                     strokeWidth={1.75}
@@ -172,11 +124,11 @@ export default function Landing() {
           </div>
         </section>
 
-        <LandingWalk selected={selectedSubject} onSelect={setSelectedSubject} />
+        <LandingStory />
 
         <section
           id="start"
-          className="scroll-mt-24 border-t border-hair py-16 sm:py-20"
+          className="mx-auto max-w-[64rem] py-28 sm:py-40"
           aria-labelledby="start-title"
         >
           <Reveal>
@@ -189,7 +141,7 @@ export default function Landing() {
             </h2>
           </Reveal>
           <Reveal delay={90}>
-            <p className="mt-5 max-w-[36rem] text-base leading-[1.72] text-fg-2">
+            <p className="mt-5 max-w-[36rem] text-base leading-[1.72] text-pretty text-fg-2">
               Bring a Topic and a Goal. Shape the Outline. Then work through a Course made for you.
             </p>
             <StartCourseButton signingIn={signingIn} onSignIn={signIn} className="mt-7 min-h-11">
@@ -205,16 +157,7 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer className="relative z-[1] mx-auto flex max-w-[77rem] flex-wrap items-center justify-between gap-4 border-t border-hair px-5 py-6 text-xs text-fg-3 sm:px-8 lg:px-10">
-        <span>Mikasa</span>
-        <span>© 2026 Mikasa · Developed by Andrés Sanabria</span>
-        <a
-          href="#top"
-          className="inline-flex min-h-11 items-center rounded-sm py-2 transition-colors hover:text-fg"
-        >
-          Back to top
-        </a>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }

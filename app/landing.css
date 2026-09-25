@@ -1,29 +1,6 @@
-/* Landing leftovers: only what Tailwind utilities cannot express. All layout,
-   typography, spacing, and color on the landing reads from utilities in
-   `app/page.tsx`, `components/landing-course-demo.tsx`, and
-   `components/landing-motion.tsx`. */
+/* Landing leftovers: only what Tailwind utilities cannot express. */
 
-/* Notebook-paper tokens. The grid holds still while content slides over it,
-   the way a page's ruling does. */
-.landing-page {
-  --grid-line: color-mix(in srgb, var(--hair) 20%, transparent);
-  --grid-cell: 2.5rem;
-}
-@media (max-width: 640px) {
-  .landing-page {
-    --grid-cell: 2rem;
-  }
-}
-
-/* Notebook paper: a faint ruled grid in the hairline token over the canvas.
-   Positioning rides Tailwind (`fixed inset-0`) on the element. */
-.landing-texture {
-  background:
-    repeating-linear-gradient(to right, var(--grid-line) 0 1px, transparent 1px var(--grid-cell)),
-    repeating-linear-gradient(to bottom, var(--grid-line) 0 1px, transparent 1px var(--grid-cell));
-}
-
-/* Hero entrance and subject-change assembly. Applied from markup through
+/* Hero entrance. Applied from markup through
    Tailwind arbitrary `animate-[...]` classes. */
 @keyframes hero-typeset {
   from {
@@ -43,57 +20,67 @@
     stroke-dashoffset: 0;
   }
 }
-@keyframes course-assemble {
-  from {
-    clip-path: inset(0 0 100% 0);
-    transform: translateY(8px);
-  }
-  to {
-    clip-path: inset(0);
-    transform: translateY(0);
-  }
-}
 
-/* Demo spine: the hairline joining the rail numerals. A pseudo-element is the
-   only way to draw it behind the numeral badges, so it stays here. The
-   `.demo-stage` class survives purely as this hook; the step layout itself is
-   Tailwind on the same element. Offsets track the step padding (2rem base,
-   1.75rem ≤1000px, 1.5rem ≤640px) so the line tucks behind the first and last
-   badges instead of stubbing past them. */
-.demo-stage::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 2.875rem;
-  width: 1px;
-  background: var(--hair);
+/* Notebook ruling. Faint rules on one pitch plus a margin line beside the
+   story column, drawn from the rule token so both grounds get their own
+   ink, and well below reading contrast so it is felt more than seen. The
+   ruling is anchored to the viewport, so the story's pinned sheet can write
+   on the same lines the page shows. */
+.landing-page {
+  --pitch: 2rem;
+  --ruling: color-mix(in srgb, var(--rule) 16%, transparent);
+  --margin: calc(50% - 34.5rem);
 }
-.demo-stage:first-child::before {
-  top: 2.75rem;
+.dark .landing-page {
+  --ruling: color-mix(in srgb, var(--rule) 22%, transparent);
 }
-.demo-stage:last-child::before {
-  bottom: calc(100% - 2.75rem);
-}
-@media (max-width: 1000px) {
-  .demo-stage::before {
-    left: 2.625rem;
-  }
-  .demo-stage:first-child::before {
-    top: 2.5rem;
-  }
-  .demo-stage:last-child::before {
-    bottom: calc(100% - 2.5rem);
+/* Phones: a tighter pitch, and no margin line where it would cross text. */
+@media (max-width: 1100px) {
+  .landing-page {
+    --margin: -2px;
   }
 }
-@media (max-width: 640px) {
-  .demo-stage::before {
-    left: 2.375rem;
+@media (max-width: 1023px) {
+  .landing-page {
+    --pitch: 1.75rem;
   }
-  .demo-stage:first-child::before {
-    top: 2.25rem;
-  }
-  .demo-stage:last-child::before {
-    bottom: calc(100% - 2.25rem);
+}
+.landing-paper,
+.landing-ruled {
+  background-image:
+    linear-gradient(
+      to right,
+      transparent calc(var(--margin) - 1px),
+      color-mix(in srgb, var(--rule) 30%, transparent) calc(var(--margin) - 1px) var(--margin),
+      transparent var(--margin)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(var(--pitch) - 1px),
+      var(--ruling) calc(var(--pitch) - 1px) var(--pitch)
+    );
+}
+.landing-paper {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+}
+/* An opaque patch of the same paper: the pinned sheet's ground on phones,
+   so text scrolling under it disappears while the lines run on unbroken.
+   ponytail: iOS Safari ignores fixed attachment, so the patch's lines can
+   sit off the page's by a few pixels there. */
+.landing-ruled {
+  background-color: var(--canvas);
+  background-attachment: fixed;
+}
+/* The pinned sheet snaps its top to the pitch so every line lands on a rule. */
+.story-pin {
+  top: calc(var(--pitch) * 2);
+}
+@media (min-width: 1024px) {
+  .story-pin {
+    top: round(down, calc(50svh - 12rem), var(--pitch));
   }
 }
