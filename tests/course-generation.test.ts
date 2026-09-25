@@ -388,17 +388,17 @@ describe("a full candidate", () => {
     );
     const saved = await getLessonContentsForVersion(db, courseId, 1);
     const model = scriptedModel([lessonJson("Lesson three")]);
+    const { lessonGenerationContext } = await import("@/lib/course/lesson-context");
+    const lessonContext = lessonGenerationContext(
+      context.outline.data,
+      context.outline.data.modules[1].lessons[0].id,
+      saved,
+    );
 
     await generateLesson(model.model, {
       course: context.course,
       spec: context.spec,
-      lesson: context.outline.data.modules[1].lessons[0],
-      nextLesson: context.outline.data.modules[1].lessons[1],
-      priorLessons: saved.map((lesson) => ({
-        title: lesson.title,
-        contextSummary: lesson.contextSummary,
-      })),
-      previousLesson: saved[1],
+      ...lessonContext,
       sources: context.sources,
     });
 
@@ -406,6 +406,13 @@ describe("a full candidate", () => {
     expect(model.prompts[0]).toContain("The chat app adds ToolPanel in Lesson two.");
     expect(model.prompts[0]).toContain("Pass ToolPanel to the next Lesson.");
     expect(model.prompts[0]).not.toContain("How **Lesson one** works.");
+    expect(() =>
+      lessonGenerationContext(
+        context.outline.data,
+        context.outline.data.modules[1].lessons[0].id,
+        saved.slice(1),
+      ),
+    ).toThrow('Earlier Lesson "Lesson one" has no content.');
   });
 
   it("writes every Lesson in dependency order through the same functions the steps call", async () => {

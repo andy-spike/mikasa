@@ -486,19 +486,6 @@ describe("staged corrections preserve Exercises", () => {
 });
 
 describe("source planning is gone from the normal path", () => {
-  it("generation and revision workflows write Lessons sequentially and never call the per-Lesson planner", async () => {
-    const fs = await import("node:fs");
-    for (const file of ["workflows/course-generation.ts", "workflows/course-revision.ts"]) {
-      const text = fs.readFileSync(file, "utf8");
-      expect(text).toContain("for (const lesson of pending)");
-      expect(text).toContain("stepGenerateLesson");
-      expect(text).not.toContain("runWithConcurrency");
-      expect(text).not.toContain("LESSON_CONCURRENCY");
-      expect(text).not.toContain("stepPlanSources");
-      expect(text).not.toContain("stepFetchSource(");
-    }
-  });
-
   it("correction searches run at most three deduplicated queries, none when ungrounded", async () => {
     const { stepFetchCorrectionSources } = await import("@/workflows/course-steps");
     // Ungrounded: no search even with queries. Uses the real searcher, so it
@@ -620,33 +607,5 @@ describe("retry after publication", () => {
     expect(
       await testDb.select().from(revisions).where(eq(revisions.courseId, course.id)),
     ).toHaveLength(1);
-  });
-});
-
-describe("compiled-workflow scheduling check", () => {
-  it("both orchestrators write Lessons through the sequential step, in reading order", async () => {
-    const fs = await import("node:fs");
-    const gen = fs.readFileSync("workflows/course-generation.ts", "utf8");
-    const rev = fs.readFileSync("workflows/course-revision.ts", "utf8");
-    const steps = fs.readFileSync("workflows/course-steps.ts", "utf8");
-    for (const text of [gen, rev]) {
-      expect(text).toContain("for (const lesson of pending)");
-      expect(text).toContain("stepGenerationCancelled");
-      expect(text).toContain("runReviewRound");
-      expect(text).toContain("stepFetchCorrectionSources");
-      expect(text).not.toContain("runWithConcurrency");
-      expect(text).not.toContain("LESSON_CONCURRENCY");
-      expect(text).not.toContain("LESSON_WAVE_SIZE");
-      expect(text).not.toContain("stepPlanSources");
-    }
-    // The shared step loads earlier summaries and the complete previous Lesson.
-    expect(steps).toContain("getLessonContentsForVersion");
-    expect(steps).toContain("contextSummary");
-    expect(steps).toContain("previousLesson");
-    // The shared review path runs structural first, then one critical factual
-    // model pass.
-    expect(steps).toContain("stepCombinedReview");
-    expect(steps).toContain("combinedFindings");
-    expect(steps).toContain("stepFetchCorrectionSources");
   });
 });

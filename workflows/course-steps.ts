@@ -187,36 +187,22 @@ export async function stepGenerateLesson(
   const { db } = await loadDb();
   const { generateLesson } = await loadGenerate();
   const { getLessonContentsForVersion, saveLessonContent } = await loadDbLessons();
+  const { lessonGenerationContext } = await loadLessonContext();
   const { generationModel } = await loadModel();
 
   // Sequential generation sees every earlier Lesson context summary and the
   // complete immediately previous Lesson, so it continues what exists.
   // The Lesson, its successor, and the Source pool all derive from the
   // context, so callers pass no stale snapshots.
-  const order = context.outline.data.modules.flatMap((m) => m.lessons);
-  const current = order.findIndex((l) => l.id === lessonId);
-  if (current < 0) throw new Error(`The Outline has no Lesson "${lessonId}".`);
-  const lesson = order[current];
-  const nextLesson = order[current + 1] ?? null;
-  const sources = context.sources;
   const written = await getLessonContentsForVersion(db, context.course.id, context.outline.version);
-  const byId = new Map(written.map((lesson) => [lesson.lessonId, lesson]));
-  const priorLessons = order.slice(0, current).map((l) => {
-    const content = byId.get(l.id);
-    if (!content) throw new Error(`Earlier Lesson "${l.title}" has no content.`);
-    return { title: l.title, contextSummary: content.contextSummary };
-  });
-  const previousLesson = current > 0 ? byId.get(order[current - 1].id) : undefined;
+  const lessonContext = lessonGenerationContext(context.outline.data, lessonId, written);
 
   const content = await withModelFailurePolicy(() =>
     generateLesson(generationModel(), {
       course: context.course,
       spec: context.spec,
-      lesson,
-      nextLesson,
-      priorLessons,
-      previousLesson,
-      sources,
+      ...lessonContext,
+      sources: context.sources,
     }),
   );
   await saveLessonContent(db, context.course.id, context.outline.version, runId, content);
@@ -253,10 +239,12 @@ export async function stepStructuralReview(
   "use step";
   const { db } = await loadDb();
   const { structuralFindings } = await loadReview();
-  const { loadGenerationContext, getLessonContentsForVersion } = await loadDbLessons();
-
-  const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
-  const lessonContents = await getLessonContentsForVersion(db, courseId, outlineVersion);
+  const { loadCourseCandidate } = await loadDbLessons();
+  const { context, lessons: lessonContents } = (await loadCourseCandidate(
+    db,
+    courseId,
+    outlineVersion,
+  ))!;
   return structuralFindings({
     spec: context.spec,
     outline: context.outline.data,
@@ -275,10 +263,12 @@ export async function stepCombinedReview(
   const { db } = await loadDb();
   const { combinedFindings } = await loadReview();
   const { generationModel } = await loadModel();
-  const { loadGenerationContext, getLessonContentsForVersion } = await loadDbLessons();
-
-  const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
-  const lessonContents = await getLessonContentsForVersion(db, courseId, outlineVersion);
+  const { loadCourseCandidate } = await loadDbLessons();
+  const { context, lessons: lessonContents } = (await loadCourseCandidate(
+    db,
+    courseId,
+    outlineVersion,
+  ))!;
   return withModelFailurePolicy(() =>
     combinedFindings(
       generationModel(),
@@ -362,30 +352,22 @@ export async function stepCorrectLesson(
   "use step";
   const { db } = await loadDb();
   const { generationModel } = await loadModel();
-  const { loadGenerationContext, getLessonContentsForVersion, saveLessonContent } =
-    await loadDbLessons();
-
-  const context = (await loadGenerationContext(db, courseId, outlineVersion))!;
-  const all = await getLessonContentsForVersion(db, courseId, outlineVersion);
-  const current = all.find((l) => l.lessonId === lessonRef);
+  const { loadCourseCandidate, saveLessonContent } = await loadDbLessons();
+  const { context, lessons: all } = (await loadCourseCandidate(db, courseId, outlineVersion))!;
+  const { lessonCorrectionContext } = await loadLessonContext();
+  const relatedRefs = findings.flatMap((finding) => finding.relatedLessonRefs ?? []);
+  const { current, otherLessons } = lessonCorrectionContext(
+    context.outline.data,
+    lessonRef,
+    relatedRefs,
+    all,
+  );
   if (!current) return;
 
   const { correctLesson } = await loadReview();
 
   // Every other Lesson contributes its summary. A Lesson named by the same
   // finding also contributes its complete current content.
-  const order = context.outline.data.modules.flatMap((m) => m.lessons);
-  const namedRefs = new Set(findings.flatMap((finding) => finding.relatedLessonRefs ?? []));
-  const prior = order
-    .filter((l) => l.id !== lessonRef)
-    .map((l) => {
-      const content = all.find((x) => x.lessonId === l.id);
-      return {
-        title: l.title,
-        contextSummary: content?.contextSummary ?? "",
-        fullContent: namedRefs.has(l.id) ? content : undefined,
-      };
-    });
   const proseFindings = findings.filter((finding) => finding.kind !== "summary");
   const corrected = proseFindings.length
     ? await withModelFailurePolicy(() =>
@@ -399,7 +381,7 @@ export async function stepCorrectLesson(
           context.spec,
           current,
           proseFindings as Parameters<typeof correctLesson>[4],
-          prior,
+          otherLessons,
           { preserveExercise: options?.preserveExercise, sources: context.sources },
         ),
       )

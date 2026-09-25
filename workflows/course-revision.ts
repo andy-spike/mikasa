@@ -1,29 +1,16 @@
 // Step args cross process boundaries as JSON, so providers resolve inside each step.
 import type { GenerationContext } from "@/lib/db/lessons";
-import { MAX_CORRECTION_ROUNDS, dedupeCorrectionQueries } from "@/lib/course/review-policy";
 import {
   ensureValidSpec,
-  groupFindingsByLesson,
-  resolveReviewResumePoint,
-  runReviewRound,
   stepEmbedFragments,
   stepFailGeneration,
-  stepFetchCorrectionSources,
-  stepFinish,
-  stepFinishReviewRun,
-  stepFailReview,
-  stepGenerateLesson,
   stepGenerationCancelled,
   stepLoadContext,
   stepMarkStep,
-  stepMarkCorrected,
-  stepCorrectLesson,
-  stepOpenReviewRun,
-  stepOrder,
   stepPublish,
   stepRecordExpandedTouched,
-  type ReviewFindingPayload,
 } from "./course-steps";
+import { reviewCourseCandidate, writeCourseLessons } from "./course-sequence";
 import { setModelStepRetryLimit, withModelFailurePolicy } from "./model-failure-policy";
 
 async function stepReconcileSpec(
@@ -142,103 +129,25 @@ export async function stageRevisionWorkflow(
     }
     const prepared = valid.context;
 
-    const order = await stepOrder(prepared);
-    await stepMarkStep(runId, "lessons");
+    const written = await writeCourseLessons(prepared, runId, false);
+    if (!written.ok) return written;
 
-    const already = new Set(prepared.written);
-    const pending = order.filter((l) => !already.has(l.id));
-
-    // One Lesson at a time, in reading order (ADR 0009), so rewritten
-    // Lessons continue from the Lessons that keep their prose.
-    for (const lesson of pending) {
-      if (await stepGenerationCancelled(runId)) {
-        return { ok: false as const, reason: "cancelled" };
-      }
-      await stepGenerateLesson(prepared, runId, lesson.id);
-    }
-
-    if (await stepGenerationCancelled(runId)) {
-      return { ok: false as const, reason: "cancelled" };
-    }
-
-    const finished = await stepFinish(courseId, outlineVersion, runId, false);
-    if (!finished.ok) {
-      return {
-        ok: false as const,
-        reason: "incomplete-candidate",
-        missing: finished.missing,
-      };
-    }
-
-    const resume = await resolveReviewResumePoint(courseId, outlineVersion);
-    if (resume.action === "done") {
+    const review = await reviewCourseCandidate(prepared, runId, {
+      kind: "revision",
+      regenerateLessonRefs,
+    });
+    if (review.state === "published") {
       await stepEmbedFragments(courseId, outlineVersion, runId, embedLessonRefs);
-      await stepMarkPlan(planId, "published", resume.revisionNumber);
-      return { ok: true as const, revisionNumber: resume.revisionNumber };
+      await stepMarkPlan(planId, "published", review.revisionNumber);
+      return { ok: true as const, revisionNumber: review.revisionNumber };
     }
-
-    let round = 0;
-    let reviewRunId: string;
-    let findings: ReviewFindingPayload[];
-    if (resume.action === "publish") {
-      reviewRunId = resume.reviewRunId;
-      findings = [];
-    } else {
-      await stepMarkStep(runId, "review");
-      reviewRunId = await stepOpenReviewRun(courseId, outlineVersion, false);
-      // Staged review sees the complete Course, not just regenerated Lessons.
-      findings = await runReviewRound(courseId, outlineVersion, reviewRunId, 0, runId);
-    }
-
+    if (review.state !== "ready") return { ok: false as const, reason: review.state };
     const regenerateSet = new Set(regenerateLessonRefs);
-    const correctedRefs = new Set<string>();
-
-    while (findings.length > 0 && round < MAX_CORRECTION_ROUNDS) {
-      round += 1;
-      if (await stepGenerationCancelled(runId)) {
-        return { ok: false as const, reason: "cancelled" };
-      }
-      await stepMarkStep(runId, `corrections:${round}`);
-
-      const queries = dedupeCorrectionQueries(findings);
-      if (queries.length > 0) {
-        await stepFetchCorrectionSources(courseId, prepared.course.grounding, queries);
-      }
-
-      const byLesson = groupFindingsByLesson(findings);
-      const entries = [...byLesson];
-      for (const [ref] of entries) correctedRefs.add(ref);
-      // One Lesson at a time: each correction step re-reads the candidate,
-      // so it sees what the previous corrections just changed and agrees
-      // with them. Parallel corrections of one shared example diverge.
-      for (const [lessonRef, lessonFindings] of entries) {
-        if (await stepGenerationCancelled(runId)) {
-          return { ok: false as const, reason: "cancelled" };
-        }
-        // Related unchanged Lessons get prose, worked-example, prompt, and
-        // bridge fixes only; their Exercises stay exactly as published.
-        const preserve = !regenerateSet.has(lessonRef);
-        await stepCorrectLesson(courseId, outlineVersion, runId, lessonRef, lessonFindings, {
-          preserveExercise: preserve,
-        });
-      }
-      await stepMarkCorrected(reviewRunId, round - 1);
-
-      findings = await runReviewRound(courseId, outlineVersion, reviewRunId, round, runId);
-    }
-
-    if (findings.length > 0) {
-      const message = `The review still finds ${findings.length} problem(s) after ${MAX_CORRECTION_ROUNDS} correction rounds. The revision was not published; the current Course is unchanged.`;
-      await stepFailReview(courseId, reviewRunId, message, false);
-      return { ok: false as const, reason: "review-failed" };
-    }
-
-    await stepFinishReviewRun(reviewRunId);
 
     // Corrections that reached beyond the plan expand the touched set and
     // the embedding set; the base Completion snapshot stays for Undo.
-    const extra = [...correctedRefs].filter((r) => !regenerateSet.has(r));
-    const expandedEmbed = [...new Set([...embedLessonRefs, ...correctedRefs])];
+    const extra = review.correctedRefs.filter((ref) => !regenerateSet.has(ref));
+    const expandedEmbed = [...new Set([...embedLessonRefs, ...review.correctedRefs])];
     if (extra.length > 0) {
       await stepRecordExpandedTouched(planId, extra);
     }
@@ -259,7 +168,7 @@ export async function stageRevisionWorkflow(
     const published = await stepPublish(
       courseId,
       outlineVersion,
-      reviewRunId,
+      review.reviewRunId,
       runId,
       baseRevisionNumber,
     );

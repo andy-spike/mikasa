@@ -5,6 +5,53 @@ import { lessonContextSummarySchema, type LessonContent } from "./content";
 import { languageName } from "./prompt-blocks";
 import { GenerationError } from "./specification";
 import { generateStructuredStage } from "./structured-generation";
+import type { OutlineData } from "./types";
+
+export function lessonGenerationContext(
+  outline: OutlineData,
+  lessonId: string,
+  written: LessonContent[],
+) {
+  const order = outline.modules.flatMap((module) => module.lessons);
+  const current = order.findIndex((lesson) => lesson.id === lessonId);
+  if (current < 0) throw new Error(`The Outline has no Lesson "${lessonId}".`);
+  const byId = new Map(written.map((lesson) => [lesson.lessonId, lesson]));
+  const priorLessons = order.slice(0, current).map((lesson) => {
+    const content = byId.get(lesson.id);
+    if (!content) throw new Error(`Earlier Lesson "${lesson.title}" has no content.`);
+    return { title: lesson.title, contextSummary: content.contextSummary };
+  });
+  return {
+    lesson: order[current],
+    nextLesson: order[current + 1] ?? null,
+    priorLessons,
+    previousLesson: current > 0 ? byId.get(order[current - 1].id) : undefined,
+  };
+}
+
+export function lessonCorrectionContext(
+  outline: OutlineData,
+  lessonRef: string,
+  relatedLessonRefs: string[],
+  written: LessonContent[],
+) {
+  const byId = new Map(written.map((lesson) => [lesson.lessonId, lesson]));
+  const related = new Set(relatedLessonRefs);
+  return {
+    current: byId.get(lessonRef),
+    otherLessons: outline.modules
+      .flatMap((module) => module.lessons)
+      .filter((lesson) => lesson.id !== lessonRef)
+      .map((lesson) => {
+        const content = byId.get(lesson.id);
+        return {
+          title: lesson.title,
+          contextSummary: content?.contextSummary ?? "",
+          fullContent: related.has(lesson.id) ? content : undefined,
+        };
+      }),
+  };
+}
 
 const summaryResponseSchema = z.object({ contextSummary: z.string() });
 

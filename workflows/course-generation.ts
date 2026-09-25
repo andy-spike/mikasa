@@ -1,26 +1,14 @@
 // Step args cross process boundaries as JSON, so providers resolve inside each step.
-import { MAX_CORRECTION_ROUNDS, dedupeCorrectionQueries } from "@/lib/course/review-policy";
 import {
   ensureValidSpec,
-  groupFindingsByLesson,
   resolveReviewResumePoint,
-  runReviewRound,
   stepEmbedFragments,
   stepFailGeneration,
-  stepFetchCorrectionSources,
-  stepFinish,
-  stepFinishReviewRun,
-  stepFailReview,
-  stepGenerateLesson,
   stepGenerationCancelled,
   stepMarkStep,
-  stepMarkCorrected,
-  stepCorrectLesson,
-  stepOpenReviewRun,
-  stepOrder,
   stepPublish,
-  type ReviewFindingPayload,
 } from "./course-steps";
+import { reviewCourseCandidate, writeCourseLessons } from "./course-sequence";
 
 export async function generateCourseWorkflow(
   courseId: string,
@@ -59,97 +47,24 @@ export async function generateCourseWorkflow(
     }
     const activeContext = valid.context;
 
-    const order = await stepOrder(activeContext);
-    await stepMarkStep(runId, "lessons");
-
-    // One Lesson at a time, in reading order: earlier summaries and the
-    // complete previous Lesson carry established scaffolding forward.
-    const alreadyWritten = new Set(activeContext.written);
-    const pending = order.filter((l) => !alreadyWritten.has(l.id));
-
-    for (const lesson of pending) {
-      if (await stepGenerationCancelled(runId)) {
-        return { ok: false as const, reason: "cancelled" };
-      }
-      await stepGenerateLesson(activeContext, runId, lesson.id);
-    }
+    const written = await writeCourseLessons(activeContext, runId, true);
+    if (!written.ok) return written;
 
     if (await stepGenerationCancelled(runId)) {
       return { ok: false as const, reason: "cancelled" };
     }
-    const finished = await stepFinish(courseId, outlineVersion, runId, true);
-    if (!finished.ok) {
-      return {
-        ok: false as const,
-        reason: "incomplete-candidate",
-        missing: finished.missing,
-      };
-    }
-
-    if (await stepGenerationCancelled(runId)) {
-      return { ok: false as const, reason: "cancelled" };
-    }
-    const resume = await resolveReviewResumePoint(courseId, outlineVersion);
-    if (resume.action === "done") {
+    const review = await reviewCourseCandidate(activeContext, runId, { kind: "initial" });
+    if (review.state === "published") {
       await stepEmbedFragments(courseId, outlineVersion, runId);
-      return { ok: true as const, revisionNumber: resume.revisionNumber };
+      return { ok: true as const, revisionNumber: review.revisionNumber };
     }
-
-    let reviewRunId: string;
-    let findings: ReviewFindingPayload[];
-    if (resume.action === "publish") {
-      reviewRunId = resume.reviewRunId;
-      findings = [];
-    } else {
-      await stepMarkStep(runId, "review");
-      reviewRunId = await stepOpenReviewRun(courseId, outlineVersion, true);
-      findings = await runReviewRound(courseId, outlineVersion, reviewRunId, 0, runId);
-    }
-
-    let round = 0;
-    while (findings.length > 0 && round < MAX_CORRECTION_ROUNDS) {
-      round += 1;
-      if (await stepGenerationCancelled(runId)) {
-        return { ok: false as const, reason: "cancelled" };
-      }
-      await stepMarkStep(runId, `corrections:${round}`);
-
-      // Correction searches obey Grounding and the query cap: deduped
-      // factual sourceQuery values, at most three, in stable finding order.
-      const queries = dedupeCorrectionQueries(findings);
-      if (queries.length > 0) {
-        await stepFetchCorrectionSources(courseId, activeContext.course.grounding, queries);
-      }
-
-      const byLesson = groupFindingsByLesson(findings);
-      // One Lesson at a time: each correction step re-reads the candidate,
-      // so it sees what the previous corrections just changed and agrees
-      // with them. Parallel corrections of one shared example diverge.
-      for (const [lessonRef, lessonFindings] of byLesson) {
-        if (await stepGenerationCancelled(runId)) {
-          return { ok: false as const, reason: "cancelled" };
-        }
-        await stepCorrectLesson(courseId, outlineVersion, runId, lessonRef, lessonFindings);
-      }
-      // Findings count as corrected only after their writes succeeded.
-      await stepMarkCorrected(reviewRunId, round - 1);
-
-      findings = await runReviewRound(courseId, outlineVersion, reviewRunId, round, runId);
-    }
-
-    if (findings.length > 0) {
-      const message = `The review still finds ${findings.length} problem(s) after ${MAX_CORRECTION_ROUNDS} correction rounds. The Course was not published.`;
-      await stepFailReview(courseId, reviewRunId, message, true);
-      return { ok: false as const, reason: "review-failed" };
-    }
-
-    await stepFinishReviewRun(reviewRunId);
+    if (review.state !== "ready") return { ok: false as const, reason: review.state };
 
     if (await stepGenerationCancelled(runId)) {
       return { ok: false as const, reason: "cancelled" };
     }
     await stepMarkStep(runId, "publish");
-    const published = await stepPublish(courseId, outlineVersion, reviewRunId, runId);
+    const published = await stepPublish(courseId, outlineVersion, review.reviewRunId, runId);
     if (!published.ok) {
       // Review stays succeeded so a retry resumes at publication.
       await stepFailGeneration(courseId, runId, published.reason ?? "Publication failed.", true);

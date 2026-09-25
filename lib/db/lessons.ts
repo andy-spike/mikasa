@@ -72,6 +72,13 @@ export async function loadGenerationContext(
   };
 }
 
+export async function loadCourseCandidate(db: Db, courseId: string, outlineVersion: number) {
+  const context = await loadGenerationContext(db, courseId, outlineVersion);
+  if (!context) return undefined;
+  const lessons = await getLessonContentsForVersion(db, courseId, outlineVersion);
+  return { context, lessons };
+}
+
 export async function saveLessonContent(
   db: Db,
   courseId: string,
