@@ -45,7 +45,8 @@ Live model calls depend on provider availability and the OpenRouter budget. Pref
 - Dev and production each have 22 applied migrations. No schema change was needed.
 - Production Google sign-in, Course search, published Lesson reading, mobile Outline access, and Completion with Undo were verified in a real browser.
 - A production Tutor failure reproduced an upstream BaseTen rate limit. Enabling provider fallback returned a successful answer through CoreWeave. The structured-output smoke check also passed with no provider capability gaps.
-- Pricing purchase controls, Google sign-in error feedback, page recovery, Outline semantics, and command palette semantics were corrected on local `main`.
-- The corrections still need deployment and a final production Tutor and Tailor check before the live interview demo is ready.
+- Pricing purchase controls, Google sign-in error feedback, page recovery, Outline semantics, and command palette semantics were corrected and deployed from `main` in commit `f91ffff`.
+- After deployment, the production Tutor completed a real answer. The Tailor prepared a reviewable Lesson rename Change plan. The demo proposal was discarded, and the published Course stayed unchanged.
+- The production New Course form loads and shows validation feedback for an empty submission. A new full Course generation was not run during this check.
 
-Automated accessibility checks found no violations on the landing page, Courses index, or the new missing-page screen. The existing Workspace had landmark defects corrected locally. Automated contrast checks on textured backgrounds and code syntax require manual review.
+Automated accessibility checks found no violations on the landing page, Courses index, Settings, new missing-page screen, or deployed Workspace. The deployed Workspace landmark defects are resolved. Code text flagged for manual review has a minimum contrast ratio of 4.69:1 against its Paper background. Automated contrast checks on textured backgrounds still need manual review.
