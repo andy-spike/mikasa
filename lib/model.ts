@@ -36,11 +36,11 @@ function openrouter() {
 }
 
 // Nitro sorts the eligible endpoints by throughput. The allowlist keeps
-// routing within the four providers selected for Course generation.
+// routing and fallback within the four providers selected for Course generation.
 export const GLM_FLASH_ROUTE: OpenRouterChatSettings = {
   provider: {
     only: ["coreweave", "together", "fireworks", "baseten"],
-    allow_fallbacks: false,
+    allow_fallbacks: true,
     require_parameters: true,
   },
 };

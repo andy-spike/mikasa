@@ -19,6 +19,9 @@ export function useGoogleSignIn() {
     setFailed(false);
     authClient.signIn
       .social({ provider: "google", callbackURL: "/courses" })
+      .then((result) => {
+        if (result.error) setFailed(true);
+      })
       .catch(() => setFailed(true))
       .finally(() => setSigningIn(false));
   }
@@ -27,7 +30,7 @@ export function useGoogleSignIn() {
 }
 
 export function MarketingHeader() {
-  const { signingIn, signIn } = useGoogleSignIn();
+  const { signingIn, failed, signIn } = useGoogleSignIn();
 
   return (
     <header className="fixed inset-x-0 top-0 z-30 border-b border-hair bg-canvas/80 backdrop-blur">
@@ -54,6 +57,7 @@ export function MarketingHeader() {
             variant="primary"
             onClick={signIn}
             disabled={signingIn}
+            aria-busy={signingIn || undefined}
             className="min-h-9 gap-2 px-4 py-1"
           >
             <GoogleMark className="block h-4 w-4" />
@@ -61,6 +65,14 @@ export function MarketingHeader() {
           </Button>
         </nav>
       </div>
+      {failed && (
+        <p
+          role="alert"
+          className="border-t border-hair px-5 py-3 text-center text-[0.8125rem] text-bad"
+        >
+          Could not start Google sign-in. Please try again.
+        </p>
+      )}
     </header>
   );
 }

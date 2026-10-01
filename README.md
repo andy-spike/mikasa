@@ -4,6 +4,8 @@ Mikasa builds a complete Course for one Topic and Goal. A Learner approves the O
 
 Domain terms (Learner, Tutor, Tailor, Change plan) are defined in `CONTEXT.md`. Product rules live in `PRODUCT.md`, the interface direction in `DESIGN.md`, and architecture decisions in `docs/adr/`.
 
+For the production demo, see the [interview walkthrough and readiness checks](docs/interview-demo.md).
+
 ## Stack
 
 Next.js (App Router), React, TypeScript, Tailwind. Postgres on Neon with Drizzle. Better Auth with Google OAuth. All model calls run through the AI SDK on OpenRouter. Durable course generation runs on Vercel Workflows. Web search uses Firecrawl.

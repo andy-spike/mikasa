@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarketingFooter, MarketingHeader } from "@/components/marketing-chrome";
@@ -10,11 +9,8 @@ import "../landing.css";
 export const metadata: Metadata = {
   title: "Pricing · Mikasa",
   description:
-    "Credits pay for Course creation, Tutor answers, and Tailor changes. Subscribe monthly or buy a credit pack. Credits never expire.",
+    "Preview Mikasa's planned pricing. Subscriptions and credit packs are not available yet.",
 };
-
-// ponytail: placeholder until the payments branch lands its checkout route.
-const checkoutHref = (plan: string) => `/checkout?plan=${plan}`;
 
 const monthly = [
   "The lowest rate: $1 for every 100 credits.",
@@ -86,6 +82,10 @@ export default function Pricing() {
             Credits pay for every Course, Tutor answer, and Tailor change. Subscribe for the best
             rate, or buy a pack when you need one.
           </p>
+          <p role="note" className="mt-5 max-w-[36rem] text-[0.9375rem] leading-[1.66] text-fg-2">
+            Planned pricing. Billing and credit purchases are not available in this prototype. The
+            estimates below describe the planned credit system.
+          </p>
         </section>
 
         <section aria-labelledby="monthly-title" className="pb-20 sm:pb-24">
@@ -120,12 +120,8 @@ export default function Pricing() {
                   </li>
                 ))}
               </ul>
-              <Button
-                variant="hero"
-                render={<Link href={checkoutHref("monthly")} />}
-                className="min-h-11 self-start"
-              >
-                Subscribe
+              <Button variant="hero" disabled className="min-h-11 self-start">
+                Subscription not available yet
               </Button>
             </div>
           </Reveal>
@@ -154,8 +150,8 @@ export default function Pricing() {
                       {pack.rate}
                     </span>
                   </span>
-                  <Button variant="primary" render={<Link href={checkoutHref(pack.id)} />}>
-                    Buy
+                  <Button variant="primary" disabled>
+                    Unavailable
                     <span className="sr-only"> {pack.credits}</span>
                   </Button>
                 </li>

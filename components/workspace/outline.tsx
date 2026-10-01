@@ -80,6 +80,7 @@ export function Outline({
       side="left"
       collapsible="icon"
       reserveSpace={false}
+      role="navigation"
       aria-label="Outline"
       className="border-hair duration-160 ease-expo"
     >
